@@ -53,7 +53,8 @@ export function GameTable({
   const DirectionIcon = clockwise ? RotateCw : RotateCcw;
 
   return (
-    <div className="relative h-full w-full">
+    // `isolate` keeps every z-index on the table below page-level popups.
+    <div className="relative isolate h-full w-full">
       {/* rail */}
       <div className="table-rail absolute inset-x-[5%] inset-y-[9%] rounded-[50%] p-[clamp(12px,2.2vmin,22px)]">
         {/* felt */}

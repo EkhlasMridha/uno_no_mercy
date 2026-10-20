@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import type { ActiveBanner } from '../../hooks/useEventBanners';
 
 const TONE: Record<ActiveBanner['tone'], string> = {
@@ -9,7 +10,7 @@ const TONE: Record<ActiveBanner['tone'], string> = {
 
 export function EventBanner({ banner }: { banner: ActiveBanner | null }) {
   if (!banner) return null;
-  return (
+  return createPortal(
     <div
       key={banner.key}
       aria-hidden
@@ -19,6 +20,7 @@ export function EventBanner({ banner }: { banner: ActiveBanner | null }) {
       {banner.subtitle && (
         <p className="mt-1 text-sm font-semibold sm:text-base">{banner.subtitle}</p>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

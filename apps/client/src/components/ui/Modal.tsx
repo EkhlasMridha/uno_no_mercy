@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -23,7 +24,8 @@ export function Modal({ title, children, onClose, dismissible = true, wide = fal
     return () => window.removeEventListener('keydown', onKey);
   }, [dismissible, onClose]);
 
-  return (
+  // Rendered at the end of <body> so no stacking context on the page (the table, the hand) can cover it.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center">
       <div
         ref={dialogRef}
@@ -43,6 +45,7 @@ export function Modal({ title, children, onClose, dismissible = true, wide = fal
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

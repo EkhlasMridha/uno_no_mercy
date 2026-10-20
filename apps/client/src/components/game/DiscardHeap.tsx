@@ -26,6 +26,8 @@ interface Placement {
 function place(
   entry: PlayedCardEntry,
   index: number,
+  /** Position within the visible heap (0 = oldest shown), used as its stacking order. */
+  depth: number,
   isTop: boolean,
   angle: number | null,
 ): Placement {
@@ -59,7 +61,7 @@ function place(
     index,
     style: {
       transform: `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${rot}deg)`,
-      zIndex: index,
+      zIndex: depth,
     },
     toss,
   };
@@ -76,7 +78,13 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
   const placements = history
     .slice(start)
     .map((entry, i) =>
-      place(entry, start + i, start + i === last, entry.playerId ? angleOf(entry.playerId) : null),
+      place(
+        entry,
+        start + i,
+        i,
+        start + i === last,
+        entry.playerId ? angleOf(entry.playerId) : null,
+      ),
     );
   const top = history[last];
   const thrower = top.playerId ? name(top.playerId) : null;
@@ -87,7 +95,7 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
       onClick={onShowPlayed}
       aria-live="polite"
       aria-label={`Top card: ${cardName(top.card)}${thrower ? `, played by ${thrower}` : ''}. Show all played cards`}
-      className="group relative h-48 w-56 rounded-[40%] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72"
+      className="group relative isolate h-48 w-56 rounded-[40%] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72"
     >
       <ColorGlow color={view.currentColor} />
       {placements.map((p) => (
