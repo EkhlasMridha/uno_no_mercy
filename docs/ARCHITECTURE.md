@@ -125,7 +125,7 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                         |
 | `game:request-state`         | `{}`                                                                 | resends this player's projection                            |
 | `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                  |
-| `game:draw`                  | `{ commandId, version }`                                             | draw until playable                                         |
+| `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette    |
 | `game:accept-penalty`        | `{ commandId, version }`                                             | take the whole stack                                        |
 | `game:choose-roulette-color` | `{ commandId, version, color }`                                      | roulette victim only                                        |
 | `game:call-uno`              | `{ commandId }`                                                      |                                                             |
