@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { ArrowRightLeft, Ban, Dices, Layers, Users } from 'lucide-react';
+import { ArrowRightLeft, Ban, Dices, Layers, MoveHorizontal, RefreshCw, Users } from 'lucide-react';
 import { colorOf, type Card, type CardColor } from '@nomercy/shared';
 import { cardName, COLOR_BG, COLOR_INK, COLOR_RING } from '../../lib/cards';
 
@@ -52,8 +52,17 @@ function Symbol({
   const iconSize = corner ? s.cornerIcon : s.icon;
   const stroke = corner ? 3 : 2.75;
   switch (card.kind) {
-    case 'number':
-      return card.value;
+    case 'number': {
+      // Printed corner hint for the hand-moving numbers: 0 passes hands, 7 swaps them.
+      if (!corner || (card.value !== 0 && card.value !== 7)) return card.value;
+      const Hint = card.value === 0 ? RefreshCw : MoveHorizontal;
+      return (
+        <span className="flex flex-col items-center gap-px">
+          {card.value}
+          <Hint size={iconSize} strokeWidth={stroke} aria-hidden />
+        </span>
+      );
+    }
     case 'skip':
       return <Ban size={iconSize} strokeWidth={stroke} aria-hidden />;
     case 'reverse':
