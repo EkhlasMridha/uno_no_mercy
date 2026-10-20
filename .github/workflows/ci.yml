@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+      - name: Dev server boots and the home page renders
+        run: |
+          npm run dev > dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:3000/api/health && curl -fs http://localhost:5173/ > /dev/null && break
+            sleep 2
+          done
+          timeout 90 google-chrome --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+            --dump-dom http://localhost:5173/ > dom.html
+          grep -q 'Create a room' dom.html || { cat dev.log; exit 1; }
