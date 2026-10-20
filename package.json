@@ -1,0 +1,38 @@
+{
+  "name": "no-mercy-lan",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LAN-only real-time multiplayer card game inspired by UNO Show 'em No Mercy",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/client"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @nomercy/shared",
+    "dev": "npm run build:shared && concurrently -k -n shared,server,client -c gray,cyan,magenta \"npm run dev -w @nomercy/shared\" \"npm run dev -w @nomercy/server\" \"npm run dev -w @nomercy/client\"",
+    "dev:lan": "npm run build:shared && concurrently -k -n shared,server,client -c gray,cyan,magenta \"npm run dev -w @nomercy/shared\" \"npm run dev:lan -w @nomercy/server\" \"npm run dev:lan -w @nomercy/client\"",
+    "build": "npm run build -w @nomercy/shared && npm run build -w @nomercy/server && npm run build -w @nomercy/client",
+    "start": "npm run start -w @nomercy/server",
+    "start:lan": "npm run start:lan -w @nomercy/server",
+    "test": "npm run build:shared && npm run test -w @nomercy/server",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.15.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3",
+    "typescript": "~5.6.3",
+    "typescript-eslint": "^8.15.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

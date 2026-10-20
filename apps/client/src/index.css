@@ -1,0 +1,246 @@
+@import '@fontsource/lilita-one/400.css';
+@import '@fontsource-variable/bricolage-grotesque';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  /* one lamp hangs over the table; the room falls off into shadow */
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255, 196, 120, 0.13) 0%, transparent 70%),
+    radial-gradient(ellipse at 50% 50%, #2a1b16 0%, #17100d 70%), #17100d;
+  background-attachment: fixed;
+  color: #f2e8da;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold transition
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-brass text-room shadow-lg shadow-black/40 hover:brightness-110 active:brightness-95;
+  }
+  .btn-secondary {
+    @apply btn bg-chalk/10 text-chalk ring-1 ring-chalk/15 hover:bg-chalk/15;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-chalk/80 hover:bg-chalk/10 hover:text-chalk;
+  }
+  .panel {
+    @apply rounded-2xl bg-felt-900/90 ring-1 ring-walnut-light/25 backdrop-blur;
+  }
+  /* walnut rail with a brass inlay where it meets the felt */
+  .table-rail {
+    background:
+      repeating-linear-gradient(
+        104deg,
+        rgba(0, 0, 0, 0.09) 0 2px,
+        transparent 2px 9px,
+        rgba(255, 220, 170, 0.04) 9px 11px,
+        transparent 11px 17px
+      ),
+      radial-gradient(ellipse at 50% 30%, #8c5b37 0%, #5b3722 55%, #3a2214 100%);
+    box-shadow:
+      0 40px 80px -20px rgba(0, 0, 0, 0.85),
+      0 12px 30px rgba(0, 0, 0, 0.5),
+      inset 0 2px 1px rgba(255, 225, 180, 0.25),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.5);
+  }
+  .table-felt {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse 65% 60% at 50% 46%, #643060 0%, #4b2347 45%, #2c1430 100%);
+    box-shadow:
+      0 0 0 2px #d0a650,
+      0 0 0 4px rgba(58, 34, 20, 0.9),
+      inset 0 10px 28px rgba(0, 0, 0, 0.55),
+      inset 0 0 60px rgba(0, 0, 0, 0.35);
+  }
+  .input {
+    @apply w-full rounded-xl bg-felt-950/70 px-4 py-3 text-white ring-1 ring-white/15 placeholder:text-white/35
+      focus:outline-none focus:ring-2 focus:ring-accent;
+  }
+  .card-symbol-text {
+    paint-order: stroke fill;
+    -webkit-text-stroke: 3px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ---- animations (purely cosmetic; never gate game state) ---- */
+@keyframes card-in {
+  from {
+    transform: translateY(48px) scale(0.7) rotate(-18deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes draw-in {
+  from {
+    transform: translateY(-36px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes banner-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -50%) scale(1.06);
+    opacity: 1;
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0;
+  }
+}
+@keyframes turn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(208, 166, 80, 0.95),
+      0 0 14px 3px rgba(231, 200, 134, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(231, 200, 134, 1),
+      0 0 28px 8px rgba(231, 200, 134, 0.55);
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+@keyframes count-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes slow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* a card thrown from a seat lands on the heap */
+@keyframes toss {
+  from {
+    transform: translate(var(--tx, 0), var(--ty, 0)) rotate(var(--tr, 0deg)) scale(0.85);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes track-flow {
+  to {
+    stroke-dashoffset: -2;
+  }
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.anim-card-in {
+  animation: card-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.anim-draw-in {
+  animation: draw-in 320ms ease-out both;
+}
+.anim-banner {
+  animation: banner-pop 1700ms ease-out both;
+}
+.anim-turn {
+  animation: turn-pulse 1.6s ease-in-out infinite;
+}
+.anim-shake {
+  animation: shake 360ms ease-in-out;
+}
+.anim-bump {
+  animation: count-bump 420ms ease-out;
+}
+.anim-spin-slow {
+  animation: slow-spin 6s linear infinite;
+}
+.anim-toss {
+  animation: toss 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.anim-track {
+  animation: track-flow 1.4s linear infinite;
+}
+.anim-toast {
+  animation: toast-in 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .anim-banner {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* thin scrollbars for the hand / feed */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(242, 232, 218, 0.2) transparent;
+}
