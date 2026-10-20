@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -20,6 +24,13 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+      - name: Production server serves and renders the client
+        run: |
+          node apps/server/dist/index.js --port 4000 > prod.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://localhost:4000/api/health && break; sleep 1; done
+          timeout 90 google-chrome --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
+            --dump-dom http://localhost:4000/ > prod.html
+          grep -q 'Create a room' prod.html || { cat prod.log; exit 1; }
       - name: Dev server boots and the home page renders
         run: |
           npm run dev > dev.log 2>&1 &
@@ -30,3 +41,13 @@ jobs:
           timeout 90 google-chrome --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
             --dump-dom http://localhost:5173/ > dom.html
           grep -q 'Create a room' dom.html || { cat dev.log; exit 1; }
+      - name: Two players can create, join and start a game
+        run: timeout 120 node scripts/e2e-two-players.mjs || { cat dev.log; exit 1; }
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
