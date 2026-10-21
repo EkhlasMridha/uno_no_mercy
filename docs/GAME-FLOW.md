@@ -26,7 +26,8 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
    - Colored 7 with more cards left: the client asks for a swap target first.
    - The client then sends one `game:play-card` with everything included.
 3. The server validates and applies the command, increments the version, and broadcasts new projections.
-   Clients animate the change; animations never hold up or alter the state.
+   Clients animate the change; animations never hold up or alter the state. A 7 or a 0 shows each hand
+   sliding face down from its old owner's seat to its new one, with a caption naming who swapped.
 4. The player may press **Draw** (or the draw pile) at any time on their turn, one card per press. From then
    on only the card drawn last is playable, if it matches. The player can play it or keep drawing; each new
    draw locks the previous one.

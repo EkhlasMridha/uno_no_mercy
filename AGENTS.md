@@ -211,7 +211,8 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
   as well as on desktop.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
-  the turn pulse. No decorative entrance animations.
+  hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
+  `handsPassed.passes` pairs the server sends), the turn pulse. No decorative entrance animations.
 
 ## Copy and voice
 

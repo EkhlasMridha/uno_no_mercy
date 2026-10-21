@@ -80,21 +80,9 @@ export interface BannerSpec {
   tone: 'danger' | 'info' | 'success' | 'warning';
 }
 
-/** Big center-screen banner for dramatic events. Cosmetic only. */
+/** Big center-screen banner for dramatic events. Cosmetic only. Swaps and passes play out on the table instead. */
 export function bannerFor(event: GameEvent, name: NameLookup): BannerSpec | null {
   switch (event.type) {
-    case 'handsSwapped':
-      return {
-        title: 'Hands swapped!',
-        subtitle: `${name(event.playerId)} ⇄ ${name(event.targetId)}`,
-        tone: 'info',
-      };
-    case 'handsPassed':
-      return {
-        title: 'Pass your hand!',
-        subtitle: event.direction === 1 ? 'Clockwise' : 'Counterclockwise',
-        tone: 'info',
-      };
     case 'playerEliminated':
       return {
         title: event.reason === 'mercy' ? 'No mercy!' : 'Player left',

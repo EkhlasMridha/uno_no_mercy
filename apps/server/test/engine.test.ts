@@ -468,6 +468,13 @@ describe('7 swap and 0 pass', () => {
     const s = play(s0, 0);
     expect(s.players.map((p) => p.hand.length)).toEqual([4, 0, 1, 3]);
     expect(s.currentIndex).toBe(2);
+    expect(s.log.find((e) => e.event.type === 'handsPassed')?.event).toMatchObject({
+      passes: [
+        { fromId: pid(0), toId: pid(2) },
+        { fromId: pid(2), toId: pid(3) },
+        { fromId: pid(3), toId: pid(0) },
+      ],
+    });
   });
 });
 
