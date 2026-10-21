@@ -72,13 +72,19 @@ export function RulesPanel({ onClose }: { onClose: () => void }) {
           </p>
         </section>
         <section className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-white/5 p-3">
-            <h3 className="mb-1 font-semibold text-white">7 — Swap</h3>
-            <p>Swap your whole hand with another player of your choice. Mandatory.</p>
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+            <PlayingCard card={sample({ kind: 'number', color: 'yellow', value: 7 })} size="sm" />
+            <div>
+              <h3 className="mb-1 font-semibold text-white">7 — Swap</h3>
+              <p>Swap your whole hand with another player of your choice. Mandatory.</p>
+            </div>
           </div>
-          <div className="rounded-xl bg-white/5 p-3">
-            <h3 className="mb-1 font-semibold text-white">0 — Pass</h3>
-            <p>Everyone passes their hand to the next player in the current direction.</p>
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+            <PlayingCard card={sample({ kind: 'number', color: 'blue', value: 0 })} size="sm" />
+            <div>
+              <h3 className="mb-1 font-semibold text-white">0 — Pass</h3>
+              <p>Everyone passes their hand to the next player in the current direction.</p>
+            </div>
           </div>
           <div className="rounded-xl bg-white/5 p-3">
             <h3 className="mb-1 font-semibold text-white">Mercy Rule</h3>
