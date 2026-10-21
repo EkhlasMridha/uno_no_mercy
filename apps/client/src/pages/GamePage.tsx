@@ -13,6 +13,7 @@ import { EventBanner } from '../components/game/EventBanner';
 import { EventFeed } from '../components/game/EventFeed';
 import { GameTable } from '../components/game/GameTable';
 import { PlayerHand } from '../components/game/PlayerHand';
+import { SoundSettings } from '../components/SoundSettings';
 import { ColorPickerModal } from '../components/modals/ColorPickerModal';
 import { DiscardChoiceModal } from '../components/modals/DiscardChoiceModal';
 import { GameOverModal } from '../components/modals/GameOverModal';
@@ -21,6 +22,7 @@ import { RulesPanel } from '../components/modals/RulesPanel';
 import { SwapTargetModal } from '../components/modals/SwapTargetModal';
 import { Modal } from '../components/ui/Modal';
 import { useEventBanners } from '../hooks/useEventBanners';
+import { useGameSounds } from '../hooks/useGameSounds';
 import { cardName, COLOR_LABEL } from '../lib/cards';
 import { nameLookup } from '../lib/event-text';
 import {
@@ -71,6 +73,12 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  useGameSounds(
+    view,
+    meId,
+    !finished && (isMyTurn || actions.canChooseRouletteColor),
+    game.version,
+  );
 
   const send = async (
     card: Card,
@@ -182,6 +190,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           >
             <Layers size={16} /> <span className="hidden sm:inline">Played</span>
           </button>
+          <SoundSettings className="btn-ghost px-2.5 py-1.5 text-sm" />
           <button
             type="button"
             className="btn-ghost px-2.5 py-1.5 text-sm"

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { GameStateView, RoomView, SessionInfo } from '@nomercy/shared';
+import type { SoundKind, SoundPrefs } from '../lib/sound';
+import { loadSoundPrefs, saveSoundPrefs } from '../net/session-storage';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -17,6 +19,8 @@ export interface AppState {
   /** True while trying to restore a seat after a refresh or network drop. */
   restoring: boolean;
   notices: Notice[];
+  /** Which game sounds are on. Saved per browser. */
+  sound: SoundPrefs;
 }
 
 /** Client-side view cache. The server stays authoritative; this only mirrors what it sent. */
@@ -27,6 +31,7 @@ let state: AppState = {
   game: null,
   restoring: false,
   notices: [],
+  sound: loadSoundPrefs(),
 };
 const listeners = new Set<() => void>();
 
@@ -58,4 +63,9 @@ export function pushNotice(kind: Notice['kind'], text: string, durationMs = 4000
 
 export function dismissNotice(id: number): void {
   setState((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
+}
+
+export function setSoundPref(kind: SoundKind, on: boolean): void {
+  setState((s) => ({ sound: { ...s.sound, [kind]: on } }));
+  saveSoundPrefs(state.sound);
 }

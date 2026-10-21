@@ -173,5 +173,5 @@ Differences from the suggested list: the wild color and the 7 swap target travel
 ## No-persistence policy
 
 Rooms, sessions, card instances, game states, reconnect tokens and match scores live only in memory. The
-browser stores only the reconnect credential (`sessionStorage`) and the last-used display name
-(`localStorage`, a convenience). There is no authoritative state in the browser.
+browser stores only the reconnect credential (`sessionStorage`), and the last-used display name and
+sound settings (`localStorage`, conveniences). There is no authoritative state in the browser.

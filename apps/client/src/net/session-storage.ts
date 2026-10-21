@@ -1,4 +1,5 @@
 import type { SessionInfo } from '@nomercy/shared';
+import type { SoundPrefs } from '../lib/sound';
 
 /**
  * The reconnect token is kept in sessionStorage (per tab, survives refresh) so a refresh
@@ -46,6 +47,24 @@ export function loadName(): string {
 export function saveName(name: string): void {
   try {
     localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* ignore */
+  }
+}
+
+const SOUND_KEY = 'nomercy.sound.v1';
+const DEFAULT_SOUND: SoundPrefs = { turnReminder: true, handExchange: true, win: true };
+export function loadSoundPrefs(): SoundPrefs {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SOUND_KEY) ?? '{}') as Partial<SoundPrefs>;
+    return { ...DEFAULT_SOUND, ...saved };
+  } catch {
+    return DEFAULT_SOUND;
+  }
+}
+export function saveSoundPrefs(prefs: SoundPrefs): void {
+  try {
+    localStorage.setItem(SOUND_KEY, JSON.stringify(prefs));
   } catch {
     /* ignore */
   }
