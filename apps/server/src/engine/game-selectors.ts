@@ -13,6 +13,7 @@ import { isActive, playerAt } from './turn-manager.js';
 
 export interface SeatPresence {
   connected: (playerId: string) => boolean;
+  isComputer: (playerId: string) => boolean;
   hostId: string;
 }
 
@@ -96,6 +97,7 @@ export function toPublicGameView(state: GameState, presence: SeatPresence): Publ
     connected: presence.connected(p.id),
     uno: p.uno,
     isHost: p.id === presence.hostId,
+    isComputer: presence.isComputer(p.id),
   }));
   return {
     players,

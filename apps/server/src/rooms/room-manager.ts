@@ -9,6 +9,7 @@ import {
 } from '@nomercy/shared';
 import { applyCommand, createGame, type GameCommand, type Rng } from '../engine/index.js';
 import { CommandCache } from '../net/command-cache.js';
+import { chooseComputerMove, computerNames } from './computer-player.js';
 import { scoreRound } from './match-scoring.js';
 import type { Room, RoomPlayer } from './room.types.js';
 import { generatePlayerId, generateReconnectToken, tokensMatch } from './session.js';
@@ -30,6 +31,8 @@ export interface RoomManagerOptions {
   checkInvariants: boolean;
   maxRooms?: number;
   now?: () => number;
+  /** Pause before a computer player moves, so people can follow the table. */
+  computerMoveDelayMs?: number;
   /** Called when a room changes outside a client request (e.g. a reconnect window expired). */
   onRoomUpdated: (room: Room) => void;
   onRoomClosed: (room: Room, reason: string) => void;
@@ -69,7 +72,8 @@ export class RoomManager {
     return player;
   }
 
-  createRoom(name: string, socketId: string, maxPlayers: number): JoinResult {
+  /** With `computers`, seats that many computer opponents and deals the first round at once. */
+  createRoom(name: string, socketId: string, maxPlayers: number, computers = 0): JoinResult {
     if (this.rooms.size >= (this.options.maxRooms ?? 50)) {
       throw new RoomError('ROOM_FULL', 'The server has reached its room limit');
     }
@@ -79,15 +83,20 @@ export class RoomManager {
       hostId: player.id,
       status: 'lobby',
       players: [player],
-      settings: { scoringEnabled: false, maxPlayers },
+      settings: { scoringEnabled: false, maxPlayers: computers > 0 ? computers + 1 : maxPlayers },
       game: null,
       roundNumber: 0,
       dealerIndex: this.options.rng(MAX_PLAYERS),
       lastResult: null,
       createdAt: this.now(),
+      computerTimer: null,
     };
     player.ready = true;
+    for (const computerName of computerNames(computers, name, this.options.rng)) {
+      room.players.push({ ...this.newPlayer(computerName, null), isComputer: true, ready: true });
+    }
     this.rooms.set(room.code, room);
+    if (computers > 0) this.beginRound(room);
     return { room, player };
   }
 
@@ -164,7 +173,9 @@ export class RoomManager {
     if (members.length < MIN_PLAYERS) {
       throw new RoomError('NOT_ENOUGH_PLAYERS', `At least ${MIN_PLAYERS} players are needed`);
     }
-    const notReady = members.filter((p) => p.id !== room.hostId && (!p.ready || !p.socketId));
+    const notReady = members.filter(
+      (p) => p.id !== room.hostId && (!p.ready || (!p.socketId && !p.isComputer)),
+    );
     if (notReady.length > 0) {
       throw new RoomError(
         'PLAYERS_NOT_READY',
@@ -181,7 +192,7 @@ export class RoomManager {
     const room = this.requireHost(code, playerId);
     if (room.status !== 'roundOver') throw new RoomError('INVALID_PHASE', 'The round is not over');
     room.players = room.players.filter((p) => !p.departed);
-    const connected = room.players.filter((p) => p.socketId);
+    const connected = room.players.filter((p) => p.socketId || p.isComputer);
     if (connected.length < MIN_PLAYERS) {
       throw new RoomError(
         'NOT_ENOUGH_PLAYERS',
@@ -202,7 +213,7 @@ export class RoomManager {
     room.roundNumber = 0;
     room.players = room.players.filter((p) => !p.departed);
     for (const p of room.players) {
-      p.ready = p.id === room.hostId;
+      p.ready = p.id === room.hostId || p.isComputer;
       p.score = 0;
     }
     return room;
@@ -232,6 +243,7 @@ export class RoomManager {
     if (!outcome.ok) throw new RoomError(outcome.error.code, outcome.error.message);
     room.game = outcome.state;
     if (room.game.phase.type === 'finished') this.finishRound(room);
+    this.scheduleComputers(room);
     return { room, version: room.game.version };
   }
 
@@ -270,6 +282,41 @@ export class RoomManager {
     room.game = state;
     room.status = 'inGame';
     room.lastResult = null;
+    this.scheduleComputers(room);
+  }
+
+  /** Queues the next computer move. Each move reschedules, until a human must act. */
+  private scheduleComputers(room: Room): void {
+    if (room.computerTimer || !room.players.some((p) => p.isComputer)) return;
+    const phase = room.game?.phase.type;
+    // Single-card draw streaks run faster than real decisions.
+    const delay =
+      (this.options.computerMoveDelayMs ?? 900) /
+      (phase === 'drawing' || phase === 'rouletteReveal' ? 2 : 1);
+    room.computerTimer = setTimeout(() => {
+      room.computerTimer = null;
+      this.runComputerMove(room);
+    }, delay);
+    room.computerTimer.unref?.();
+  }
+
+  private runComputerMove(room: Room): void {
+    const game = room.game;
+    if (!this.rooms.has(room.code) || room.status !== 'inGame' || !game) return;
+    for (const player of room.players) {
+      if (!player.isComputer || player.departed) continue;
+      const command = chooseComputerMove(game, player.id, this.options.rng);
+      if (!command) continue;
+      try {
+        this.executeGameCommand(room.code, player.id, command, null);
+      } catch (error) {
+        // A throw inside a timer would take the whole server down.
+        console.error(`[room ${room.code}] computer move failed`, error);
+        return;
+      }
+      this.options.onRoomUpdated(room);
+      return;
+    }
   }
 
   private finishRound(room: Room): void {
@@ -328,6 +375,7 @@ export class RoomManager {
         if (outcome.ok) {
           room.game = outcome.state;
           if (room.game.phase.type === 'finished') this.finishRound(room);
+          this.scheduleComputers(room);
         }
       }
     }
@@ -343,7 +391,8 @@ export class RoomManager {
     const host = room.players.find((p) => p.id === room.hostId && !p.departed);
     if (!force && host?.socketId) return;
     const candidate =
-      room.players.find((p) => !p.departed && p.socketId) ?? room.players.find((p) => !p.departed);
+      room.players.find((p) => !p.departed && p.socketId) ??
+      room.players.find((p) => !p.departed && !p.isComputer);
     if (candidate && (force || !host?.socketId)) {
       room.hostId = candidate.id;
       candidate.ready = true;
@@ -352,6 +401,8 @@ export class RoomManager {
 
   private closeRoom(room: Room, reason: string): void {
     for (const p of room.players) this.clearExpiry(p);
+    if (room.computerTimer) clearTimeout(room.computerTimer);
+    room.computerTimer = null;
     this.rooms.delete(room.code);
     this.options.onRoomClosed(room, reason);
   }
@@ -368,7 +419,7 @@ export class RoomManager {
     player.expiryTimer = null;
   }
 
-  private newPlayer(name: string, socketId: string): RoomPlayer {
+  private newPlayer(name: string, socketId: string | null): RoomPlayer {
     return {
       id: generatePlayerId(),
       name,
@@ -378,6 +429,7 @@ export class RoomManager {
       disconnectedAt: null,
       departed: false,
       score: 0,
+      isComputer: false,
       commandCache: new CommandCache(),
       expiryTimer: null,
     };

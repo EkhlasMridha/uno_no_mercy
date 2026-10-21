@@ -13,6 +13,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
+- **Play with computer** skips the lobby: the player picks 1–19 computer opponents, the server seats
+  them under generated names and deals the first round at once. Computers move by themselves after a
+  short pause; the player is the host for Next round and Back to lobby. The room closes when they leave.
 - Joining is only possible in the lobby. During a game, only reconnecting with a valid token is accepted.
 - Players who leave or time out during a game are marked _departed_ and removed when the next round starts
   or the room returns to the lobby.

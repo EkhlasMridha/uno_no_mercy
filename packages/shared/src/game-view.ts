@@ -88,6 +88,8 @@ export interface PublicPlayerView {
   connected: boolean;
   uno: UnoStatus;
   isHost: boolean;
+  /** A computer player run by the host server. */
+  isComputer: boolean;
 }
 
 /** One card that went onto the discard pile this round. `playerId` is null for the starting card. */

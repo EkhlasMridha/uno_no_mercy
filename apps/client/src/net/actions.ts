@@ -19,8 +19,9 @@ function report<T>(result: Ack<T>): Ack<T> {
 
 // ---- room ----
 
-export async function createRoom(name: string, maxPlayers: number) {
-  const result = await request('room:create', { name, maxPlayers });
+/** With `computers`, the server seats computer opponents and deals straight away. */
+export async function createRoom(name: string, maxPlayers: number, computers?: number) {
+  const result = await request('room:create', { name, maxPlayers, computers });
   if (result.ok) adoptSession(result.data);
   return report(result);
 }

@@ -9,6 +9,7 @@ import {
   type GameCommand,
   type GameState,
 } from '../src/engine/index.js';
+import { chooseComputerMove } from '../src/rooms/computer-player.js';
 import { scoreRound, cardPoints } from '../src/rooms/match-scoring.js';
 
 /** Picks a random legal command for some player, using only the server's valid-action projection. */
@@ -89,6 +90,38 @@ describe('randomized full games', () => {
       expect(scoreRound(state)?.winnerId).toBe(state.phase.winnerId);
     }
     expect(finishedByEmptyHand + finishedByLastStanding).toBe(120);
+  });
+});
+
+describe('computer players', () => {
+  it('finish every game legally when they fill the whole table', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const rng = seededRng(seed);
+      const playerCount = [2, 4, 6, MAX_PLAYERS][seed % 4]!;
+      const players = Array.from({ length: playerCount }, (_, i) => ({
+        id: `p_cpu${String(i).padStart(5, '0')}`,
+        name: `C${i}`,
+      }));
+      let { state } = createGame({ players, dealerIndex: seed, rng });
+      let steps = 0;
+      while (state.phase.type !== 'finished') {
+        // Every seat is asked, since UNO calls and catches come from players off turn.
+        const mover = state.players
+          .map((p) => ({ playerId: p.id, command: chooseComputerMove(state, p.id, rng) }))
+          .find((m) => m.command !== null);
+        expect(mover, `seed ${seed}: no computer move at version ${state.version}`).toBeDefined();
+        const outcome = applyCommand(state, mover!.playerId, mover!.command!, rng, {
+          checkInvariants: true,
+        });
+        if (!outcome.ok)
+          throw new Error(`seed ${seed}: ${outcome.error.code} ${outcome.error.message}`);
+        state = outcome.state;
+        steps++;
+        expect(steps).toBeLessThan(20_000);
+      }
+      assertCardConservation(state);
+      expect(state.phase.winnerId).not.toBeNull();
+    }
   });
 });
 

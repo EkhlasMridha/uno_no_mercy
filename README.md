@@ -2,6 +2,7 @@
 
 A real-time multiplayer card game for 2–6 players on a local network, built to the official rules of the
 168-card **UNO Show 'em No Mercy** base game. It uses original artwork and is not affiliated with Mattel.
+No one else around? **Play with computer** seats 1–19 computer opponents and deals you straight in.
 
 - React + TypeScript + Vite + Tailwind client
 - Node.js + Express + Socket.IO server with an authoritative, pure-TypeScript rules engine

@@ -12,6 +12,7 @@ export interface SocketServerOptions {
   rng: Rng;
   reconnectGraceMs: number;
   checkInvariants: boolean;
+  computerMoveDelayMs?: number;
   /** Allowed browser origins for cross-origin dev setups. Same-origin needs nothing. */
   corsOrigins?: string[];
 }
@@ -33,6 +34,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     rng: options.rng,
     reconnectGraceMs: options.reconnectGraceMs,
     checkInvariants: options.checkInvariants,
+    computerMoveDelayMs: options.computerMoveDelayMs,
     onRoomUpdated: (room) => broadcaster.room(room),
     onRoomClosed: (room, reason) => {
       console.info(`[room ${room.code}] closed: ${reason}`);

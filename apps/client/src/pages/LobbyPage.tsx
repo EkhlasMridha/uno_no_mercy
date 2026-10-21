@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { BookOpen, Check, Copy, Crown, DoorOpen, Play, Trophy, Users, WifiOff } from 'lucide-react';
+import {
+  Bot,
+  BookOpen,
+  Check,
+  Copy,
+  Crown,
+  DoorOpen,
+  Play,
+  Trophy,
+  Users,
+  WifiOff,
+} from 'lucide-react';
 import type { RoomView } from '@nomercy/shared';
 import { leaveRoom, setMaxPlayers, setReady, setScoring, startGame } from '../net/actions';
 import { RulesPanel } from '../components/modals/RulesPanel';
@@ -79,7 +90,11 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-felt-600 font-display text-lg">
-                {p.name.slice(0, 1).toUpperCase()}
+                {p.isComputer ? (
+                  <Bot size={18} aria-label="Computer" />
+                ) : (
+                  p.name.slice(0, 1).toUpperCase()
+                )}
               </span>
               <span className="flex-1 truncate">
                 {p.name} {p.id === meId && <span className="text-white/50">(you)</span>}
@@ -126,7 +141,7 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
           <PlayerCountInput
             value={room.maxPlayers}
             disabled={!isHost}
-            min={room.players.length}
+            min={Math.max(room.minPlayers, room.players.length)}
             onChange={(n) => void setMaxPlayers(n)}
           />
         </div>
