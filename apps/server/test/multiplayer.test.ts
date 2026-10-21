@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
+import { playerNameSchema } from '@nomercy/shared';
 import type {
   Ack,
   ClientToServerEvents,
@@ -251,6 +252,7 @@ describe('multiplayer over Socket.IO', () => {
     expect(computers).toHaveLength(3);
     expect(new Set([...computers.map((p) => p.name), 'Solo']).size).toBe(4);
     expect(computers.every((p) => p.connected && p.ready)).toBe(true);
+    expect(computers.every((p) => playerNameSchema.safeParse(p.name).success)).toBe(true);
 
     const computerIds = new Set(computers.map((p) => p.id));
     const computerMoved = () =>
