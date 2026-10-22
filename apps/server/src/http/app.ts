@@ -1,5 +1,6 @@
 import path from 'node:path';
-import express, { type ErrorRequestHandler, type Express } from 'express';
+import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express';
+import { createIndexPage } from './index-page.js';
 import { createRequestGuard, type RequestGuardOptions } from './request-guard.js';
 
 function httpStatusOf(error: unknown): number {
@@ -20,7 +21,7 @@ export function createHttpApp(
   app.disable('x-powered-by');
 
   app.use((req, res, next) => {
-    if (!guard.isAllowedHost(req.headers.host)) {
+    if (!guard.allowsHost(req)) {
       res.status(421).type('text/plain').send("Open the game by the host machine's IP address.");
       return;
     }
@@ -45,14 +46,18 @@ export function createHttpApp(
   });
 
   if (clientDist) {
+    const indexPage = createIndexPage(clientDist);
+    const sendIndex: RequestHandler = (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('html').send(indexPage(guard.publicOrigin(req)));
+    };
     app.use(
       '/assets',
       express.static(path.join(clientDist, 'assets'), { immutable: true, maxAge: '30d' }),
     );
+    app.get('/index.html', sendIndex);
     app.use(express.static(clientDist, { index: false, maxAge: 0 }));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(clientDist, 'index.html'));
-    });
+    app.get('*', sendIndex);
   } else {
     app.get('/', (_req, res) => {
       res

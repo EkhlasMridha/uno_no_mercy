@@ -6,11 +6,34 @@ export interface RequestGuardOptions {
   allowedHosts?: string[];
   /** Extra browser origins allowed to open the game socket (cross-origin dev setups). */
   corsOrigins?: string[];
+  /**
+   * Behind a reverse proxy: take the public host from X-Forwarded-Host and the player's address
+   * from X-Forwarded-For. Off by default, because any LAN client could forge those headers.
+   */
+  trustProxy?: boolean;
+  /** Told why a request was refused, so a misconfigured proxy shows up in the server log. */
+  onRefused?: (reason: string) => void;
 }
 
 /** The subset of an incoming request the guard reads. */
 export interface GuardedRequest {
-  headers: { host?: string; origin?: string };
+  headers: {
+    host?: string;
+    origin?: string;
+    'x-forwarded-host'?: string | string[];
+    'x-forwarded-for'?: string | string[];
+    'x-forwarded-proto'?: string | string[];
+  };
+  socket?: { remoteAddress?: string };
+}
+
+/** All comma-separated entries of a header that may be repeated, in order. */
+function headerEntries(value: string | string[] | undefined): string[] {
+  return [value ?? []]
+    .flat()
+    .flatMap((v) => v.split(','))
+    .map((v) => v.trim())
+    .filter(Boolean);
 }
 
 function hostnameOf(hostHeader: string): string {
@@ -33,6 +56,39 @@ function knownHostnames(allowedHosts: string[]): Set<string> {
 export function createRequestGuard(options: RequestGuardOptions = {}) {
   const hosts = knownHostnames(options.allowedHosts ?? []);
   const extraOrigins = new Set(options.corsOrigins ?? []);
+  const refused = (reason: string): false => {
+    options.onRefused?.(reason);
+    return false;
+  };
+
+  /**
+   * The host the player's browser asked for. A proxy's first X-Forwarded-Host entry is the one the
+   * browser used; the Host header then only names the proxy's upstream.
+   */
+  const publicHost = (req: GuardedRequest): string | undefined =>
+    (options.trustProxy ? headerEntries(req.headers['x-forwarded-host'])[0] : undefined) ??
+    req.headers.host;
+
+  /**
+   * The player's address. A proxy appends the address it saw to X-Forwarded-For, so only the last
+   * entry is trustworthy; earlier ones come from the client and can be forged.
+   */
+  const addressOf = (req: GuardedRequest): string => {
+    const forwarded = options.trustProxy ? headerEntries(req.headers['x-forwarded-for']) : [];
+    return clientAddress(forwarded[forwarded.length - 1] ?? req.socket?.remoteAddress);
+  };
+
+  /**
+   * The origin the player's browser used, such as `http://192.168.1.20:3000`. Only meaningful once
+   * `allowsHost` has passed. This server speaks plain HTTP, so HTTPS comes only from a trusted proxy.
+   */
+  const publicOrigin = (req: GuardedRequest): string => {
+    const forwardedProto = options.trustProxy
+      ? headerEntries(req.headers['x-forwarded-proto'])[0]?.toLowerCase()
+      : undefined;
+    const protocol = forwardedProto === 'https' ? 'https' : 'http';
+    return `${protocol}://${publicHost(req) ?? 'localhost'}`;
+  };
 
   /** True when the Host header names this machine by IP, localhost or a configured name. */
   const isAllowedHost = (hostHeader: string | undefined): boolean => {
@@ -56,12 +112,33 @@ export function createRequestGuard(options: RequestGuardOptions = {}) {
     }
   };
 
+  /** The host check for a request, reporting the hostname when it is refused. */
+  const allowsHost = (req: GuardedRequest): boolean => {
+    const host = publicHost(req);
+    if (isAllowedHost(host)) return true;
+    return refused(
+      `Refused a request for host "${host ?? ''}". If players open the game by this name, add it to ` +
+        'ALLOWED_HOSTS. Behind a reverse proxy, also set TRUST_PROXY=1 and forward X-Forwarded-Host.',
+    );
+  };
+
   return {
     isAllowedHost,
     isAllowedOrigin,
+    allowsHost,
+    addressOf,
+    publicOrigin,
     /** Both checks, for the Socket.IO handshake. */
-    allows: (req: GuardedRequest): boolean =>
-      isAllowedHost(req.headers.host) && isAllowedOrigin(req.headers.origin, req.headers.host),
+    allows: (req: GuardedRequest): boolean => {
+      if (!allowsHost(req)) return false;
+      const host = publicHost(req);
+      if (isAllowedOrigin(req.headers.origin, host)) return true;
+      return refused(
+        `Refused a game socket from origin "${req.headers.origin ?? ''}" for host "${host ?? ''}". ` +
+          'Behind a reverse proxy, set TRUST_PROXY=1 and forward X-Forwarded-Host $http_host ' +
+          '(with the port).',
+      );
+    },
   };
 }
 

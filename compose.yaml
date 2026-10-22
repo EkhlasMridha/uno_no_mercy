@@ -8,6 +8,9 @@ services:
       RECONNECT_GRACE_SECONDS: 120
       # Docker Desktop may show every player under one address: raise this if players are refused.
       MAX_CONNECTIONS_PER_IP: 32
+      # Behind nginx: trust its X-Forwarded-* headers and accept the public name (docs/LAN-SETUP.md).
+      # TRUST_PROXY: 1
+      # ALLOWED_HOSTS: uno.example.com
     restart: unless-stopped
     # The server only reads its own files and keeps everything in memory, so the container gets
     # no write access, no Linux capabilities and no way to gain privileges.

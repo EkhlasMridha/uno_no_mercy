@@ -13,7 +13,18 @@ function lanAddresses(): string[] {
 }
 
 const config = loadConfig();
-const app = createHttpApp(config.clientDist, { allowedHosts: config.allowedHosts });
+// Each distinct refusal is logged once (and only the first few), so a flood can't fill the log.
+const loggedRefusals = new Set<string>();
+const guardOptions = {
+  allowedHosts: config.allowedHosts,
+  trustProxy: config.trustProxy,
+  onRefused: (reason: string) => {
+    if (loggedRefusals.has(reason) || loggedRefusals.size >= 20) return;
+    loggedRefusals.add(reason);
+    console.warn(reason);
+  },
+};
+const app = createHttpApp(config.clientDist, guardOptions);
 const httpServer = createServer(app);
 // Slow or idle clients can't hold sockets open forever, and the total stays bounded.
 httpServer.headersTimeout = 10_000;
@@ -23,8 +34,8 @@ const { io, manager } = createSocketServer(httpServer, {
   rng: cryptoRng,
   reconnectGraceMs: config.reconnectGraceMs,
   checkInvariants: config.dev,
-  allowedHosts: config.allowedHosts,
   maxConnectionsPerIp: config.maxConnectionsPerIp,
+  ...guardOptions,
 });
 
 httpServer.on('error', (error: NodeJS.ErrnoException) => {
@@ -48,6 +59,9 @@ httpServer.listen(config.port, config.host, () => {
     console.info('  Only run LAN mode on trusted local networks.');
   } else {
     console.info('  LAN access is off. Use "npm run start:lan" so other devices can join.');
+  }
+  if (config.trustProxy) {
+    console.info('  Proxy:  trusting X-Forwarded-Host and X-Forwarded-For');
   }
   if (!config.clientDist) console.info('  Client bundle not found: serving API/socket only.');
   console.info('');

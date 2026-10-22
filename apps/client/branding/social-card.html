@@ -1,0 +1,235 @@
+<!doctype html>
+<!--
+  Source for public/social-card.jpg (1200 × 630), the link preview image.
+  To regenerate after editing, from the repo root:
+    msedge --headless --disable-gpu --hide-scrollbars --window-size=1200,630 ^
+      --screenshot=apps/client/public/social-card.jpg apps/client/branding/social-card.html
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      @font-face {
+        font-family: 'Lilita One';
+        src: url('../../../node_modules/@fontsource/lilita-one/files/lilita-one-latin-400-normal.woff2');
+      }
+      @font-face {
+        font-family: 'Bricolage';
+        font-weight: 200 800;
+        src: url('../../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2');
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        background: radial-gradient(120% 90% at 70% 50%, #2e201b 0%, #17100d 62%);
+        color: #f2e8da;
+        font-family: 'Bricolage', system-ui, sans-serif;
+      }
+      .rail {
+        position: absolute;
+        left: 560px;
+        top: -40px;
+        width: 860px;
+        height: 710px;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, #8c5b37 90%, #5b3722 96%, #3a2214 100%);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      }
+      .felt {
+        position: absolute;
+        inset: 34px;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, #5d2c58 0%, #4b2347 55%, #2c1430 100%);
+        box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+      }
+      .fan {
+        position: absolute;
+        left: 915px;
+        top: 420px;
+      }
+      .card {
+        position: absolute;
+        left: -85px;
+        top: -238px;
+        width: 170px;
+        height: 238px;
+        border: 9px solid #fff;
+        border-radius: 22px;
+        transform-origin: 50% 140%;
+        box-shadow:
+          0 18px 30px -10px rgba(0, 0, 0, 0.7),
+          0 4px 8px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+      }
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 12%;
+        border-radius: 50%;
+        background: #fff;
+        transform: rotate(28deg);
+      }
+      .card .face {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Lilita One', sans-serif;
+        font-size: 84px;
+        paint-order: stroke fill;
+        -webkit-text-stroke: 5px rgba(0, 0, 0, 0.3);
+      }
+      .card .corner {
+        position: absolute;
+        left: 9px;
+        top: 4px;
+        font-family: 'Lilita One', sans-serif;
+        font-size: 26px;
+        line-height: 1;
+        color: #fff;
+      }
+      .card .corner.flip {
+        left: auto;
+        top: auto;
+        right: 9px;
+        bottom: 4px;
+        transform: rotate(180deg);
+      }
+      .red {
+        background: #e5383b;
+        color: #a3161a;
+      }
+      .yellow {
+        background: #f4c20d;
+        color: #8a6a00;
+      }
+      .yellow .corner {
+        color: #17100d;
+      }
+      .green {
+        background: #22a559;
+        color: #11663a;
+      }
+      .blue {
+        background: #2f6fe0;
+        color: #1b46a0;
+      }
+      .wild {
+        background: #17151f;
+        color: #fff;
+      }
+      .wild::before {
+        background: conic-gradient(#e5383b 0 25%, #2f6fe0 0 50%, #f4c20d 0 75%, #22a559 0);
+      }
+      .wild .face {
+        font-size: 76px;
+        -webkit-text-stroke: 0;
+        text-shadow: 0 3px 3px rgba(0, 0, 0, 0.9);
+      }
+      .copy {
+        position: absolute;
+        left: 80px;
+        top: 0;
+        bottom: 0;
+        width: 560px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 26px;
+        font-weight: 600;
+        color: #e7c886;
+      }
+      .eyebrow::before {
+        content: '';
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: #d0a650;
+      }
+      h1 {
+        margin-top: 18px;
+        font-family: 'Lilita One', sans-serif;
+        font-weight: 400;
+        font-size: 112px;
+        line-height: 0.95;
+        letter-spacing: 0.5px;
+        text-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+      }
+      h1 span {
+        color: #d0a650;
+      }
+      p {
+        margin-top: 26px;
+        font-size: 30px;
+        line-height: 1.3;
+        font-weight: 500;
+        color: rgba(242, 232, 218, 0.86);
+      }
+      .chips {
+        margin-top: 34px;
+        display: flex;
+        gap: 12px;
+      }
+      .chip {
+        padding: 8px 16px;
+        white-space: nowrap;
+        border: 2px solid rgba(208, 166, 80, 0.55);
+        border-radius: 999px;
+        background: rgba(23, 16, 13, 0.6);
+        font-size: 20px;
+        font-weight: 600;
+        color: #f2e8da;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="rail"><div class="felt"></div></div>
+
+    <div class="fan">
+      <div class="card red" style="transform: rotate(-30deg)">
+        <span class="corner">7</span><span class="face">7</span><span class="corner flip">7</span>
+      </div>
+      <div class="card yellow" style="transform: rotate(-15deg)">
+        <span class="corner">0</span><span class="face">0</span><span class="corner flip">0</span>
+      </div>
+      <div class="card green" style="transform: rotate(0deg)">
+        <span class="corner">+4</span><span class="face">+4</span
+        ><span class="corner flip">+4</span>
+      </div>
+      <div class="card blue" style="transform: rotate(15deg)">
+        <span class="corner">+2</span><span class="face">+2</span
+        ><span class="corner flip">+2</span>
+      </div>
+      <div class="card wild" style="transform: rotate(30deg)">
+        <span class="corner">+10</span><span class="face">+10</span
+        ><span class="corner flip">+10</span>
+      </div>
+    </div>
+
+    <div class="copy">
+      <div class="eyebrow">Multiplayer card game</div>
+      <h1>No Mercy <span>LAN</span></h1>
+      <p>168 cards. Stack the draws, swap hands and survive the Mercy Rule.</p>
+      <div class="chips">
+        <span class="chip">2 to 20 players</span>
+        <span class="chip">Plays in the browser</span>
+        <span class="chip">No sign-up</span>
+      </div>
+    </div>
+  </body>
+</html>

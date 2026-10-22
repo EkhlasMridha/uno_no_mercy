@@ -15,6 +15,7 @@ import type {
   SessionInfo,
 } from '@nomercy/shared';
 import { createHttpApp } from '../src/http/app.js';
+import { createRequestGuard } from '../src/http/request-guard.js';
 import { createSocketServer } from '../src/net/socket-server.js';
 import { seededRng } from '../src/engine/index.js';
 
@@ -312,7 +313,12 @@ describe('network guard', () => {
 
   beforeAll(async () => {
     siteDir = mkdtempSync(path.join(tmpdir(), 'nomercy-site-'));
-    writeFileSync(path.join(siteDir, 'index.html'), '<!doctype html><title>t</title>');
+    writeFileSync(
+      path.join(siteDir, 'index.html'),
+      '<!doctype html><title>t</title>' +
+        '<meta property="og:image" content="/social-card.jpg" />' +
+        '<meta property="og:url" content="/" />',
+    );
     guarded = createServer(createHttpApp(siteDir));
     const { io } = createSocketServer(guarded, {
       rng: seededRng(7),
@@ -331,29 +337,9 @@ describe('network guard', () => {
     rmSync(siteDir, { recursive: true, force: true });
   });
 
-  /** Resolves 'connected' or the refusal message. */
-  const tryConnect = (headers: Record<string, string> = {}) =>
-    new Promise<{ outcome: string; socket: ClientSocket }>((resolve) => {
-      const socket: ClientSocket = connect(guardedUrl, {
-        transports: ['websocket'],
-        forceNew: true,
-        reconnection: false,
-        extraHeaders: headers,
-      });
-      socket.on('connect', () => resolve({ outcome: 'connected', socket }));
-      socket.on('connect_error', (error) => resolve({ outcome: error.message, socket }));
-    });
-
-  const get = (pathname: string, host: string) =>
-    new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const req = httpRequest(`${guardedUrl}${pathname}`, { headers: { host } }, (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
-      });
-      req.on('error', reject);
-      req.end();
-    });
+  const tryConnect = (headers: Record<string, string> = {}) => tryConnectTo(guardedUrl, headers);
+  const get = (pathname: string, host: string, headers: Record<string, string> = {}) =>
+    getFrom(guardedUrl, pathname, { ...headers, host });
 
   it('refuses game sockets opened from another website', async () => {
     const foreign = await tryConnect({ origin: 'http://evil.example' });
@@ -371,6 +357,16 @@ describe('network guard', () => {
     expect((await get('/api/health', 'localhost')).status).toBe(200);
     expect((await get('/api/health', 'rebind.evil.example')).status).toBe(421);
     expect((await get('/', 'rebind.evil.example')).body).not.toContain('<title>');
+  });
+
+  it('gives link previews absolute URLs on the host the page was opened from', async () => {
+    const host = new URL(guardedUrl).host;
+    for (const pathname of ['/', '/index.html', '/room/ABCD']) {
+      const page = await get(pathname, host);
+      expect(page.status).toBe(200);
+      expect(page.body).toContain(`content="http://${host}/social-card.jpg"`);
+      expect(page.body).toContain(`content="http://${host}/"`);
+    }
   });
 
   it('answers malformed requests without stack traces or file paths', async () => {
@@ -394,4 +390,133 @@ describe('network guard', () => {
     retry.socket.close();
     second.socket.close();
   });
+
+  it('ignores forwarded headers unless it is told it sits behind a proxy', async () => {
+    const forgedHost = await get('/api/health', 'rebind.evil.example', {
+      'x-forwarded-host': 'localhost',
+    });
+    expect(forgedHost.status).toBe(421);
+
+    await new Promise((r) => setTimeout(r, 100));
+    const first = await tryConnect({ 'x-forwarded-for': '10.0.0.1' });
+    const second = await tryConnect({ 'x-forwarded-for': '10.0.0.2' });
+    const third = await tryConnect({ 'x-forwarded-for': '10.0.0.3' });
+    expect(third.outcome).not.toBe('connected');
+    for (const s of [first, second, third]) s.socket.close();
+    await new Promise((r) => setTimeout(r, 100));
+  });
 });
+
+describe('behind a reverse proxy', () => {
+  let proxied: HttpServer;
+  let proxiedUrl: string;
+  let closeProxied: () => void;
+  const refusals: string[] = [];
+
+  beforeAll(async () => {
+    const guard = {
+      allowedHosts: ['game.example'],
+      trustProxy: true,
+      onRefused: (reason: string) => refusals.push(reason),
+    };
+    proxied = createServer(createHttpApp(null, guard));
+    const { io } = createSocketServer(proxied, {
+      rng: seededRng(8),
+      reconnectGraceMs: 60_000,
+      checkInvariants: true,
+      maxConnectionsPerIp: 1,
+      ...guard,
+    });
+    closeProxied = () => io.close();
+    await new Promise<void>((resolve) => proxied.listen(0, '127.0.0.1', resolve));
+    proxiedUrl = `http://127.0.0.1:${(proxied.address() as AddressInfo).port}`;
+  });
+
+  afterAll(() => {
+    closeProxied();
+    proxied.close();
+  });
+
+  /** Headers nginx sends for a browser on https://game.example:8443 with the given address. */
+  const viaProxy = (playerAddress: string) => ({
+    origin: 'https://game.example:8443',
+    'x-forwarded-host': 'game.example:8443',
+    'x-forwarded-for': playerAddress,
+  });
+
+  it('accepts the public host the proxy forwards, not the upstream name', async () => {
+    const page = await getFrom(proxiedUrl, '/api/health', {
+      host: 'nomercy:3000',
+      'x-forwarded-host': 'game.example:8443',
+    });
+    expect(page.status).toBe(200);
+
+    const player = await tryConnectTo(proxiedUrl, viaProxy('192.168.1.20'));
+    expect(player.outcome).toBe('connected');
+    player.socket.close();
+  });
+
+  it('still refuses unknown hosts and foreign origins, and says why', async () => {
+    const rebind = await getFrom(proxiedUrl, '/api/health', {
+      'x-forwarded-host': 'rebind.evil.example',
+    });
+    expect(rebind.status).toBe(421);
+    expect(refusals.some((r) => r.includes('"rebind.evil.example"'))).toBe(true);
+
+    const foreign = await tryConnectTo(proxiedUrl, {
+      ...viaProxy('192.168.1.21'),
+      origin: 'https://evil.example',
+    });
+    expect(foreign.outcome).not.toBe('connected');
+    foreign.socket.close();
+    expect(refusals.some((r) => r.includes('"https://evil.example"'))).toBe(true);
+  });
+
+  it('builds the public origin from the forwarded host and scheme', () => {
+    const behindProxy = createRequestGuard({ trustProxy: true });
+    const headers = { host: 'nomercy:3000', 'x-forwarded-host': 'game.example:8443' };
+    expect(
+      behindProxy.publicOrigin({ headers: { ...headers, 'x-forwarded-proto': 'https' } }),
+    ).toBe('https://game.example:8443');
+    expect(behindProxy.publicOrigin({ headers })).toBe('http://game.example:8443');
+    expect(
+      createRequestGuard().publicOrigin({ headers: { ...headers, 'x-forwarded-proto': 'https' } }),
+    ).toBe('http://nomercy:3000');
+  });
+
+  it('caps sockets per player address, counting only the entry the proxy added', async () => {
+    const alice = await tryConnectTo(proxiedUrl, viaProxy('192.168.1.30'));
+    const bob = await tryConnectTo(proxiedUrl, viaProxy('192.168.1.31'));
+    expect([alice.outcome, bob.outcome]).toEqual(['connected', 'connected']);
+
+    const aliceAgain = await tryConnectTo(proxiedUrl, viaProxy('1.2.3.4, 192.168.1.30'));
+    expect(aliceAgain.outcome).not.toBe('connected');
+    for (const s of [alice, bob, aliceAgain]) s.socket.close();
+  });
+});
+
+/** Resolves 'connected' or the refusal message. */
+function tryConnectTo(url: string, headers: Record<string, string> = {}) {
+  return new Promise<{ outcome: string; socket: ClientSocket }>((resolve) => {
+    const socket: ClientSocket = connect(url, {
+      transports: ['websocket'],
+      forceNew: true,
+      reconnection: false,
+      extraHeaders: headers,
+    });
+    socket.on('connect', () => resolve({ outcome: 'connected', socket }));
+    socket.on('connect_error', (error) => resolve({ outcome: error.message, socket }));
+  });
+}
+
+function getFrom(url: string, pathname: string, headers: Record<string, string>) {
+  return new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const req = httpRequest(`${url}${pathname}`, { headers }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
