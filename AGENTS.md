@@ -62,7 +62,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
 7. **Validate every payload.** Each client event has a strict Zod schema in `packages/shared/src/schemas.ts`.
    Unknown keys are rejected. Commands never carry the actor's player id; the socket binding decides that.
 8. **Nothing persists.** No database, no cloud. The browser keeps only the reconnect token
-   (`sessionStorage`) and the last display name (`localStorage`).
+   (`sessionStorage`), and the last display name and sound settings (`localStorage`).
 
 ## Coding standards
 
@@ -117,6 +117,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
   every CSS animation and transition; motion started from script must check the media query itself).
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
+- Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files),
+  `useGameSounds` plays them only from state the server sent, and the Sound panel
+  (`SoundSettings.tsx`) switches each one off or mutes them all.
 
 ### Tests
 

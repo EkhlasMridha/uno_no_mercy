@@ -15,6 +15,7 @@ import type { RoomView } from '@nomercy/shared';
 import { leaveRoom, setMaxPlayers, setReady, setScoring, startGame } from '../net/actions';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayerCountInput } from '../components/PlayerCountInput';
+import { SoundSettings } from '../components/SoundSettings';
 
 export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
   const [copied, setCopied] = useState(false);
@@ -48,6 +49,7 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
       <header className="flex items-center justify-between gap-3">
         <h1 className="font-display text-3xl tracking-wide">Lobby</h1>
         <div className="flex gap-2">
+          <SoundSettings className="btn-ghost text-sm" />
           <button type="button" className="btn-ghost text-sm" onClick={() => setShowRules(true)}>
             <BookOpen size={16} /> Rules
           </button>
