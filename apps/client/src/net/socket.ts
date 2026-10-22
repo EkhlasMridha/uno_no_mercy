@@ -12,6 +12,8 @@ type AckOf<E extends EventName> = Parameters<Parameters<ClientToServerEvents[E]>
 export const socket: GameSocket = io({
   autoConnect: false,
   transports: ['websocket', 'polling'],
+  // A proxy that drops the WebSocket upgrade still works over long-polling.
+  tryAllTransports: true,
   reconnectionDelay: 500,
   reconnectionDelayMax: 3000,
 });

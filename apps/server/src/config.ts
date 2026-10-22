@@ -12,6 +12,8 @@ export interface ServerConfig {
   /** Hostnames accepted besides IPs, localhost and this machine's name (DNS-rebinding guard). */
   allowedHosts: string[];
   maxConnectionsPerIp: number;
+  /** Running behind a reverse proxy that sets X-Forwarded-Host and X-Forwarded-For. */
+  trustProxy: boolean;
 }
 
 function argValue(args: string[], name: string): string | undefined {
@@ -27,8 +29,9 @@ function argValue(args: string[], name: string): string | undefined {
  *   --host <addr>    explicit bind address (overrides --lan)
  *   --port <n>       port (default 3000)
  *   --dev            development mode (card-conservation checks on every move)
+ *   --trust-proxy    behind a reverse proxy: trust its X-Forwarded-Host and X-Forwarded-For
  * Env: HOST, PORT, RECONNECT_GRACE_SECONDS, CLIENT_DIST, ALLOWED_HOSTS (comma-separated),
- *      MAX_CONNECTIONS_PER_IP (default 32)
+ *      MAX_CONNECTIONS_PER_IP (default 32), TRUST_PROXY=1
  */
 export function loadConfig(args = process.argv.slice(2), env = process.env): ServerConfig {
   const lanMode = args.includes('--lan') || env.LAN === '1';
@@ -54,5 +57,6 @@ export function loadConfig(args = process.argv.slice(2), env = process.env): Ser
       .map((h) => h.trim())
       .filter(Boolean),
     maxConnectionsPerIp: Number.isInteger(perIp) && perIp > 0 ? perIp : 32,
+    trustProxy: args.includes('--trust-proxy') || ['1', 'true'].includes(env.TRUST_PROXY ?? ''),
   };
 }

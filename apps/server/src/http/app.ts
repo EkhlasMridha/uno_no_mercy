@@ -20,7 +20,7 @@ export function createHttpApp(
   app.disable('x-powered-by');
 
   app.use((req, res, next) => {
-    if (!guard.isAllowedHost(req.headers.host)) {
+    if (!guard.allowsHost(req)) {
       res.status(421).type('text/plain').send("Open the game by the host machine's IP address.");
       return;
     }

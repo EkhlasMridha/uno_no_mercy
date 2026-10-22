@@ -159,13 +159,16 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   are plain "Bad request" / "Server error" with no stack trace. All assets, including the font, are bundled
   locally. Headers must arrive within 10 s and a request within 30 s; the server holds at most 1,000 sockets.
 - **Host surface:** nothing a player sends reaches the file system, a shell, `eval` or a database. Static
-  files come only from the client bundle, through Express's traversal-safe `static`. The server never
-  trusts `X-Forwarded-For`.
+  files come only from the client bundle, through Express's traversal-safe `static`. The server ignores
+  `X-Forwarded-*` headers unless `TRUST_PROXY` is set for a reverse proxy; then it takes the public host
+  from the first `X-Forwarded-Host` entry and the player's address from the last `X-Forwarded-For` entry,
+  the only one the proxy itself added.
 - **Who may connect** (`http/request-guard.ts`): the `Host` header must be an IP address, `localhost`, this
   machine's name or a name in `ALLOWED_HOSTS`; anything else gets `421`, which defeats DNS-rebinding pages.
   The Socket.IO handshake also requires a same-origin `Origin` (WebSockets skip CORS, so without it any
   website a player visits could drive the game socket). One address may hold `MAX_CONNECTIONS_PER_IP`
-  sockets (default 32), so a single device can't fill the 50-room limit or exhaust memory.
+  sockets (default 32), so a single device can't fill the 50-room limit or exhaust memory. Each refusal is
+  logged once with its reason, so a misconfigured proxy is easy to spot.
 - **Container:** non-root user, read-only file system, every Linux capability dropped,
   `no-new-privileges`, 64 processes and 512 MB at most (`compose.yaml`). The image holds only `node`, one
   bundled server file and the static client.

@@ -1,6 +1,6 @@
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import { Server } from 'socket.io';
-import { clientAddress, createRequestGuard } from '../http/request-guard.js';
+import { createRequestGuard } from '../http/request-guard.js';
 import { RoomManager } from '../rooms/room-manager.js';
 import type { Rng } from '../engine/index.js';
 import { Broadcaster } from './broadcaster.js';
@@ -20,6 +20,10 @@ export interface SocketServerOptions {
   allowedHosts?: string[];
   /** Open game sockets one address may hold, so one device can't exhaust rooms or memory. */
   maxConnectionsPerIp?: number;
+  /** Behind a reverse proxy: read the public host and player address from X-Forwarded-*. */
+  trustProxy?: boolean;
+  /** Told why a handshake was refused. */
+  onRefused?: (reason: string) => void;
 }
 
 /** The parts of a raw Engine.IO connection used to count sockets per address. */
@@ -45,7 +49,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     // Called once per new connection handshake, before any game handler sees the socket.
     allowRequest: (req, callback) => {
       if (!guard.allows(req)) return callback('Forbidden origin', false);
-      const open = openPerIp.get(clientAddress(req.socket.remoteAddress)) ?? 0;
+      const open = openPerIp.get(guard.addressOf(req)) ?? 0;
       if (open >= maxPerIp) return callback('Too many connections from this device', false);
       callback(null, true);
     },
@@ -53,7 +57,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
   });
 
   io.engine.on('connection', (raw: EngineConnection) => {
-    const address = clientAddress(raw.request.socket.remoteAddress);
+    const address = guard.addressOf(raw.request);
     openPerIp.set(address, (openPerIp.get(address) ?? 0) + 1);
     raw.once('close', () => {
       const left = (openPerIp.get(address) ?? 1) - 1;
