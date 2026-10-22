@@ -15,3 +15,5 @@ export const ROOM_CODE_LENGTH = 5;
 /** Alphabet without easily confused characters (0/O, 1/I/L). */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const PLAYER_NAME_MAX_LENGTH = 20;
+/** Most computer players a room can seat. */
+export const MAX_COMPUTERS = 9;

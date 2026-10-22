@@ -5,6 +5,8 @@ export type Direction = 1 | -1;
 
 export type EliminationReason = 'mercy' | 'forfeit';
 export type WinReason = 'emptyHand' | 'lastStanding';
+/** How a round ended: a win, or every person at a table with computers was knocked out (no winner). */
+export type EndReason = WinReason | 'peopleOut';
 export type DrawReason = 'noPlayableCard' | 'penalty' | 'unoPenalty' | 'roulette';
 
 /**
@@ -77,7 +79,7 @@ export type GamePhaseView =
   | { type: 'rouletteColor'; victimId: string }
   /** The victim draws face-up cards one at a time until a card of `color` appears. */
   | { type: 'rouletteReveal'; victimId: string; color: CardColor; revealed: Card[] }
-  | { type: 'finished'; winnerId: string | null; reason: WinReason | null };
+  | { type: 'finished'; winnerId: string | null; reason: EndReason | null };
 
 export interface PublicPlayerView {
   id: string;

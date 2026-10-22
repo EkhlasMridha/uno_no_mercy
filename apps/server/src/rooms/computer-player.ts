@@ -34,11 +34,11 @@ const COMPUTER_NAMES = [
   'Lipi',
 ];
 
-/** Distinct auto-generated names for computer opponents, never the human's own name. */
-export function computerNames(count: number, takenName: string, rng: Rng): string[] {
-  const taken = takenName.toLocaleLowerCase();
+/** Distinct auto-generated names for computer opponents, never a name already at the table. */
+export function computerNames(count: number, takenNames: readonly string[], rng: Rng): string[] {
+  const taken = new Set(takenNames.map((n) => n.toLocaleLowerCase()));
   return shuffle(COMPUTER_NAMES, rng)
-    .filter((name) => name.toLocaleLowerCase() !== taken)
+    .filter((name) => !taken.has(name.toLocaleLowerCase()))
     .slice(0, count);
 }
 

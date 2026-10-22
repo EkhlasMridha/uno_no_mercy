@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CARD_COLORS, isWildCard, MAX_PLAYERS, type Card } from '@nomercy/shared';
+import { CARD_COLORS, isWildCard, MAX_COMPUTERS, MAX_PLAYERS, type Card } from '@nomercy/shared';
 import {
   applyCommand,
   assertCardConservation,
@@ -135,6 +135,38 @@ describe('computer players', () => {
     // Seat 1 could catch seat 2, but seat 2 saves itself first even though it sits later.
     const [first] = computerMoves(state, [PLAYER_IDS[1]!, PLAYER_IDS[2]!], seededRng(1));
     expect(first).toEqual({ playerId: PLAYER_IDS[2], command: { type: 'callUno' } });
+  });
+
+  it('fill open seats on start, end once the people are out, and leave in the lobby', () => {
+    const manager = new RoomManager({
+      rng: seededRng(5),
+      reconnectGraceMs: 60_000,
+      checkInvariants: true,
+      computerMoveDelayMs: 60_000,
+      onRoomUpdated: () => {},
+      onRoomClosed: () => {},
+    });
+    const { room, player: host } = manager.createRoom('Host', 'socket-1', 4);
+    const { player: guest } = manager.joinRoom(room.code, 'Guest', 'socket-2');
+    manager.setReady(room.code, guest.id, true);
+    manager.startGame(room.code, host.id, true);
+    expect(room.players.filter((p) => p.isComputer)).toHaveLength(2);
+    expect(new Set(room.players.map((p) => p.name)).size).toBe(4);
+
+    for (const person of [host, guest]) {
+      manager.executeGameCommand(room.code, person.id, { type: 'forfeit' }, null);
+    }
+    expect(room.status).toBe('roundOver');
+    expect(room.lastResult).toMatchObject({ winnerId: null, reason: 'peopleOut' });
+
+    manager.returnToLobby(room.code, host.id);
+    expect(room.players.map((p) => p.name)).toEqual(['Host', 'Guest']);
+
+    // A big room fills only up to the computer limit.
+    const { room: big, player: loner } = manager.createRoom('Loner', 'socket-3', MAX_PLAYERS);
+    manager.startGame(big.code, loner.id, true);
+    expect(big.players.filter((p) => p.isComputer)).toHaveLength(MAX_COMPUTERS);
+    manager.closeAll('done');
   });
 
   it('retry instead of freezing the table when a move is refused', () => {

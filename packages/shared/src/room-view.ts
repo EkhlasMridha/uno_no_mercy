@@ -1,4 +1,4 @@
-import type { WinReason } from './game-view.js';
+import type { EndReason } from './game-view.js';
 
 export type RoomStatus = 'lobby' | 'inGame' | 'roundOver';
 
@@ -25,7 +25,7 @@ export interface LobbyPlayerView {
 export interface RoundResultView {
   winnerId: string | null;
   winnerName: string | null;
-  reason: WinReason | null;
+  reason: EndReason | null;
   /** Points awarded this round (scoring mode only). */
   pointsAwarded: number;
   cardPoints: number;

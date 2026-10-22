@@ -237,7 +237,7 @@ describe('multiplayer over Socket.IO', () => {
     const tooMany = await emit(solo, 'room:create', {
       name: 'Solo',
       maxPlayers: 20,
-      computers: 20,
+      computers: 10,
     });
     expect(tooMany).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
 
@@ -286,5 +286,17 @@ describe('multiplayer over Socket.IO', () => {
       await new Promise((r) => setTimeout(r, 30));
     }
     expect(computerMoved()).toBe(true);
+  });
+
+  it('lets a lone host start by filling the open seats with computers', async () => {
+    const host = await newClient();
+    await emit(host, 'room:create', { name: 'Loner', maxPlayers: 3 });
+    const alone = await emit(host, 'game:start', {});
+    expect(alone).toMatchObject({ ok: false, error: { code: 'NOT_ENOUGH_PLAYERS' } });
+    const bad = await emit(host, 'game:start', { fillWithComputers: 'yes' });
+    expect(bad).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    expect((await emit(host, 'game:start', { fillWithComputers: true })).ok).toBe(true);
+    await until(() => host.room?.status === 'inGame');
+    expect(host.room!.players.filter((p) => p.isComputer)).toHaveLength(2);
   });
 });

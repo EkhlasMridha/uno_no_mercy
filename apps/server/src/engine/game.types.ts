@@ -6,7 +6,7 @@ import type {
   PendingDrawView,
   PlayedCardEntry,
   UnoStatus,
-  WinReason,
+  EndReason,
 } from '@nomercy/shared';
 import type { Card, CardColor } from './card.types.js';
 
@@ -34,7 +34,7 @@ export type EnginePhase =
    * Revealed cards go straight into their hand; `revealedIds` marks which ones are on show.
    */
   | { type: 'rouletteReveal'; victimId: string; color: CardColor; revealedIds: string[] }
-  | { type: 'finished'; winnerId: string | null; reason: WinReason | null };
+  | { type: 'finished'; winnerId: string | null; reason: EndReason | null };
 
 export type PendingDraw = PendingDrawView;
 
@@ -59,6 +59,8 @@ export interface GameState {
   logSeq: number;
   /** Every card played this round, oldest first (public; kept across reshuffles). */
   playHistory: PlayedCardEntry[];
+  /** When all of these players are out, the round ends with no winner. Empty: play to the end. */
+  endWhenOut: string[];
 }
 
 export type GameCommand =
