@@ -114,7 +114,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
 - Accessibility is part of done: real `<button>`s, `aria-label` on icon-only and card controls,
   `role="status"` + `aria-live` for turn and reveal messages, visible `focus-visible` outlines, and every
   animation disabled under `prefers-reduced-motion` (the global rule in `index.css` already does this for
-  `.anim-*` classes).
+  every CSS animation and transition; motion started from script must check the media query itself).
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files),

@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
+import { playerNameSchema } from '@nomercy/shared';
 import type {
   Ack,
   ClientToServerEvents,
@@ -34,6 +35,7 @@ beforeAll(async () => {
     rng: seededRng(99),
     reconnectGraceMs: 60_000,
     checkInvariants: true,
+    computerMoveDelayMs: 5,
   });
   closeServer = () => io.close();
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
@@ -228,5 +230,61 @@ describe('multiplayer over Socket.IO', () => {
     expect(shrink).toMatchObject({ ok: false, error: { code: 'ROOM_FULL' } });
     const notHost = await emit(second, 'room:settings', { maxPlayers: 6 });
     expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+  });
+
+  it('deals a solo player in against named computer players who take their turns', async () => {
+    const solo = await newClient();
+    const tooMany = await emit(solo, 'room:create', {
+      name: 'Solo',
+      maxPlayers: 20,
+      computers: 20,
+    });
+    expect(tooMany).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+
+    const created = await emit<SessionInfo>(solo, 'room:create', {
+      name: 'Solo',
+      maxPlayers: 4,
+      computers: 3,
+    });
+    expect(created.ok).toBe(true);
+    await until(() => solo.room?.status === 'inGame' && solo.game !== null);
+    const computers = solo.room!.players.filter((p) => p.isComputer);
+    expect(computers).toHaveLength(3);
+    expect(new Set([...computers.map((p) => p.name), 'Solo']).size).toBe(4);
+    expect(computers.every((p) => p.connected && p.ready)).toBe(true);
+    expect(computers.every((p) => playerNameSchema.safeParse(p.name).success)).toBe(true);
+
+    const computerIds = new Set(computers.map((p) => p.id));
+    const computerMoved = () =>
+      solo.game!.public.log.some((e) => 'playerId' in e.event && computerIds.has(e.event.playerId));
+    // Take the solo player's turns until a computer has acted on its own.
+    for (let i = 0; i < 50 && !computerMoved(); i++) {
+      const { me, version, public: table } = solo.game!;
+      const actions = me.validActions;
+      const card = me.hand.find((c) => c.id === actions.playableCardIds[0]);
+      if (card) {
+        await emit(solo, 'game:play-card', {
+          commandId: commandId(),
+          version,
+          cardId: card.id,
+          ...('color' in card ? {} : { color: 'red' }),
+          ...(card.kind === 'number' && card.value === 7
+            ? { swapTargetId: actions.swapTargetIds[0] }
+            : {}),
+        });
+      } else if (actions.canAcceptPenalty) {
+        await emit(solo, 'game:accept-penalty', { commandId: commandId(), version });
+      } else if (actions.canChooseRouletteColor) {
+        await emit(solo, 'game:choose-roulette-color', {
+          commandId: commandId(),
+          version,
+          color: 'red',
+        });
+      } else if (actions.canDraw && table.currentPlayerId === me.playerId) {
+        await emit(solo, 'game:draw', { commandId: commandId(), version });
+      }
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    expect(computerMoved()).toBe(true);
   });
 });
