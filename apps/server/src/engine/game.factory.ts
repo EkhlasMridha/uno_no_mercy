@@ -15,6 +15,8 @@ export interface CreateGameOptions {
   rng: Rng;
   /** Optional pre-built deck (top of draw pile = last element). Used by tests. */
   deck?: Card[];
+  /** Players whose knockout ends the round with no winner (the people at a table with computers). */
+  endWhenOut?: string[];
 }
 
 /**
@@ -72,6 +74,7 @@ export function createGame(options: CreateGameOptions): { state: GameState; even
     log: [],
     logSeq: 0,
     playHistory: [{ playerId: null, card: first, chosenColor: null }],
+    endWhenOut: options.endWhenOut ?? [],
   };
   const events: EventSink = [
     {

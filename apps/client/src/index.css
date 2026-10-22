@@ -148,6 +148,24 @@ body {
     transform: translateX(6px);
   }
 }
+/* the idle nudge: two hops in time with the turn reminder's knocks, pivoting on the card's foot */
+@keyframes nudge {
+  0%,
+  22%,
+  50%,
+  100% {
+    transform: none;
+  }
+  10% {
+    transform: translateY(-10px) rotate(-3deg);
+  }
+  34% {
+    transform: translateY(-7px) rotate(2.5deg);
+  }
+  62% {
+    transform: translateY(-2px);
+  }
+}
 @keyframes count-bump {
   0% {
     transform: scale(1);
@@ -209,6 +227,10 @@ body {
 .anim-shake {
   animation: shake 360ms ease-in-out;
 }
+.anim-nudge {
+  animation: nudge 600ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+  transform-origin: 50% 100%;
+}
 .anim-bump {
   animation: count-bump 420ms ease-out;
 }
@@ -239,8 +261,15 @@ body {
   }
 }
 
-/* thin scrollbars for the hand / feed */
+/* thin scrollbars for the feed and the roulette tray */
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(242, 232, 218, 0.2) transparent;
+}
+/* the hand still scrolls sideways by swipe, trackpad or keyboard, without a bar under the fan */
+.scroll-none {
+  scrollbar-width: none;
+}
+.scroll-none::-webkit-scrollbar {
+  display: none;
 }

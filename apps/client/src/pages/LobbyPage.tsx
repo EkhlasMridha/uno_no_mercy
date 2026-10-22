@@ -1,18 +1,8 @@
 import { useState } from 'react';
-import {
-  Bot,
-  BookOpen,
-  Check,
-  Copy,
-  Crown,
-  DoorOpen,
-  Play,
-  Trophy,
-  Users,
-  WifiOff,
-} from 'lucide-react';
+import { BookOpen, Check, Copy, Crown, DoorOpen, Play, Trophy, Users, WifiOff } from 'lucide-react';
 import type { RoomView } from '@nomercy/shared';
 import { leaveRoom, setMaxPlayers, setReady, setScoring, startGame } from '../net/actions';
+import { FillSeatsModal } from '../components/modals/FillSeatsModal';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayerCountInput } from '../components/PlayerCountInput';
 import { SoundSettings } from '../components/SoundSettings';
@@ -20,13 +10,15 @@ import { SoundSettings } from '../components/SoundSettings';
 export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
   const [copied, setCopied] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showFill, setShowFill] = useState(false);
   const me = room.players.find((p) => p.id === meId);
   const isHost = room.hostId === meId;
   const others = room.players.filter((p) => p.id !== room.hostId);
   const waitingFor = others.filter((p) => !p.ready || !p.connected);
   const enoughPlayers = room.players.length >= room.minPlayers;
-  const canStart = isHost && enoughPlayers && waitingFor.length === 0;
   const openSeats = Math.max(0, room.maxPlayers - room.players.length);
+  // Open seats can go to computers, so a host on their own can start too.
+  const canStart = isHost && waitingFor.length === 0 && (enoughPlayers || openSeats > 0);
 
   const copyCode = async () => {
     try {
@@ -38,11 +30,12 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
     }
   };
 
-  const startHint = !enoughPlayers
-    ? `Need at least ${room.minPlayers} players`
-    : waitingFor.length > 0
+  const startHint =
+    waitingFor.length > 0
       ? `Waiting for ${waitingFor.map((p) => p.name).join(', ')}`
-      : 'Everyone is ready!';
+      : !enoughPlayers
+        ? 'Start now and computers fill the empty seats'
+        : 'Everyone is ready!';
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-4 py-8">
@@ -91,13 +84,8 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
         <ul className="space-y-2">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-felt-600 font-display text-lg">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-felt-600 font-display text-lg">
                 {p.name.slice(0, 1).toUpperCase()}
-                {p.isComputer && (
-                  <span className="absolute -left-1 -top-1 flex h-[1.1rem] w-[1.1rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-felt-900">
-                    <Bot size={11} strokeWidth={2.5} aria-label="Computer" />
-                  </span>
-                )}
               </span>
               <span className="flex-1 truncate">
                 {p.name} {p.id === meId && <span className="text-white/50">(you)</span>}
@@ -174,7 +162,7 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
               type="button"
               className="btn-primary w-full py-3 text-lg"
               disabled={!canStart}
-              onClick={() => void startGame()}
+              onClick={() => (openSeats > 0 ? setShowFill(true) : void startGame())}
             >
               <Play size={20} /> Start game
             </button>
@@ -191,6 +179,7 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
         )}
       </section>
       {showRules && <RulesPanel onClose={() => setShowRules(false)} />}
+      {showFill && <FillSeatsModal room={room} meId={meId} onClose={() => setShowFill(false)} />}
     </main>
   );
 }

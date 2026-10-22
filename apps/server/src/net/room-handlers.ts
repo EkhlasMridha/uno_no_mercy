@@ -4,6 +4,7 @@ import {
   readySchema,
   reconnectSchema,
   roomSettingsSchema,
+  startGameSchema,
   type SessionInfo,
 } from '@nomercy/shared';
 import { z } from 'zod';
@@ -103,9 +104,9 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     return { ok: true, data: null };
   });
 
-  registerHandler(socket, limiter, 'game:start', emptySchema, () => {
+  registerHandler(socket, limiter, 'game:start', startGameSchema, ({ fillWithComputers }) => {
     const session = requireSession(socket);
-    const room = manager.startGame(session.roomCode, session.playerId);
+    const room = manager.startGame(session.roomCode, session.playerId, fillWithComputers);
     console.info(`[room ${room.code}] round ${room.roundNumber} started`);
     broadcaster.room(room);
     return { ok: true, data: null };

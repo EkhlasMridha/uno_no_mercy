@@ -114,13 +114,13 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 
 | Event                        | Payload                                                              | Notes                                                       |
 | ---------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `room:create`                | `{ name, maxPlayers, computers? }`                                   | returns `SessionInfo`; `computers` (1–19) deals at once     |
+| `room:create`                | `{ name, maxPlayers, computers? }`                                   | returns `SessionInfo`; `computers` (1–9) deals at once      |
 | `room:join`                  | `{ code, name }`                                                     | lobby only; max 6; unique names                             |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                     |
 | `room:ready`                 | `{ ready }`                                                          |                                                             |
 | `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                            |
-| `game:start`                 | `{}`                                                                 | host; ≥2 players; everyone else ready and connected         |
+| `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats    |
 | `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)         |
 | `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                         |
 | `game:request-state`         | `{}`                                                                 | resends this player's projection                            |
@@ -189,7 +189,11 @@ Differences from the suggested list: the wild color and the 7 swap target travel
 ## Computer players
 
 Computer seats are `RoomPlayer`s with `isComputer` and no socket, created by `room:create` with
-`computers`. They live in the rooms layer, not the engine. After every successful command and every new
+`computers`, or by `game:start` with `fillWithComputers`, which seats them in the open seats (at most
+`MAX_COMPUTERS`, 9, per room) before the deal. They leave when the room goes back to the lobby, so the
+lobby only ever shows people. They live in the rooms layer, not the engine; the engine only gets
+`endWhenOut`, the people's seats, and ends the round with no winner (`peopleOut`) once all of them are
+out. After every successful command and every new
 round, `RoomManager` sets one timer per room, but only when some computer has a move
 (`computerMoveDelayMs`, 900 ms by default, shorter on fuller tables and halved while a player is drawing
 card by card). When it fires, `computerMoves` in `rooms/computer-player.ts` picks each computer's move

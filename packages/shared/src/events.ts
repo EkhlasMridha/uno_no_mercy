@@ -13,6 +13,7 @@ import type {
   ReconnectPayload,
   RoomSettingsPayload,
   RouletteColorPayload,
+  StartGamePayload,
 } from './schemas.js';
 
 export interface CommandResult {
@@ -32,7 +33,7 @@ export interface ClientToServerEvents {
   'room:ready': (payload: ReadyPayload, ack: AckCallback<null>) => void;
   'room:settings': (payload: RoomSettingsPayload, ack: AckCallback<null>) => void;
   'room:return-lobby': (payload: Record<string, never>, ack: AckCallback<null>) => void;
-  'game:start': (payload: Record<string, never>, ack: AckCallback<null>) => void;
+  'game:start': (payload: StartGamePayload, ack: AckCallback<null>) => void;
   'game:restart': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'game:request-state': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'game:play-card': (payload: PlayCardPayload, ack: AckCallback<CommandResult>) => void;

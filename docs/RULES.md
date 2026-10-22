@@ -176,6 +176,9 @@ single card enters a hand: penalties, mandatory draws, roulette reveals and UNO 
 1. **Empty hand:** the moment you play your final card you win. This is checked **before** the card's
    effect, so a final +4 gives no penalty, and a final 7 or 0 swaps or passes nothing.
 2. **Last standing:** when only one active player remains, they win.
+3. **Tables with computers (house rule):** once every person at the table is knocked out, the round
+   ends at once with **no winner** and no points, so nobody watches the computers play on. If a single
+   computer is left, it still wins as last standing. Tables with only people are unaffected.
 
 ### 5.15 Optional scoring (official)
 

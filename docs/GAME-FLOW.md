@@ -5,7 +5,7 @@
 ```
 Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    │  guests toggle Ready; host may enable scoring
-                   │  host: Start (≥2 players, all others ready & connected)
+                   │  host: Start (all others ready & connected; open seats? fill with computers)
                    ▼
                  inGame ──(win)──► roundOver
                    ▲                 │ host: Next round ──► inGame (scores kept; reset after a match win)
@@ -13,9 +13,14 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
-- **Play with computer** skips the lobby: the player picks 1–19 computer opponents, the server seats
+- **Play with computer** skips the lobby: the player picks 1–9 computer opponents, the server seats
   them under generated names and deals the first round at once. Computers move by themselves after a
   short pause; the player is the host for Next round and Back to lobby. The room closes when they leave.
+- **Filling empty seats:** when the host presses Start with seats still open, a prompt shows the table
+  with computers in the open seats. "Add N computers and start" fills them (up to 9); "Start with N
+  players" starts as is (only with 2 or more people). A host on their own can start this way.
+- With computers at the table, the round ends with no winner once every person is knocked out.
+  Computers leave on Back to lobby, freeing their seats for people.
 - Joining is only possible in the lobby. During a game, only reconnecting with a valid token is accepted.
 - Players who leave or time out during a game are marked _departed_ and removed when the next round starts
   or the room returns to the lobby.

@@ -43,7 +43,9 @@ export const setScoring = async (scoringEnabled: boolean) =>
   report(await request('room:settings', { scoringEnabled }));
 export const setMaxPlayers = async (maxPlayers: number) =>
   report(await request('room:settings', { maxPlayers }));
-export const startGame = async () => report(await request('game:start', {}));
+/** With `fillWithComputers`, computers take the open seats before the deal. */
+export const startGame = async (fillWithComputers?: boolean) =>
+  report(await request('game:start', fillWithComputers ? { fillWithComputers } : {}));
 export const nextRound = async () => report(await request('game:restart', {}));
 export const returnToLobby = async () => report(await request('room:return-lobby', {}));
 
