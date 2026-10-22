@@ -58,7 +58,8 @@ function randomMove(
   return null;
 }
 
-describe('randomized full games', () => {
+// Hundreds of complete games: seconds of synchronous work, well past the default 5 s budget.
+describe('randomized full games', { timeout: 60_000 }, () => {
   it('always terminates with a winner and conserves all 168 cards', () => {
     let finishedByEmptyHand = 0;
     let finishedByLastStanding = 0;
@@ -96,7 +97,7 @@ describe('randomized full games', () => {
   });
 });
 
-describe('computer players', () => {
+describe('computer players', { timeout: 60_000 }, () => {
   it('finish every game legally when they fill the whole table', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const rng = seededRng(seed);

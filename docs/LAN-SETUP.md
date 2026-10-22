@@ -5,7 +5,7 @@ the host's LAN address in a browser. No internet connection is needed once depen
 game is built.
 
 > **Security:** LAN mode listens on every network interface. Use it only on a trusted home or office network.
-> Never forward the port on your router or expose it to the internet.
+> Never forward the port on your router or expose it to the internet. See [Keeping the host safe](#8-keeping-the-host-safe).
 
 ## 1. Requirements (host only)
 
@@ -38,6 +38,8 @@ Options:
 | Specific interface     | `npm start -- --host 192.168.1.23`                         |
 | Local only (no LAN)    | `npm start` (binds to `127.0.0.1`)                         |
 | Reconnect grace period | env `RECONNECT_GRACE_SECONDS=180` (default 120)            |
+| Join by a custom name  | env `ALLOWED_HOSTS=gamebox.lan` (IP addresses always work) |
+| Sockets per device     | env `MAX_CONNECTIONS_PER_IP=32` (default 32)               |
 
 ### Or run it in Docker
 
@@ -90,20 +92,42 @@ npm run dev:lan    # same, reachable from other devices via http://<LAN-IP>:5173
 
 ## 6. Troubleshooting
 
-| Symptom                                                   | Fix                                                                                                                                                                                                   |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Other devices can't open the page                         | Use `start:lan` (not `start`). Check the firewall rule, that the network profile is Private, and that both devices are on the same network (guest Wi-Fi often isolates clients). Try `ping <host-IP>` |
-| Several "LAN" addresses are printed                       | Use the one on your Wi-Fi/Ethernet adapter (usually `192.168.x.x` or `10.x.x.x`). Virtual adapters (WSL/Hyper-V/VPN, e.g. `172.x.x.x`) are not reachable from phones                                  |
-| `Port 3000 is already in use`                             | Start with `--port 3001`, or stop the other program (`Get-NetTCPConnection -LocalPort 3000` shows which process)                                                                                      |
-| Page loads but says "Connecting to the host…"             | A proxy, VPN or browser extension may be blocking WebSockets. The client falls back to HTTP long-polling automatically. Disable the VPN and reload                                                    |
-| "That room is no longer available"                        | The server was restarted or everyone left. Rooms only live in memory, so create a new one                                                                                                             |
-| A player dropped mid-game                                 | They have 2 minutes to reopen the same tab/browser (it reconnects automatically). After that they forfeit and the game continues                                                                      |
-| "This seat was opened in another window"                  | The same player opened the game in a second tab. Only the newest tab stays connected                                                                                                                  |
-| Plain `http` page on a phone doesn't allow clipboard copy | Expected on non-HTTPS origins. Read the room code from the screen                                                                                                                                     |
-| `Client bundle not found` printed                         | Run `npm run build` before `npm run start:lan`                                                                                                                                                        |
+| Symptom                                                    | Fix                                                                                                                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Other devices can't open the page                          | Use `start:lan` (not `start`). Check the firewall rule, that the network profile is Private, and that both devices are on the same network (guest Wi-Fi often isolates clients). Try `ping <host-IP>` |
+| Several "LAN" addresses are printed                        | Use the one on your Wi-Fi/Ethernet adapter (usually `192.168.x.x` or `10.x.x.x`). Virtual adapters (WSL/Hyper-V/VPN, e.g. `172.x.x.x`) are not reachable from phones                                  |
+| `Port 3000 is already in use`                              | Start with `--port 3001`, or stop the other program (`Get-NetTCPConnection -LocalPort 3000` shows which process)                                                                                      |
+| Page loads but says "Connecting to the host…"              | A proxy, VPN or browser extension may be blocking WebSockets. The client falls back to HTTP long-polling automatically. Disable the VPN and reload                                                    |
+| "That room is no longer available"                         | The server was restarted or everyone left. Rooms only live in memory, so create a new one                                                                                                             |
+| A player dropped mid-game                                  | They have 2 minutes to reopen the same tab/browser (it reconnects automatically). After that they forfeit and the game continues                                                                      |
+| "This seat was opened in another window"                   | The same player opened the game in a second tab. Only the newest tab stays connected                                                                                                                  |
+| Plain `http` page on a phone doesn't allow clipboard copy  | Expected on non-HTTPS origins. Read the room code from the screen                                                                                                                                     |
+| `Client bundle not found` printed                          | Run `npm run build` before `npm run start:lan`                                                                                                                                                        |
+| Page says "Open the game by the host machine's IP address" | Use the IP address the server printed, or add your hostname with `ALLOWED_HOSTS`                                                                                                                      |
 
 ## 7. Offline check
 
 After `npm run build`, the bundle in `apps/client/dist` contains all JavaScript, CSS and the font. It loads
 nothing from a CDN and has no analytics. You can disconnect the host and the players from the internet: as
 long as they share the LAN, the game works.
+
+## 8. Keeping the host safe
+
+Players only ever talk to the game server, and the server only understands game moves. Nothing a player
+sends reaches files, a shell or a database. On top of that:
+
+- **Play on the production build** (`npm run start:lan`, `make play` or Docker). `npm run dev:lan` also puts
+  the Vite dev server on the network. It is locked to the client files, but it is a development tool.
+- **Docker is the most isolated option.** The container runs as an unprivileged user on a read-only file
+  system, with no Linux capabilities and capped memory and processes. It cannot see the host's files.
+- **Open the game by IP address** (`http://192.168.1.23:3000`). Requests that arrive under an unknown
+  hostname get `421`, which stops DNS-rebinding web pages from reaching the server. If you gave the host a
+  DNS name, add it with `ALLOWED_HOSTS`.
+- **Other websites can't use the game socket.** A page on another site that a player has open is refused at
+  the handshake.
+- **One device can hold 32 sockets.** That stops one phone or laptop from filling every room. Docker Desktop
+  (Windows/macOS) can show every player under one internal address; if players get refused there, raise
+  `MAX_CONNECTIONS_PER_IP` in `compose.yaml`.
+- **Keep dependencies patched:** run `npm audit` now and then. `npm audit --omit=dev` (what actually runs on
+  game night) should report 0 vulnerabilities.
+- Keep the firewall rule scoped to **Private** networks (section 4) and stop the server when you're done.

@@ -154,8 +154,24 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   disconnected. Socket.IO payloads are capped at 16 KB.
 - **Secrets:** reconnect tokens are 256-bit random values compared in constant time. They are never placed
   in URLs or logs and are only sent to their owner. Logs record room events, never hands or tokens.
-- **HTTP:** CSP `default-src 'self'`, `nosniff`, `frame-ancestors 'none'`, no `x-powered-by`. All assets,
-  including the font, are bundled locally.
+- **HTTP:** CSP `default-src 'self'`, `nosniff`, `frame-ancestors 'none'`, COOP/CORP `same-origin`, a
+  `Permissions-Policy` that turns off camera, microphone and location, no `x-powered-by`. Error responses
+  are plain "Bad request" / "Server error" with no stack trace. All assets, including the font, are bundled
+  locally. Headers must arrive within 10 s and a request within 30 s; the server holds at most 1,000 sockets.
+- **Host surface:** nothing a player sends reaches the file system, a shell, `eval` or a database. Static
+  files come only from the client bundle, through Express's traversal-safe `static`. The server never
+  trusts `X-Forwarded-For`.
+- **Who may connect** (`http/request-guard.ts`): the `Host` header must be an IP address, `localhost`, this
+  machine's name or a name in `ALLOWED_HOSTS`; anything else gets `421`, which defeats DNS-rebinding pages.
+  The Socket.IO handshake also requires a same-origin `Origin` (WebSockets skip CORS, so without it any
+  website a player visits could drive the game socket). One address may hold `MAX_CONNECTIONS_PER_IP`
+  sockets (default 32), so a single device can't fill the 50-room limit or exhaust memory.
+- **Container:** non-root user, read-only file system, every Linux capability dropped,
+  `no-new-privileges`, 64 processes and 512 MB at most (`compose.yaml`). The image holds only `node`, one
+  bundled server file and the static client.
+- **Dev server:** `npm run dev:lan` exposes Vite to the network. `server.fs.allow` limits it to the client,
+  the shared package and `node_modules`, so the rest of the repo and the machine stay unreadable. Keep Vite
+  patched: older releases had file-read bugs on Windows. Use the production build for real game nights.
 
 ## Sessions, disconnects and reconnects
 

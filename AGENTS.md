@@ -63,6 +63,10 @@ These keep the game fair and the code testable. Do not trade them away for conve
    Unknown keys are rejected. Commands never carry the actor's player id; the socket binding decides that.
 8. **Nothing persists.** No database, no cloud. The browser keeps only the reconnect token
    (`sessionStorage`), and the last display name and sound settings (`localStorage`).
+9. **Players never reach the host.** Nothing from a client touches the file system, a shell, `eval` or
+   `child_process`. New HTTP routes go behind the Host check in `http/request-guard.ts`, the socket keeps
+   its same-origin and per-address limits, and errors never return stack traces. See "Reliability and
+   security" in `docs/ARCHITECTURE.md`.
 
 ## Coding standards
 

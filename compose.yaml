@@ -6,4 +6,13 @@ services:
       - '3000:3000'
     environment:
       RECONNECT_GRACE_SECONDS: 120
+      # Docker Desktop may show every player under one address: raise this if players are refused.
+      MAX_CONNECTIONS_PER_IP: 32
     restart: unless-stopped
+    # The server only reads its own files and keeps everything in memory, so the container gets
+    # no write access, no Linux capabilities and no way to gain privileges.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m

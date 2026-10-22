@@ -1,20 +1,41 @@
 import path from 'node:path';
-import express, { type Express } from 'express';
+import express, { type ErrorRequestHandler, type Express } from 'express';
+import { createRequestGuard, type RequestGuardOptions } from './request-guard.js';
+
+function httpStatusOf(error: unknown): number {
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
+  return typeof status === 'number' && status >= 400 && status < 600 ? status : 500;
+}
 
 /**
  * HTTP app: serves the production client bundle (all assets local, no CDN) and a health check.
  */
-export function createHttpApp(clientDist: string | null): Express {
+export function createHttpApp(
+  clientDist: string | null,
+  guardOptions?: RequestGuardOptions,
+): Express {
   const app = express();
+  const guard = createRequestGuard(guardOptions);
   app.disable('x-powered-by');
 
-  app.use((_req, res, next) => {
+  app.use((req, res, next) => {
+    if (!guard.isAllowedHost(req.headers.host)) {
+      res.status(421).type('text/plain').send("Open the game by the host machine's IP address.");
+      return;
+    }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=()',
+    );
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
     );
     next();
   });
@@ -42,5 +63,15 @@ export function createHttpApp(clientDist: string | null): Express {
         );
     });
   }
+
+  // Express's default handler prints stack traces (and file paths) unless NODE_ENV=production.
+  const hideErrors: ErrorRequestHandler = (error, _req, res, _next) => {
+    const status = httpStatusOf(error);
+    if (status >= 500)
+      console.error('[http] request failed:', error instanceof Error ? error.message : error);
+    const message = status >= 500 ? 'Server error' : status === 404 ? 'Not found' : 'Bad request';
+    res.status(status).type('text/plain').send(message);
+  };
+  app.use(hideErrors);
   return app;
 }
