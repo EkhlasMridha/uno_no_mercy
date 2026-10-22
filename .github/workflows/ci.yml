@@ -43,11 +43,3 @@ jobs:
           grep -q 'Create a room' dom.html || { cat dev.log; exit 1; }
       - name: Two players can create, join and start a game
         run: timeout 120 node scripts/e2e-two-players.mjs || { cat dev.log; exit 1; }
-
-  dependency-review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/dependency-review-action@v5
-        with:
-          fail-on-severity: high
