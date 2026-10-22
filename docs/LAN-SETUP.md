@@ -39,6 +39,23 @@ Options:
 | Local only (no LAN)    | `npm start` (binds to `127.0.0.1`)                         |
 | Reconnect grace period | env `RECONNECT_GRACE_SECONDS=180` (default 120)            |
 
+### Or run it in Docker
+
+The image builds everything and runs one Node process that serves both the page and the game socket. Only
+Docker is needed on the host, not Node.js.
+
+```bash
+docker compose up -d --build    # build and start on port 3000
+docker compose logs -f          # follow the server log
+docker compose down             # stop (all rooms are closed)
+```
+
+Without Compose: `docker build -t nomercy-lan .` then `docker run -d -p 3000:3000 nomercy-lan`.
+
+The `LAN:` address printed in the container log is the container's internal IP (`172.17.x.x`). Share the
+**host machine's** LAN IP instead. To use another port, change the left side of the mapping
+(`-p 4000:3000`). The firewall rule in section 4 is still needed on Windows.
+
 ## 3. Players join
 
 1. Connect the phone or laptop to the **same Wi-Fi/Ethernet network** as the host.

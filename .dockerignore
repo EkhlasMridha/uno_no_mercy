@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/bundle
+**/*.tsbuildinfo
+**/coverage
+**/*.log
+.git
+.github
+docs
+scripts
+Dockerfile
+compose.yaml

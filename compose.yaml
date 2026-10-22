@@ -1,0 +1,9 @@
+services:
+  nomercy:
+    build: .
+    image: nomercy-lan
+    ports:
+      - '3000:3000'
+    environment:
+      RECONNECT_GRACE_SECONDS: 120
+    restart: unless-stopped
