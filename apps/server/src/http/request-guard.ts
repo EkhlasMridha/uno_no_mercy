@@ -22,6 +22,7 @@ export interface GuardedRequest {
     origin?: string;
     'x-forwarded-host'?: string | string[];
     'x-forwarded-for'?: string | string[];
+    'x-forwarded-proto'?: string | string[];
   };
   socket?: { remoteAddress?: string };
 }
@@ -77,6 +78,18 @@ export function createRequestGuard(options: RequestGuardOptions = {}) {
     return clientAddress(forwarded[forwarded.length - 1] ?? req.socket?.remoteAddress);
   };
 
+  /**
+   * The origin the player's browser used, such as `http://192.168.1.20:3000`. Only meaningful once
+   * `allowsHost` has passed. This server speaks plain HTTP, so HTTPS comes only from a trusted proxy.
+   */
+  const publicOrigin = (req: GuardedRequest): string => {
+    const forwardedProto = options.trustProxy
+      ? headerEntries(req.headers['x-forwarded-proto'])[0]?.toLowerCase()
+      : undefined;
+    const protocol = forwardedProto === 'https' ? 'https' : 'http';
+    return `${protocol}://${publicHost(req) ?? 'localhost'}`;
+  };
+
   /** True when the Host header names this machine by IP, localhost or a configured name. */
   const isAllowedHost = (hostHeader: string | undefined): boolean => {
     if (!hostHeader) return false;
@@ -114,6 +127,7 @@ export function createRequestGuard(options: RequestGuardOptions = {}) {
     isAllowedOrigin,
     allowsHost,
     addressOf,
+    publicOrigin,
     /** Both checks, for the Socket.IO handshake. */
     allows: (req: GuardedRequest): boolean => {
       if (!allowsHost(req)) return false;

@@ -15,6 +15,7 @@ import type {
   SessionInfo,
 } from '@nomercy/shared';
 import { createHttpApp } from '../src/http/app.js';
+import { createRequestGuard } from '../src/http/request-guard.js';
 import { createSocketServer } from '../src/net/socket-server.js';
 import { seededRng } from '../src/engine/index.js';
 
@@ -312,7 +313,12 @@ describe('network guard', () => {
 
   beforeAll(async () => {
     siteDir = mkdtempSync(path.join(tmpdir(), 'nomercy-site-'));
-    writeFileSync(path.join(siteDir, 'index.html'), '<!doctype html><title>t</title>');
+    writeFileSync(
+      path.join(siteDir, 'index.html'),
+      '<!doctype html><title>t</title>' +
+        '<meta property="og:image" content="/social-card.jpg" />' +
+        '<meta property="og:url" content="/" />',
+    );
     guarded = createServer(createHttpApp(siteDir));
     const { io } = createSocketServer(guarded, {
       rng: seededRng(7),
@@ -351,6 +357,16 @@ describe('network guard', () => {
     expect((await get('/api/health', 'localhost')).status).toBe(200);
     expect((await get('/api/health', 'rebind.evil.example')).status).toBe(421);
     expect((await get('/', 'rebind.evil.example')).body).not.toContain('<title>');
+  });
+
+  it('gives link previews absolute URLs on the host the page was opened from', async () => {
+    const host = new URL(guardedUrl).host;
+    for (const pathname of ['/', '/index.html', '/room/ABCD']) {
+      const page = await get(pathname, host);
+      expect(page.status).toBe(200);
+      expect(page.body).toContain(`content="http://${host}/social-card.jpg"`);
+      expect(page.body).toContain(`content="http://${host}/"`);
+    }
   });
 
   it('answers malformed requests without stack traces or file paths', async () => {
@@ -454,6 +470,18 @@ describe('behind a reverse proxy', () => {
     expect(foreign.outcome).not.toBe('connected');
     foreign.socket.close();
     expect(refusals.some((r) => r.includes('"https://evil.example"'))).toBe(true);
+  });
+
+  it('builds the public origin from the forwarded host and scheme', () => {
+    const behindProxy = createRequestGuard({ trustProxy: true });
+    const headers = { host: 'nomercy:3000', 'x-forwarded-host': 'game.example:8443' };
+    expect(
+      behindProxy.publicOrigin({ headers: { ...headers, 'x-forwarded-proto': 'https' } }),
+    ).toBe('https://game.example:8443');
+    expect(behindProxy.publicOrigin({ headers })).toBe('http://game.example:8443');
+    expect(
+      createRequestGuard().publicOrigin({ headers: { ...headers, 'x-forwarded-proto': 'https' } }),
+    ).toBe('http://nomercy:3000');
   });
 
   it('caps sockets per player address, counting only the entry the proxy added', async () => {
