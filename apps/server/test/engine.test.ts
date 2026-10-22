@@ -503,6 +503,30 @@ describe('Mercy Rule', () => {
     expect(s.phase).toEqual({ type: 'finished', winnerId: pid(1), reason: 'lastStanding' });
   });
 
+  it('a table with computers ends with no winner once all of its people are out', () => {
+    const spec = { pendingDraw: { total: 10, lastValue: 10 } };
+    const s0 = threePlayers(filler(20, 'blue', 3), spec);
+    s0.endWhenOut = [pid(0)];
+    const s = run(s0, 0, { type: 'acceptPenalty' });
+    expect(s.phase).toEqual({ type: 'finished', winnerId: null, reason: 'peopleOut' });
+    expect(s.log.some((e) => e.event.type === 'gameWon')).toBe(false);
+
+    // Another person still in: play goes on.
+    const both = threePlayers(filler(20, 'blue', 3), spec);
+    both.endWhenOut = [pid(0), pid(1)];
+    expect(run(both, 0, { type: 'acceptPenalty' }).phase).toEqual({ type: 'turn' });
+  });
+
+  it('a lone surviving computer still wins as last standing', () => {
+    const s0 = twoPlayers(filler(23, 'blue', 3), { pendingDraw: { total: 2, lastValue: 2 } });
+    s0.endWhenOut = [pid(0)];
+    expect(run(s0, 0, { type: 'acceptPenalty' }).phase).toEqual({
+      type: 'finished',
+      winnerId: pid(1),
+      reason: 'lastStanding',
+    });
+  });
+
   it('set-aside hands return to play on the next reshuffle', () => {
     const s0 = buildState({ hands: [[n('green', 1)], filler(3), filler(3)], top: n('blue', 5) });
     s0.setAside.push(card(n('blue', 9)));

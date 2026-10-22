@@ -1,29 +1,44 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PublicGameView } from '@nomercy/shared';
 import { playSound, type SoundKind } from '../lib/sound';
 import { getState } from '../state/store';
 
 const REMINDER_MS = 10_000;
 
-function playIfOn(kind: SoundKind): void {
+function playIfOn(kind: SoundKind, delay = 0): void {
   const prefs = getState().sound;
-  if (!prefs.muted && prefs[kind]) playSound(kind);
+  if (!prefs.muted && prefs[kind]) playSound(kind, delay);
 }
 
 /**
- * Plays the turn reminder, hand exchange and win sounds the player has switched on. Purely
- * presentational: every trigger is state the server already sent.
+ * The idle turn reminder's nudge for the hand. `count` only grows, one per reminder, so each one can
+ * replay the hop; `active` stays true until anything happens at the table.
+ */
+export interface IdleNudge {
+  count: number;
+  active: boolean;
+}
+
+/**
+ * Plays the card play, turn reminder, hand exchange and win sounds the player has switched on, and
+ * returns the idle nudge so the hand can shake with the reminder. Purely presentational: every trigger
+ * is state the server already sent.
  */
 export function useGameSounds(
   view: PublicGameView,
   meId: string,
   mustAct: boolean,
   version: number,
-): void {
+): IdleNudge {
+  const [tick, setTick] = useState({ count: 0, version: -1 });
   // `version` changes on every move, so anything happening at the table restarts the countdown.
   useEffect(() => {
     if (!mustAct) return;
-    const timer = window.setInterval(() => playIfOn('turnReminder'), REMINDER_MS);
+    const timer = window.setInterval(() => {
+      playIfOn('turnReminder');
+      // The shake is a visual nudge, so it happens even when the knock is off.
+      setTick((t) => ({ count: t.count + 1, version }));
+    }, REMINDER_MS);
     return () => window.clearInterval(timer);
   }, [mustAct, version]);
 
@@ -34,17 +49,25 @@ export function useGameSounds(
     const since =
       lastSeq.current === null ? newest : newest < lastSeq.current ? 0 : lastSeq.current;
     lastSeq.current = newest;
-    const exchanged = view.log.some(
-      (e) => e.seq > since && (e.event.type === 'handsSwapped' || e.event.type === 'handsPassed'),
-    );
-    if (exchanged) playIfOn('handExchange');
+    const fresh = view.log.filter((e) => e.seq > since);
+    const played = fresh.some((e) => e.event.type === 'cardPlayed');
+    if (played) playIfOn('cardPlay');
+    // A 0 or 7 is played and passed in one update: let the card land before the hands move.
+    if (fresh.some((e) => e.event.type === 'handsSwapped' || e.event.type === 'handsPassed')) {
+      playIfOn('handExchange', played ? 0.25 : 0);
+    }
   }, [view.log]);
 
-  // Only the moment of winning cheers; reloading into a finished game stays quiet.
+  // Only the moment of winning cheers, after the final card lands; reloading into a finished game
+  // stays quiet.
   const iWon = view.phase.type === 'finished' && view.phase.winnerId === meId;
   const wonBefore = useRef(iWon);
   useEffect(() => {
-    if (iWon && !wonBefore.current) playIfOn('win');
+    if (iWon && !wonBefore.current) playIfOn('win', 0.3);
     wonBefore.current = iWon;
   }, [iWon]);
+
+  // Worked out here rather than reset in an effect: a move only drops the class, so nothing remounts
+  // and a card drawn right after a nudge still slides in.
+  return { count: tick.count, active: tick.count > 0 && tick.version === version };
 }

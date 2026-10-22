@@ -53,6 +53,8 @@ export function RulesPanel({ onClose }: { onClose: () => void }) {
           <h3 className="mb-1 font-semibold text-white">Goal</h3>
           <p>
             Empty your hand — or be the last player standing after everyone else is knocked out.
+            Playing with computers? Once every person at the table is knocked out, the round ends
+            with no winner.
           </p>
         </section>
         <section>

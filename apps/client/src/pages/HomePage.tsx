@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Bot, BookOpen, LogIn, Play, Plus, Users, Wifi, WifiOff } from 'lucide-react';
 import {
-  MAX_PLAYERS,
+  MAX_COMPUTERS,
   MIN_PLAYERS,
   playerNameSchema,
   roomCodeSchema,
@@ -14,7 +14,7 @@ import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayingCard } from '../components/card/PlayingCard';
 import { PlayerCountInput } from '../components/PlayerCountInput';
 import { Modal } from '../components/ui/Modal';
-import { seatAngle, seatPosition } from '../lib/table-geometry';
+import { TablePreview } from '../components/TablePreview';
 
 export function HomePage() {
   const connection = useAppState((s) => s.connection);
@@ -209,7 +209,15 @@ export function HomePage() {
       {showComputer && (
         <Modal title="Play with computer" onClose={() => setShowComputer(false)}>
           <form className="space-y-5" onSubmit={(e) => void onPlayComputer(e)}>
-            <TablePreview you={name.trim()} computers={computers} />
+            <TablePreview
+              seats={[
+                { name: name.trim() || 'You', kind: 'you' },
+                ...Array.from({ length: computers }, () => ({
+                  name: '',
+                  kind: 'computer' as const,
+                })),
+              ]}
+            />
             <div className="flex items-center justify-between gap-4">
               <span>
                 <span className="flex items-center gap-2 font-semibold">
@@ -224,7 +232,7 @@ export function HomePage() {
                 value={computers}
                 onChange={setComputers}
                 min={1}
-                max={MAX_PLAYERS - 1}
+                max={MAX_COMPUTERS}
                 noun="computers"
                 label="Computer opponents"
               />
@@ -240,39 +248,5 @@ export function HomePage() {
         </Modal>
       )}
     </main>
-  );
-}
-
-/** The table you are about to sit at: you on the near edge, computers around the rail. */
-function TablePreview({ you, computers }: { you: string; computers: number }) {
-  const seats = computers + 1;
-  // Smaller seats as the table fills, so a full table still fits at phone width.
-  const [avatar, icon] =
-    seats > 14
-      ? ['h-5 w-5 text-[10px]', 10]
-      : seats > 10
-        ? ['h-6 w-6 text-xs', 12]
-        : ['h-8 w-8 text-sm', 15];
-  return (
-    <div className="relative mx-auto aspect-[2/1] w-full" aria-hidden>
-      <div className="table-rail absolute inset-x-[5%] inset-y-[9%] rounded-[50%] p-2">
-        <div className="table-felt h-full w-full rounded-[50%]" />
-      </div>
-      {Array.from({ length: seats }, (_, offset) => (
-        <span
-          key={offset}
-          className={[
-            'absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display shadow-seat ring-2 transition-[left,top] duration-300 ease-out',
-            avatar,
-            offset === 0
-              ? 'bg-brass text-room ring-chalk'
-              : 'bg-leather text-chalk ring-walnut-light/70',
-          ].join(' ')}
-          style={seatPosition(seatAngle(offset, seats))}
-        >
-          {offset === 0 ? you.slice(0, 1).toUpperCase() || 'Y' : <Bot size={icon} />}
-        </span>
-      ))}
-    </div>
   );
 }

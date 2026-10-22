@@ -125,6 +125,8 @@ try {
   );
   await waitFor(() => bravo(`click("I'm ready")`), 'Bravo to mark ready');
   await waitFor(() => alpha(`click('Start game')`), 'Alpha to start the game');
+  // The room has open seats, so Start asks about computers first; play with just the two of them.
+  await waitFor(() => alpha(`click('Start with 2 players')`), 'Alpha to start without computers');
 
   for (const [player, me, opponent] of [
     [alpha, 'Alpha', 'Bravo'],

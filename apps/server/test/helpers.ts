@@ -64,6 +64,7 @@ export function buildState(spec: StateSpec): GameState {
     log: [],
     logSeq: 0,
     playHistory: [{ playerId: null, card: top, chosenColor: null }],
+    endWhenOut: [],
   };
 }
 

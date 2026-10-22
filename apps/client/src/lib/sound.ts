@@ -1,5 +1,5 @@
 /** The game sounds. Each is synthesized with Web Audio, so the client ships no audio files. */
-export type SoundKind = 'turnReminder' | 'handExchange' | 'win';
+export type SoundKind = 'cardPlay' | 'turnReminder' | 'handExchange' | 'win';
 
 /** Which sounds the player has switched on, and whether all of them are muted. */
 export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
@@ -52,7 +52,10 @@ function tone(
   osc.stop(at + duration + 0.05);
 }
 
-/** A burst of white noise through a band-pass sweeping from `fromHz` to `toHz`. */
+/**
+ * A burst of white noise through a band-pass sweeping from `fromHz` to `toHz`. `attack` is the share
+ * of the burst spent swelling to its peak; keep it small for a sharp hit.
+ */
 function noise(
   ac: AudioContext,
   at: number,
@@ -60,6 +63,7 @@ function noise(
   peak: number,
   fromHz: number,
   toHz: number,
+  attack = 0.3,
 ): void {
   const buffer = ac.createBuffer(1, Math.ceil(ac.sampleRate * duration), ac.sampleRate);
   const data = buffer.getChannelData(0);
@@ -73,13 +77,23 @@ function noise(
   band.frequency.setValueAtTime(fromHz, at);
   band.frequency.exponentialRampToValueAtTime(toHz, at + duration);
   amp.gain.setValueAtTime(0.0001, at);
-  amp.gain.linearRampToValueAtTime(peak, at + duration * 0.3);
+  amp.gain.linearRampToValueAtTime(peak, at + duration * attack);
   amp.gain.exponentialRampToValueAtTime(0.0001, at + duration);
   source.connect(band).connect(amp).connect(ac.destination);
   source.start(at);
 }
 
 const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
+  // A card flicked from the fingers, a breath of air in flight, and a soft slap on the felt as the
+  // toss lands. Each play varies a little, so a run of plays never sounds machine-made.
+  cardPlay(ac, at) {
+    const vary = (v: number) => v * (0.88 + Math.random() * 0.24);
+    const land = at + 0.18 + Math.random() * 0.04;
+    noise(ac, at, 0.012, 0.18, vary(4500), vary(5200), 0.1);
+    noise(ac, at + 0.02, 0.14, 0.035, vary(2200), vary(900));
+    noise(ac, land, 0.045, 0.25, vary(900), vary(550), 0.04);
+    tone(ac, ac.destination, 'sine', land, 0.08, 0.2, vary(140), 70);
+  },
   // Two knuckle knocks on the rail, then a small brass bell.
   turnReminder(ac, at) {
     const out = ac.destination;
@@ -111,8 +125,11 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
   },
 };
 
-/** Plays a sound now. Skipped until the player has interacted, rather than queued for later. */
-export function playSound(kind: SoundKind): void {
+/**
+ * Plays a sound now, or `delay` seconds from now so sounds from one move can follow each other.
+ * Skipped until the player has interacted, rather than queued for later.
+ */
+export function playSound(kind: SoundKind, delay = 0): void {
   if (ctx?.state !== 'running') return;
-  SOUNDS[kind](ctx, ctx.currentTime + 0.02);
+  SOUNDS[kind](ctx, ctx.currentTime + 0.02 + delay);
 }
