@@ -3,11 +3,78 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0a14" />
+    <title>No Mercy LAN · Multiplayer card game for your local network</title>
+    <meta
+      name="description"
+      content="A real-time multiplayer card game with all 168 No Mercy cards. Host on one machine, then 2 to 20 friends join from any browser on the same network. No sign-up."
+    />
+    <meta name="application-name" content="No Mercy LAN" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#17100d" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- The server rewrites root-relative URLs in og:url, og:image and twitter:image to absolute
+         ones for the host the page was requested from (apps/server/src/http/index-page.ts). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="No Mercy LAN" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="/" />
+    <meta property="og:title" content="No Mercy LAN: the card game with no mercy" />
+    <meta
+      property="og:description"
+      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players, right in the browser on your local network."
+    />
+    <meta property="og:image" content="/social-card.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="No Mercy LAN title beside a fan of red, yellow, green, blue and wild +10 cards on a plum felt table"
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="No Mercy LAN: the card game with no mercy" />
+    <meta
+      name="twitter:description"
+      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players, right in the browser on your local network."
+    />
+    <meta name="twitter:image" content="/social-card.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="No Mercy LAN title beside a fan of red, yellow, green, blue and wild +10 cards on a plum felt table"
+    />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>No Mercy LAN</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="No Mercy" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "No Mercy LAN",
+        "description": "A real-time multiplayer card game for a local network, played with all 168 No Mercy cards in the browser.",
+        "genre": ["Card game", "Party game"],
+        "gamePlatform": "Web browser",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any",
+        "playMode": "MultiPlayer",
+        "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 2, "maxValue": 20 },
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "image": "/social-card.jpg",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
   </head>
   <body class="bg-felt-950 text-white">
+    <noscript>No Mercy LAN needs JavaScript to run in your browser.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

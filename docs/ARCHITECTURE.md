@@ -163,6 +163,10 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   `X-Forwarded-*` headers unless `TRUST_PROXY` is set for a reverse proxy; then it takes the public host
   from the first `X-Forwarded-Host` entry and the player's address from the last `X-Forwarded-For` entry,
   the only one the proxy itself added.
+- **Link previews** (`http/index-page.ts`): `index.html` carries Open Graph and Twitter tags with
+  root-relative URLs. The server makes `og:url`, `og:image` and `twitter:image` absolute for the origin of
+  each request (the host is already checked; HTTPS only via a trusted `X-Forwarded-Proto`), because most
+  crawlers ignore relative image URLs. The share image and icons are drawn from `apps/client/branding/`.
 - **Who may connect** (`http/request-guard.ts`): the `Host` header must be an IP address, `localhost`, this
   machine's name or a name in `ALLOWED_HOSTS`; anything else gets `421`, which defeats DNS-rebinding pages.
   The Socket.IO handshake also requires a same-origin `Origin` (WebSockets skip CORS, so without it any
