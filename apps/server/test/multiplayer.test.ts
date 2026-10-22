@@ -1,5 +1,8 @@
-import { createServer, type Server as HttpServer } from 'node:http';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, request as httpRequest, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
 import { playerNameSchema } from '@nomercy/shared';
@@ -286,5 +289,97 @@ describe('multiplayer over Socket.IO', () => {
       await new Promise((r) => setTimeout(r, 30));
     }
     expect(computerMoved()).toBe(true);
+  });
+});
+
+describe('network guard', () => {
+  let guarded: HttpServer;
+  let guardedUrl: string;
+  let closeGuarded: () => void;
+  let siteDir: string;
+
+  beforeAll(async () => {
+    siteDir = mkdtempSync(path.join(tmpdir(), 'nomercy-site-'));
+    writeFileSync(path.join(siteDir, 'index.html'), '<!doctype html><title>t</title>');
+    guarded = createServer(createHttpApp(siteDir));
+    const { io } = createSocketServer(guarded, {
+      rng: seededRng(7),
+      reconnectGraceMs: 60_000,
+      checkInvariants: true,
+      maxConnectionsPerIp: 2,
+    });
+    closeGuarded = () => io.close();
+    await new Promise<void>((resolve) => guarded.listen(0, '127.0.0.1', resolve));
+    guardedUrl = `http://127.0.0.1:${(guarded.address() as AddressInfo).port}`;
+  });
+
+  afterAll(() => {
+    closeGuarded();
+    guarded.close();
+    rmSync(siteDir, { recursive: true, force: true });
+  });
+
+  /** Resolves 'connected' or the refusal message. */
+  const tryConnect = (headers: Record<string, string> = {}) =>
+    new Promise<{ outcome: string; socket: ClientSocket }>((resolve) => {
+      const socket: ClientSocket = connect(guardedUrl, {
+        transports: ['websocket'],
+        forceNew: true,
+        reconnection: false,
+        extraHeaders: headers,
+      });
+      socket.on('connect', () => resolve({ outcome: 'connected', socket }));
+      socket.on('connect_error', (error) => resolve({ outcome: error.message, socket }));
+    });
+
+  const get = (pathname: string, host: string) =>
+    new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = httpRequest(`${guardedUrl}${pathname}`, { headers: { host } }, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+  it('refuses game sockets opened from another website', async () => {
+    const foreign = await tryConnect({ origin: 'http://evil.example' });
+    expect(foreign.outcome).not.toBe('connected');
+    foreign.socket.close();
+
+    const sameOrigin = await tryConnect({ origin: guardedUrl });
+    expect(sameOrigin.outcome).toBe('connected');
+    sameOrigin.socket.close();
+  });
+
+  it('refuses requests addressed to an unknown hostname (DNS rebinding)', async () => {
+    const host = new URL(guardedUrl).host;
+    expect((await get('/api/health', host)).status).toBe(200);
+    expect((await get('/api/health', 'localhost')).status).toBe(200);
+    expect((await get('/api/health', 'rebind.evil.example')).status).toBe(421);
+    expect((await get('/', 'rebind.evil.example')).body).not.toContain('<title>');
+  });
+
+  it('answers malformed requests without stack traces or file paths', async () => {
+    const res = await get('/%E0%A4%A', new URL(guardedUrl).host);
+    expect(res.status).toBe(400);
+    expect(res.body).toBe('Bad request');
+  });
+
+  it('caps open sockets per device and frees the slot on disconnect', async () => {
+    const first = await tryConnect();
+    const second = await tryConnect();
+    expect([first.outcome, second.outcome]).toEqual(['connected', 'connected']);
+    const third = await tryConnect();
+    expect(third.outcome).not.toBe('connected');
+    third.socket.close();
+
+    first.socket.close();
+    await new Promise((r) => setTimeout(r, 100));
+    const retry = await tryConnect();
+    expect(retry.outcome).toBe('connected');
+    retry.socket.close();
+    second.socket.close();
   });
 });

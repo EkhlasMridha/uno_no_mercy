@@ -9,6 +9,9 @@ export interface ServerConfig {
   dev: boolean;
   reconnectGraceMs: number;
   clientDist: string | null;
+  /** Hostnames accepted besides IPs, localhost and this machine's name (DNS-rebinding guard). */
+  allowedHosts: string[];
+  maxConnectionsPerIp: number;
 }
 
 function argValue(args: string[], name: string): string | undefined {
@@ -24,7 +27,8 @@ function argValue(args: string[], name: string): string | undefined {
  *   --host <addr>    explicit bind address (overrides --lan)
  *   --port <n>       port (default 3000)
  *   --dev            development mode (card-conservation checks on every move)
- * Env: HOST, PORT, RECONNECT_GRACE_SECONDS, CLIENT_DIST
+ * Env: HOST, PORT, RECONNECT_GRACE_SECONDS, CLIENT_DIST, ALLOWED_HOSTS (comma-separated),
+ *      MAX_CONNECTIONS_PER_IP (default 32)
  */
 export function loadConfig(args = process.argv.slice(2), env = process.env): ServerConfig {
   const lanMode = args.includes('--lan') || env.LAN === '1';
@@ -34,6 +38,7 @@ export function loadConfig(args = process.argv.slice(2), env = process.env): Ser
     throw new Error(`Invalid port: ${port}`);
   }
   const graceSeconds = Number(env.RECONNECT_GRACE_SECONDS ?? 120);
+  const perIp = Number(env.MAX_CONNECTIONS_PER_IP ?? 32);
   const here = path.dirname(fileURLToPath(import.meta.url));
   const defaultDist = path.resolve(here, '../../client/dist');
   const clientDist = env.CLIENT_DIST ? path.resolve(env.CLIENT_DIST) : defaultDist;
@@ -44,5 +49,10 @@ export function loadConfig(args = process.argv.slice(2), env = process.env): Ser
     dev: args.includes('--dev') || env.NODE_ENV === 'development',
     reconnectGraceMs: Math.max(10, Number.isFinite(graceSeconds) ? graceSeconds : 120) * 1000,
     clientDist: existsSync(path.join(clientDist, 'index.html')) ? clientDist : null,
+    allowedHosts: (env.ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((h) => h.trim())
+      .filter(Boolean),
+    maxConnectionsPerIp: Number.isInteger(perIp) && perIp > 0 ? perIp : 32,
   };
 }

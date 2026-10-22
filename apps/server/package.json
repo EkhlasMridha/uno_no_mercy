@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts --dev",
     "dev:lan": "tsx watch src/index.ts --dev --lan",
     "build": "tsc -p tsconfig.build.json",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --minify --legal-comments=none --outfile=bundle/server.mjs --external:bufferutil --external:utf-8-validate --external:uWebSockets.js \"--banner:js=import{createRequire}from'node:module';const require=createRequire(import.meta.url);\"",
     "start": "node dist/index.js",
     "start:lan": "node dist/index.js --lan",
     "test": "vitest run",
@@ -22,8 +23,9 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.17.6",
+    "esbuild": "^0.28.2",
     "socket.io-client": "^4.8.1",
     "tsx": "^4.19.2",
-    "vitest": "^2.1.5"
+    "vitest": "^4.1.12"
   }
 }

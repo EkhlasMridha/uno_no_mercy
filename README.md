@@ -17,6 +17,9 @@ npm run build
 npm run start:lan      # then open the printed LAN URL on every device
 ```
 
+Or with Docker: `docker compose up -d --build`, then open `http://<host-LAN-IP>:3000`
+(see [LAN setup](docs/LAN-SETUP.md#or-run-it-in-docker)).
+
 | Command                                                 | Purpose                                                                |
 | ------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `npm run dev`                                           | Dev mode: server on :3000 + Vite on :5173 (open http://localhost:5173) |

@@ -13,12 +13,18 @@ function lanAddresses(): string[] {
 }
 
 const config = loadConfig();
-const app = createHttpApp(config.clientDist);
+const app = createHttpApp(config.clientDist, { allowedHosts: config.allowedHosts });
 const httpServer = createServer(app);
+// Slow or idle clients can't hold sockets open forever, and the total stays bounded.
+httpServer.headersTimeout = 10_000;
+httpServer.requestTimeout = 30_000;
+httpServer.maxConnections = 1_000;
 const { io, manager } = createSocketServer(httpServer, {
   rng: cryptoRng,
   reconnectGraceMs: config.reconnectGraceMs,
   checkInvariants: config.dev,
+  allowedHosts: config.allowedHosts,
+  maxConnectionsPerIp: config.maxConnectionsPerIp,
 });
 
 httpServer.on('error', (error: NodeJS.ErrnoException) => {
