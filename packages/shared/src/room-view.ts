@@ -13,6 +13,8 @@ export interface LobbyPlayerView {
   id: string;
   name: string;
   isHost: boolean;
+  /** A computer player run by the host server. */
+  isComputer: boolean;
   ready: boolean;
   connected: boolean;
   /** Player left or timed out during a running game; kept until the room returns to the lobby. */

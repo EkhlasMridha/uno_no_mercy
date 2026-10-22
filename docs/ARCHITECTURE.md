@@ -114,7 +114,7 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 
 | Event                        | Payload                                                              | Notes                                                       |
 | ---------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `room:create`                | `{ name }`                                                           | returns `SessionInfo` (code, playerId, reconnectToken)      |
+| `room:create`                | `{ name, maxPlayers, computers? }`                                   | returns `SessionInfo`; `computers` (1–19) deals at once     |
 | `room:join`                  | `{ code, name }`                                                     | lobby only; max 6; unique names                             |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                     |
@@ -166,9 +166,22 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   other players see a disconnected icon. If the host disconnects, host rights move to a connected player.
 - **When the reconnect window expires:** in the lobby the seat is freed. During a game the player forfeits
   (eliminated, cards set aside, play continues), is marked _departed_, and their token becomes invalid. When
-  no members remain, the room is deleted.
+  no human members remain, the room is deleted.
 - **Host shutdown** (Ctrl+C): every client receives `room:closed` and all rooms are discarded. After a server
   restart, saved sessions fail to reconnect and the client shows "That room is no longer available".
+
+## Computer players
+
+Computer seats are `RoomPlayer`s with `isComputer` and no socket, created by `room:create` with
+`computers`. They live in the rooms layer, not the engine. After every successful command and every new
+round, `RoomManager` sets one timer per room, but only when some computer has a move
+(`computerMoveDelayMs`, 900 ms by default, shorter on fuller tables and halved while a player is drawing
+card by card). When it fires, `computerMoves` in `rooms/computer-player.ts` picks each computer's move
+from `getValidActions` alone, UNO calls first so a computer saves itself before another can catch it,
+and the first one goes through `executeGameCommand`, the same path a human command takes. A refused move
+falls back to a plain draw or penalty, and if nothing goes through the timer is set again, so the table
+never waits on a computer. Each move schedules the next, so computers keep playing until a human must act
+or the round ends. The public views mark them `isComputer`, and they always count as connected and ready.
 
 ## No-persistence policy
 

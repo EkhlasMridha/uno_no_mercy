@@ -17,8 +17,9 @@ export function toRoomView(room: Room): RoomView {
       id: p.id,
       name: p.name,
       isHost: p.id === room.hostId,
+      isComputer: p.isComputer,
       ready: p.ready,
-      connected: p.socketId !== null,
+      connected: p.socketId !== null || p.isComputer,
       departed: p.departed,
       score: p.score,
     })),
@@ -40,12 +41,16 @@ export function toGameView(room: Room, playerId: string): GameStateView | null {
   if (!game) return null;
   const seat = game.players.find((p) => p.id === playerId);
   if (!seat) return null;
-  const connectedIds = new Set(room.players.filter((p) => p.socketId).map((p) => p.id));
+  const connectedIds = new Set(
+    room.players.filter((p) => p.socketId || p.isComputer).map((p) => p.id),
+  );
+  const computerIds = new Set(room.players.filter((p) => p.isComputer).map((p) => p.id));
   return {
     roomCode: room.code,
     version: game.version,
     public: toPublicGameView(game, {
       connected: (id) => connectedIds.has(id),
+      isComputer: (id) => computerIds.has(id),
       hostId: room.hostId,
     }),
     me: {

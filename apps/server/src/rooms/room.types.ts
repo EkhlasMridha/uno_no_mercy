@@ -13,6 +13,8 @@ export interface RoomPlayer {
   /** Left or timed out during a game; removed when the room returns to the lobby. */
   departed: boolean;
   score: number;
+  /** Seat played by the server (play with computer). Never has a socket. */
+  isComputer: boolean;
   commandCache: CommandCache<Ack<unknown>>;
   expiryTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -28,4 +30,6 @@ export interface Room {
   dealerIndex: number;
   lastResult: RoundResultView | null;
   createdAt: number;
+  /** Pending computer move, if any. */
+  computerTimer: ReturnType<typeof setTimeout> | null;
 }
