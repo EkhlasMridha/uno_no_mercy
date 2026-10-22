@@ -58,23 +58,24 @@ export function HandExchange({ log, meId, name, angleOf }: HandExchangeProps) {
               toReach={toId === meId ? MY_REACH : REACH}
               route={event?.type === 'handsPassed' ? event.direction : 'across'}
               small={moves.length > 6}
+              single={moves.length > 10}
             />
           );
         })}
       <div role="status" aria-live="polite">
-        {exchange && <Caption key={exchange.seq} event={exchange.event} name={name} />}
+        {exchange && <Caption key={exchange.seq} event={exchange.event} meId={meId} name={name} />}
       </div>
     </div>
   );
 }
 
 /** Sits just above your hand, which overlaps the near edge of the table (`-mt-20 sm:-mt-28`). */
-function Caption({ event, name }: { event: Exchange; name: NameLookup }) {
+function Caption({ event, meId, name }: { event: Exchange; meId: string; name: NameLookup }) {
   let text: string;
   let Icon: typeof RotateCw | null = null;
   if (event.type === 'handsSwapped') {
     const [first, second] =
-      name(event.targetId) === 'You'
+      event.targetId === meId
         ? [name(event.targetId), name(event.playerId)]
         : [name(event.playerId), name(event.targetId)];
     text = `${first} and ${second} swap hands`;
@@ -102,8 +103,9 @@ function useLatestExchange(log: GameLogEntry[]): { seq: number; event: Exchange 
       lastSeq.current = newest;
       return;
     }
-    const since = lastSeq.current;
-    lastSeq.current = Math.max(since, newest);
+    // A new round restarts the log while the table stays mounted, so a lower seq means "from the top".
+    const since = newest < lastSeq.current ? 0 : lastSeq.current;
+    lastSeq.current = newest;
     const entry = log.filter((e) => e.seq > since && isExchange(e.event)).pop();
     if (entry && isExchange(entry.event)) setCurrent({ seq: entry.seq, event: entry.event });
   }, [log]);
@@ -125,9 +127,11 @@ interface HandBundleProps {
   /** A pass follows the rail in the direction of play; a swap cuts across the felt. */
   route: 1 | -1 | 'across';
   small: boolean;
+  /** A crowded pass sends one card back per hand, so the felt isn't buried in movement. */
+  single: boolean;
 }
 
-function HandBundle({ from, to, fromReach, toReach, route, small }: HandBundleProps) {
+function HandBundle({ from, to, fromReach, toReach, route, small, single }: HandBundleProps) {
   const travel = useRef<HTMLDivElement>(null);
   const lift = useRef<HTMLDivElement>(null);
 
@@ -166,7 +170,7 @@ function HandBundle({ from, to, fromReach, toReach, route, small }: HandBundlePr
         className="absolute left-0 top-0 flex"
         style={{ transform: 'translate(-50%, -50%)', opacity: 0 }}
       >
-        {[-14, 0, 14].map((tilt, i) => (
+        {(single ? [0] : [-14, 0, 14]).map((tilt, i) => (
           <CardBack
             key={tilt}
             size={small ? 'xs' : 'sm'}
