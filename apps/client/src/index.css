@@ -261,8 +261,15 @@ body {
   }
 }
 
-/* thin scrollbars for the hand / feed */
+/* thin scrollbars for the feed and the roulette tray */
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(242, 232, 218, 0.2) transparent;
+}
+/* the hand still scrolls sideways by swipe, trackpad or keyboard, without a bar under the fan */
+.scroll-none {
+  scrollbar-width: none;
+}
+.scroll-none::-webkit-scrollbar {
+  display: none;
 }

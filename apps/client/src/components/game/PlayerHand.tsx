@@ -37,7 +37,7 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   const step = sorted.length > 1 ? spread / (sorted.length - 1) : 0;
 
   return (
-    <div className="scroll-thin overflow-x-auto px-4 pb-3 pt-6">
+    <div className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6">
       <ul
         className="mx-auto flex w-max items-end px-6"
         aria-label={`Your hand, ${sorted.length} cards`}
