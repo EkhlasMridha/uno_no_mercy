@@ -11,25 +11,33 @@ function playIfOn(kind: SoundKind, delay = 0): void {
 }
 
 /**
- * Plays the card play, turn reminder, hand exchange and win sounds the player has switched on. Returns
- * how many times the 10 s reminder has fired, so the hand can shake with it; it is 0 again as soon as
- * anything happens at the table. Purely presentational: every trigger is state the server already sent.
+ * The idle turn reminder's nudge for the hand. `count` only grows, one per reminder, so each one can
+ * replay the hop; `active` stays true until anything happens at the table.
+ */
+export interface IdleNudge {
+  count: number;
+  active: boolean;
+}
+
+/**
+ * Plays the card play, turn reminder, hand exchange and win sounds the player has switched on, and
+ * returns the idle nudge so the hand can shake with the reminder. Purely presentational: every trigger
+ * is state the server already sent.
  */
 export function useGameSounds(
   view: PublicGameView,
   meId: string,
   mustAct: boolean,
   version: number,
-): number {
-  const [nudge, setNudge] = useState(0);
+): IdleNudge {
+  const [tick, setTick] = useState({ count: 0, version: -1 });
   // `version` changes on every move, so anything happening at the table restarts the countdown.
   useEffect(() => {
-    setNudge(0);
     if (!mustAct) return;
     const timer = window.setInterval(() => {
       playIfOn('turnReminder');
       // The shake is a visual nudge, so it happens even when the knock is off.
-      setNudge((n) => n + 1);
+      setTick((t) => ({ count: t.count + 1, version }));
     }, REMINDER_MS);
     return () => window.clearInterval(timer);
   }, [mustAct, version]);
@@ -59,5 +67,7 @@ export function useGameSounds(
     wonBefore.current = iWon;
   }, [iWon]);
 
-  return nudge;
+  // Worked out here rather than reset in an effect: a move only drops the class, so nothing remounts
+  // and a card drawn right after a nudge still slides in.
+  return { count: tick.count, active: tick.count > 0 && tick.version === version };
 }

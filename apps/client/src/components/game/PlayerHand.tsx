@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { Card } from '@nomercy/shared';
+import type { IdleNudge } from '../../hooks/useGameSounds';
 import { sortHand } from '../../lib/cards';
 import { PlayingCard } from '../card/PlayingCard';
 
@@ -8,8 +9,8 @@ interface PlayerHandProps {
   playableIds: ReadonlySet<string>;
   isMyTurn: boolean;
   onCardClick: (card: Card) => void;
-  /** Goes up each time the idle turn reminder fires; each step makes the cards hop. 0 = still. */
-  nudge: number;
+  /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
+  nudge: IdleNudge;
 }
 
 /** Your cards held in a fan over the table edge. */
@@ -57,11 +58,11 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
                 transformOrigin: '50% 100%',
               }}
             >
-              {/* Re-keyed on every nudge so the hop replays, rippling across the fan. */}
+              {/* Re-keyed on each reminder so the hop replays, rippling across the fan. */}
               <div
-                key={nudge}
-                className={nudge ? 'anim-nudge' : undefined}
-                style={nudge ? { animationDelay: `${Math.min(i * 18, 220)}ms` } : undefined}
+                key={nudge.count}
+                className={nudge.active ? 'anim-nudge' : undefined}
+                style={nudge.active ? { animationDelay: `${Math.min(i * 18, 220)}ms` } : undefined}
               >
                 <PlayingCard
                   card={card}
