@@ -1,4 +1,4 @@
-import { Crown, Hand, Skull, WifiOff } from 'lucide-react';
+import { Bot, Crown, Hand, Skull, WifiOff } from 'lucide-react';
 import type { PublicPlayerView } from '@nomercy/shared';
 import { seatPosition } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
@@ -42,7 +42,7 @@ export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }
     <div
       className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
       style={seatPosition(angle)}
-      aria-label={`${player.name}, ${player.handCount} cards${isCurrent ? ', playing now' : ''}${out ? ', out' : ''}`}
+      aria-label={`${player.name}${player.isComputer ? ', computer' : ''}, ${player.handCount} cards${isCurrent ? ', playing now' : ''}${out ? ', out' : ''}`}
     >
       {fan > 0 && (
         <div
@@ -84,6 +84,14 @@ export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }
           ].join(' ')}
         >
           {out ? <Skull size={18} aria-hidden /> : player.name.slice(0, 1).toUpperCase()}
+          {player.isComputer && (
+            <span
+              aria-hidden
+              className="absolute -left-1.5 -top-1 flex h-[1.15rem] w-[1.15rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-walnut"
+            >
+              <Bot size={11} strokeWidth={2.5} />
+            </span>
+          )}
           <span
             key={player.handCount}
             className={[

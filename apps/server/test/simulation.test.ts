@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CARD_COLORS, isWildCard, MAX_PLAYERS, type Card } from '@nomercy/shared';
 import {
   applyCommand,
@@ -9,6 +9,10 @@ import {
   type GameCommand,
   type GameState,
 } from '../src/engine/index.js';
+import { computerMoves } from '../src/rooms/computer-player.js';
+import { RoomManager } from '../src/rooms/room-manager.js';
+import type { Room } from '../src/rooms/room.types.js';
+import { buildState, filler, n, PLAYER_IDS } from './helpers.js';
 import { scoreRound, cardPoints } from '../src/rooms/match-scoring.js';
 
 /** Picks a random legal command for some player, using only the server's valid-action projection. */
@@ -89,6 +93,83 @@ describe('randomized full games', () => {
       expect(scoreRound(state)?.winnerId).toBe(state.phase.winnerId);
     }
     expect(finishedByEmptyHand + finishedByLastStanding).toBe(120);
+  });
+});
+
+describe('computer players', () => {
+  it('finish every game legally when they fill the whole table', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const rng = seededRng(seed);
+      const playerCount = [2, 4, 6, MAX_PLAYERS][seed % 4]!;
+      const players = Array.from({ length: playerCount }, (_, i) => ({
+        id: `p_cpu${String(i).padStart(5, '0')}`,
+        name: `C${i}`,
+      }));
+      let { state } = createGame({ players, dealerIndex: seed, rng });
+      let steps = 0;
+      while (state.phase.type !== 'finished') {
+        // Every seat is asked, since UNO calls and catches come from players off turn.
+        const mover = computerMoves(
+          state,
+          state.players.map((p) => p.id),
+          rng,
+        )[0];
+        expect(mover, `seed ${seed}: no computer move at version ${state.version}`).toBeDefined();
+        const outcome = applyCommand(state, mover!.playerId, mover!.command, rng, {
+          checkInvariants: true,
+        });
+        if (!outcome.ok)
+          throw new Error(`seed ${seed}: ${outcome.error.code} ${outcome.error.message}`);
+        state = outcome.state;
+        steps++;
+        expect(steps).toBeLessThan(20_000);
+      }
+      assertCardConservation(state);
+      expect(state.phase.winnerId).not.toBeNull();
+    }
+  });
+
+  it('let a computer call UNO before another computer can catch it', () => {
+    const state = buildState({ hands: [filler(3), filler(3), [n('blue', 1)]], top: n('red', 5) });
+    state.players[2]!.uno = 'vulnerable';
+    // Seat 1 could catch seat 2, but seat 2 saves itself first even though it sits later.
+    const [first] = computerMoves(state, [PLAYER_IDS[1]!, PLAYER_IDS[2]!], seededRng(1));
+    expect(first).toEqual({ playerId: PLAYER_IDS[2], command: { type: 'callUno' } });
+  });
+
+  it('retry instead of freezing the table when a move is refused', () => {
+    vi.useFakeTimers();
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const manager = new RoomManager({
+        rng: seededRng(3),
+        reconnectGraceMs: 60_000,
+        checkInvariants: true,
+        computerMoveDelayMs: 10,
+        onRoomUpdated: () => {},
+        onRoomClosed: () => {},
+      });
+      const { room, player } = manager.createRoom('Solo', 'socket-1', 2, 1);
+      const game = room.game!;
+      game.currentIndex = game.players.findIndex((p) => p.id !== player.id);
+      game.phase = { type: 'turn' };
+      game.pendingDraw = null;
+      // A missing card fails the conservation check, so every command is refused.
+      const missing = game.drawPile.pop()!;
+      const run = () =>
+        (manager as unknown as { runComputerMove(r: Room): void }).runComputerMove(room);
+      run();
+      expect(room.game!.version).toBe(game.version);
+      expect(room.computerTimer).not.toBeNull();
+
+      game.drawPile.push(missing);
+      vi.advanceTimersByTime(50);
+      expect(room.game!.version).toBeGreaterThan(game.version);
+      manager.closeAll('done');
+    } finally {
+      quiet.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
 

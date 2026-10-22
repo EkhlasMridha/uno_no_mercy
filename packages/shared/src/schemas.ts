@@ -26,7 +26,17 @@ export const stateVersionSchema = z.number().int().nonnegative();
 export const maxPlayersSchema = z.number().int().min(MIN_PLAYERS).max(MAX_PLAYERS);
 
 export const createRoomSchema = z
-  .object({ name: playerNameSchema, maxPlayers: maxPlayersSchema })
+  .object({
+    name: playerNameSchema,
+    maxPlayers: maxPlayersSchema,
+    /** Play with computer: seats this many computer opponents and deals straight away. */
+    computers: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PLAYERS - 1)
+      .optional(),
+  })
   .strict();
 export const joinRoomSchema = z.object({ code: roomCodeSchema, name: playerNameSchema }).strict();
 export const reconnectSchema = z
