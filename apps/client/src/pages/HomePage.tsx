@@ -262,7 +262,7 @@ function TablePreview({ you, computers }: { you: string; computers: number }) {
         <span
           key={offset}
           className={[
-            'absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display shadow-seat ring-2 transition-[left,top] duration-300 ease-out motion-reduce:transition-none',
+            'absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display shadow-seat ring-2 transition-[left,top] duration-300 ease-out',
             avatar,
             offset === 0
               ? 'bg-brass text-room ring-chalk'
