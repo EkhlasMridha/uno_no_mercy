@@ -1,15 +1,31 @@
 /** The game sounds. Each is synthesized with Web Audio, so the client ships no audio files. */
 export type SoundKind = 'turnReminder' | 'handExchange' | 'win';
 
-/** Which sounds the player has switched on. */
-export type SoundPrefs = Record<SoundKind, boolean>;
+/** Which sounds the player has switched on, and whether all of them are muted. */
+export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
+
+declare global {
+  interface Window {
+    /** Safari before 14.1 only has the prefixed constructor. */
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+// Undefined where there's no Web Audio at all (some in-app webviews); every sound is then skipped.
+const AudioContextCtor: typeof AudioContext | undefined =
+  window.AudioContext ?? window.webkitAudioContext;
 
 let ctx: AudioContext | null = null;
 
-/** Browsers keep audio suspended until the player interacts, so call this from a click or key press. */
+/**
+ * Browsers keep audio suspended until the player interacts, so call this from a click, tap or key
+ * press. It returns at once while audio runs, and resumes a context the OS suspended (a phone sent
+ * to the background) on the next tap.
+ */
 export function unlockAudio(): void {
-  ctx ??= new AudioContext();
-  if (ctx.state === 'suspended') void ctx.resume();
+  if (!AudioContextCtor || ctx?.state === 'running') return;
+  ctx ??= new AudioContextCtor();
+  void ctx.resume();
 }
 
 /** One enveloped oscillator note, optionally gliding to `endHz`. */

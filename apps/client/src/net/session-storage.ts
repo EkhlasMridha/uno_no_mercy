@@ -53,7 +53,12 @@ export function saveName(name: string): void {
 }
 
 const SOUND_KEY = 'nomercy.sound.v1';
-const DEFAULT_SOUND: SoundPrefs = { turnReminder: true, handExchange: true, win: true };
+const DEFAULT_SOUND: SoundPrefs = {
+  turnReminder: true,
+  handExchange: true,
+  win: true,
+  muted: false,
+};
 export function loadSoundPrefs(): SoundPrefs {
   try {
     const saved = JSON.parse(localStorage.getItem(SOUND_KEY) ?? '{}') as Partial<SoundPrefs>;

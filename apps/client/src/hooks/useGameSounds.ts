@@ -6,7 +6,8 @@ import { getState } from '../state/store';
 const REMINDER_MS = 10_000;
 
 function playIfOn(kind: SoundKind): void {
-  if (getState().sound[kind]) playSound(kind);
+  const prefs = getState().sound;
+  if (!prefs.muted && prefs[kind]) playSound(kind);
 }
 
 /**

@@ -37,6 +37,8 @@ export function App() {
   useEffect(() => startConnection(), []);
   useEffect(() => {
     // A touch only allows audio once the finger lifts, so listen for the release as well as the press.
+    // These stay attached: unlockAudio returns at once while audio runs, and the next tap resumes a
+    // context the OS suspended.
     const events = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const;
     events.forEach((e) => window.addEventListener(e, unlockAudio));
     return () => events.forEach((e) => window.removeEventListener(e, unlockAudio));

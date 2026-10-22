@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { GameStateView, RoomView, SessionInfo } from '@nomercy/shared';
-import type { SoundKind, SoundPrefs } from '../lib/sound';
+import type { SoundPrefs } from '../lib/sound';
 import { loadSoundPrefs, saveSoundPrefs } from '../net/session-storage';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -65,7 +65,7 @@ export function dismissNotice(id: number): void {
   setState((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
 }
 
-export function setSoundPref(kind: SoundKind, on: boolean): void {
-  setState((s) => ({ sound: { ...s.sound, [kind]: on } }));
+export function setSoundPref(key: keyof SoundPrefs, value: boolean): void {
+  setState((s) => ({ sound: { ...s.sound, [key]: value } }));
   saveSoundPrefs(state.sound);
 }

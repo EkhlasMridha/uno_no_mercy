@@ -20,13 +20,44 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
   { kind: 'win', label: 'Win', description: 'A fanfare when you win the round.', Icon: Trophy },
 ];
 
-/** Top-bar button that opens the sound panel: a toggle and a preview for each game sound. */
+/** A brass-and-walnut switch drawn over a real checkbox, so keyboards and screen readers still work. */
+function Toggle({
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <span className="relative inline-flex shrink-0">
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span
+        aria-hidden="true"
+        className="h-6 w-11 rounded-full bg-walnut-dark ring-1 ring-walnut-light/60 transition-colors peer-checked:bg-brass peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white motion-reduce:transition-none"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-chalk shadow transition-transform peer-checked:translate-x-5 motion-reduce:transition-none"
+      />
+    </span>
+  );
+}
+
+/** Top-bar button that opens the sound panel: mute all, plus a toggle and a preview for each sound. */
 export function SoundSettings({ className }: { className: string }) {
   const [open, setOpen] = useState(false);
   const prefs = useAppState((s) => s.sound);
   // Stable, so the open panel keeps focus while game updates re-render the page.
   const close = useCallback(() => setOpen(false), []);
-  const Icon = Object.values(prefs).some(Boolean) ? Volume2 : VolumeX;
+  const Icon = !prefs.muted && SOUNDS.some(({ kind }) => prefs[kind]) ? Volume2 : VolumeX;
 
   return (
     <>
@@ -40,21 +71,30 @@ export function SoundSettings({ className }: { className: string }) {
       </button>
       {open && (
         <Modal title="Sound" onClose={close}>
+          <label className="mb-3 flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-white/5 px-3 py-2.5">
+            <span className="flex items-center gap-2 font-semibold">
+              <VolumeX size={16} className="text-brass" /> Mute all
+            </span>
+            <Toggle checked={prefs.muted} onChange={(on) => setSoundPref('muted', on)} />
+          </label>
           <ul className="space-y-2">
             {SOUNDS.map(({ kind, label, description, Icon: SoundIcon }) => (
               <li key={kind} className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5">
-                <label className="flex flex-1 cursor-pointer items-center justify-between gap-4">
+                <label
+                  className={`flex flex-1 items-center justify-between gap-4 ${
+                    prefs.muted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                  }`}
+                >
                   <span>
                     <span className="flex items-center gap-2 font-semibold">
                       <SoundIcon size={16} className="text-brass" /> {label}
                     </span>
                     <span className="block text-sm text-white/60">{description}</span>
                   </span>
-                  <input
-                    type="checkbox"
-                    className="h-6 w-6 shrink-0 accent-accent"
+                  <Toggle
                     checked={prefs[kind]}
-                    onChange={(e) => setSoundPref(kind, e.target.checked)}
+                    disabled={prefs.muted}
+                    onChange={(on) => setSoundPref(kind, on)}
                   />
                 </label>
                 <button
