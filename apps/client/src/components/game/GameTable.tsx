@@ -5,6 +5,7 @@ import type { NameLookup } from '../../lib/event-text';
 import { seatAngle } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
 import { DiscardHeap } from './DiscardHeap';
+import { HandExchange } from './HandExchange';
 import { RouletteReveal } from './RouletteReveal';
 import { TableSeat, type SeatScale } from './TableSeat';
 
@@ -120,6 +121,13 @@ export function GameTable({
           onCatch={() => onCatch(p.id)}
         />
       ))}
+
+      <HandExchange
+        log={view.log}
+        meId={meId}
+        name={name}
+        angleOf={(id) => angles.get(id) ?? null}
+      />
     </div>
   );
 }

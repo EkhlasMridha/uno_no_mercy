@@ -41,7 +41,8 @@ export type GameEvent =
   | { type: 'everyoneSkipped'; playerId: string }
   | { type: 'discardedAll'; playerId: string; color: CardColor; count: number }
   | { type: 'handsSwapped'; playerId: string; targetId: string }
-  | { type: 'handsPassed'; direction: Direction }
+  /** Every pass that happened, in seat order; knocked-out seats are skipped. */
+  | { type: 'handsPassed'; direction: Direction; passes: { fromId: string; toId: string }[] }
   | { type: 'rouletteStarted'; playerId: string; victimId: string }
   | { type: 'rouletteColorNamed'; victimId: string; color: CardColor }
   /** Roulette cards are drawn face up, so the card itself is public. */
