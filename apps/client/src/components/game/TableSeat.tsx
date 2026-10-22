@@ -83,12 +83,14 @@ export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }
             isCurrent ? 'anim-turn ring-brass' : 'ring-walnut-light/70',
           ].join(' ')}
         >
-          {out ? (
-            <Skull size={18} aria-hidden />
-          ) : player.isComputer ? (
-            <Bot size={18} aria-hidden />
-          ) : (
-            player.name.slice(0, 1).toUpperCase()
+          {out ? <Skull size={18} aria-hidden /> : player.name.slice(0, 1).toUpperCase()}
+          {player.isComputer && (
+            <span
+              aria-hidden
+              className="absolute -left-1.5 -top-1 flex h-[1.15rem] w-[1.15rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-walnut"
+            >
+              <Bot size={11} strokeWidth={2.5} />
+            </span>
           )}
           <span
             key={player.handCount}

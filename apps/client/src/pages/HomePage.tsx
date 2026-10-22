@@ -216,8 +216,8 @@ export function HomePage() {
                   <Bot size={16} className="text-brass" /> Opponents
                 </span>
                 <span className="block text-sm text-white/60" aria-live="polite">
-                  {computers === 1 ? '1 computer' : `${computers} computers`}. Names are picked for
-                  them.
+                  {computers === 1 ? '1 computer opponent' : `${computers} computer opponents`},
+                  named at random.
                 </span>
               </span>
               <PlayerCountInput
@@ -262,7 +262,7 @@ function TablePreview({ you, computers }: { you: string; computers: number }) {
         <span
           key={offset}
           className={[
-            'absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display shadow-seat ring-2 transition-[left,top] duration-300 ease-out',
+            'absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display shadow-seat ring-2 transition-[left,top] duration-300 ease-out motion-reduce:transition-none',
             avatar,
             offset === 0
               ? 'bg-brass text-room ring-chalk'

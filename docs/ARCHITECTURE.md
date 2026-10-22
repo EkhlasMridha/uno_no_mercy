@@ -174,12 +174,14 @@ Differences from the suggested list: the wild color and the 7 swap target travel
 
 Computer seats are `RoomPlayer`s with `isComputer` and no socket, created by `room:create` with
 `computers`. They live in the rooms layer, not the engine. After every successful command and every new
-round, `RoomManager` sets one timer per room (`computerMoveDelayMs`, 900 ms by default, half that while
-a player is drawing card by card). When it fires, the first computer with something to do picks a move
-in `rooms/computer-player.ts` from `getValidActions` alone and sends it through `executeGameCommand`,
-the same path a human command takes. That move schedules the next one, so computers keep playing until a
-human must act or the round ends. The public views mark them `isComputer`, and they always count as
-connected and ready.
+round, `RoomManager` sets one timer per room, but only when some computer has a move
+(`computerMoveDelayMs`, 900 ms by default, shorter on fuller tables and halved while a player is drawing
+card by card). When it fires, `computerMoves` in `rooms/computer-player.ts` picks each computer's move
+from `getValidActions` alone, UNO calls first so a computer saves itself before another can catch it,
+and the first one goes through `executeGameCommand`, the same path a human command takes. A refused move
+falls back to a plain draw or penalty, and if nothing goes through the timer is set again, so the table
+never waits on a computer. Each move schedules the next, so computers keep playing until a human must act
+or the round ends. The public views mark them `isComputer`, and they always count as connected and ready.
 
 ## No-persistence policy
 

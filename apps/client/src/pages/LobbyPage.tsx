@@ -89,11 +89,12 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
         <ul className="space-y-2">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-felt-600 font-display text-lg">
-                {p.isComputer ? (
-                  <Bot size={18} aria-label="Computer" />
-                ) : (
-                  p.name.slice(0, 1).toUpperCase()
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-felt-600 font-display text-lg">
+                {p.name.slice(0, 1).toUpperCase()}
+                {p.isComputer && (
+                  <span className="absolute -left-1 -top-1 flex h-[1.1rem] w-[1.1rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-felt-900">
+                    <Bot size={11} strokeWidth={2.5} aria-label="Computer" />
+                  </span>
                 )}
               </span>
               <span className="flex-1 truncate">

@@ -9,7 +9,12 @@ import {
 } from '@nomercy/shared';
 import { applyCommand, createGame, type GameCommand, type Rng } from '../engine/index.js';
 import { CommandCache } from '../net/command-cache.js';
-import { chooseComputerMove, computerNames } from './computer-player.js';
+import {
+  chooseComputerMove,
+  computerMoves,
+  computerNames,
+  fallbackComputerMove,
+} from './computer-player.js';
 import { scoreRound } from './match-scoring.js';
 import type { Room, RoomPlayer } from './room.types.js';
 import { generatePlayerId, generateReconnectToken, tokensMatch } from './session.js';
@@ -285,38 +290,52 @@ export class RoomManager {
     this.scheduleComputers(room);
   }
 
-  /** Queues the next computer move. Each move reschedules, until a human must act. */
+  private computerIds(room: Room): string[] {
+    return room.players.filter((p) => p.isComputer && !p.departed).map((p) => p.id);
+  }
+
+  /** Queues the next computer move, only when a computer has one. Each move reschedules. */
   private scheduleComputers(room: Room): void {
-    if (room.computerTimer || !room.players.some((p) => p.isComputer)) return;
-    const phase = room.game?.phase.type;
-    // Single-card draw streaks run faster than real decisions.
-    const delay =
-      (this.options.computerMoveDelayMs ?? 900) /
-      (phase === 'drawing' || phase === 'rouletteReveal' ? 2 : 1);
-    room.computerTimer = setTimeout(() => {
-      room.computerTimer = null;
-      this.runComputerMove(room);
-    }, delay);
+    const game = room.game;
+    if (room.computerTimer || room.status !== 'inGame' || !game) return;
+    const computers = this.computerIds(room);
+    // A fixed rng is enough here: only whether any move exists matters.
+    if (!computers.some((id) => chooseComputerMove(game, id, () => 0))) return;
+    // Fuller tables move faster so a lap doesn't keep the human waiting; draw streaks faster still.
+    const crowd = Math.max(0.35, Math.min(1, 6 / computers.length));
+    const streak = game.phase.type === 'drawing' || game.phase.type === 'rouletteReveal' ? 0.5 : 1;
+    room.computerTimer = setTimeout(
+      () => {
+        room.computerTimer = null;
+        this.runComputerMove(room);
+      },
+      (this.options.computerMoveDelayMs ?? 900) * crowd * streak,
+    );
     room.computerTimer.unref?.();
   }
 
   private runComputerMove(room: Room): void {
     const game = room.game;
     if (!this.rooms.has(room.code) || room.status !== 'inGame' || !game) return;
-    for (const player of room.players) {
-      if (!player.isComputer || player.departed) continue;
-      const command = chooseComputerMove(game, player.id, this.options.rng);
-      if (!command) continue;
-      try {
-        this.executeGameCommand(room.code, player.id, command, null);
-      } catch (error) {
-        // A throw inside a timer would take the whole server down.
-        console.error(`[room ${room.code}] computer move failed`, error);
-        return;
+    for (const { playerId, command } of computerMoves(
+      game,
+      this.computerIds(room),
+      this.options.rng,
+    )) {
+      for (const attempt of [command, fallbackComputerMove(game, playerId)]) {
+        if (!attempt) continue;
+        try {
+          this.executeGameCommand(room.code, playerId, attempt, null);
+          this.options.onRoomUpdated(room);
+          return;
+        } catch (error) {
+          // Logged, not thrown: a throw inside a timer would take the whole server down.
+          console.error(`[room ${room.code}] computer ${attempt.type} refused`, error);
+        }
       }
-      this.options.onRoomUpdated(room);
-      return;
     }
+    // Every move was refused: try again shortly rather than leave the table waiting on a computer.
+    this.scheduleComputers(room);
   }
 
   private finishRound(room: Room): void {

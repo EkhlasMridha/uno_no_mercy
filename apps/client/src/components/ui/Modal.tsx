@@ -14,10 +14,8 @@ interface ModalProps {
 export function Modal({ title, children, onClose, dismissible = true, wide = false }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Focus once on open; refocusing on every render would pull focus out of inputs inside.
-  useEffect(() => dialogRef.current?.focus(), []);
-
   useEffect(() => {
+    dialogRef.current?.focus();
     if (!dismissible || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

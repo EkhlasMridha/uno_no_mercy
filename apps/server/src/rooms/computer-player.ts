@@ -63,7 +63,11 @@ export function chooseComputerMove(
   const catchable = actions.catchablePlayerIds[0];
   if (catchable) return { type: 'catchUno', targetId: catchable };
   if (actions.canChooseRouletteColor) {
-    return { type: 'chooseRouletteColor', color: favoriteColor([], rng) };
+    // Every color is equally likely to turn up, so any guess is as good as another.
+    return {
+      type: 'chooseRouletteColor',
+      color: CARD_COLORS[rng(CARD_COLORS.length)] as CardColor,
+    };
   }
 
   const hand = state.players.find((p) => p.id === playerId)?.hand ?? [];
@@ -89,5 +93,29 @@ export function chooseComputerMove(
   }
   if (actions.canAcceptPenalty) return { type: 'acceptPenalty' };
   if (actions.canDraw) return { type: 'draw' };
+  return null;
+}
+
+/**
+ * The move each computer would make, UNO calls first: a computer left on one card saves itself
+ * before another computer can catch it.
+ */
+export function computerMoves(
+  state: GameState,
+  playerIds: readonly string[],
+  rng: Rng,
+): { playerId: string; command: GameCommand }[] {
+  return playerIds
+    .map((playerId) => ({ playerId, command: chooseComputerMove(state, playerId, rng) }))
+    .filter((m): m is { playerId: string; command: GameCommand } => m.command !== null)
+    .sort((a, b) => Number(b.command.type === 'callUno') - Number(a.command.type === 'callUno'));
+}
+
+/** A plain move that keeps the game going when the preferred one is refused. */
+export function fallbackComputerMove(state: GameState, playerId: string): GameCommand | null {
+  const actions = getValidActions(state, playerId);
+  if (actions.canAcceptPenalty) return { type: 'acceptPenalty' };
+  if (actions.canDraw) return { type: 'draw' };
+  if (actions.canChooseRouletteColor) return { type: 'chooseRouletteColor', color: CARD_COLORS[0] };
   return null;
 }
