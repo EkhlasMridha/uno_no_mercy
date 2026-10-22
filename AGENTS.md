@@ -121,8 +121,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
   every CSS animation and transition; motion started from script must check the media query itself).
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
-- Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files),
-  `useGameSounds` plays them only from state the server sent, and the Sound panel
+- Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files): every
+  card play, the turn reminder, 0/7 hand exchanges and the win. `useGameSounds` plays them only from
+  state the server sent, and the Sound panel
   (`SoundSettings.tsx`) switches each one off or mutes them all.
 
 ### Tests
@@ -219,7 +220,9 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
   as well as on desktop.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
   hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
-  `handsPassed.passes` pairs the server sends), the turn pulse. No decorative entrance animations.
+  `handsPassed.passes` pairs the server sends), the turn pulse, and your cards hopping in a ripple
+  with the knock after 10 s idle on your move (`anim-nudge`, not `anim-shake`, which means "can't play
+  that"). No decorative entrance animations.
 
 ## Copy and voice
 
