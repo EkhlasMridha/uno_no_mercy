@@ -1,5 +1,6 @@
 import {
   MATCH_TARGET_POINTS,
+  MAX_COMPUTERS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROOM_CODE_ALPHABET,
@@ -97,9 +98,7 @@ export class RoomManager {
       computerTimer: null,
     };
     player.ready = true;
-    for (const computerName of computerNames(computers, name, this.options.rng)) {
-      room.players.push({ ...this.newPlayer(computerName, null), isComputer: true, ready: true });
-    }
+    this.addComputers(room, computers);
     this.rooms.set(room.code, room);
     if (computers > 0) this.beginRound(room);
     return { room, player };
@@ -170,22 +169,29 @@ export class RoomManager {
     return room;
   }
 
-  startGame(code: string, playerId: string): Room {
+  /** With `fillWithComputers`, computers take the open seats (up to MAX_COMPUTERS) before dealing. */
+  startGame(code: string, playerId: string, fillWithComputers = false): Room {
     const room = this.requireHost(code, playerId);
     if (room.status !== 'lobby')
       throw new RoomError('INVALID_PHASE', 'The game has already started');
-    const members = room.players.filter((p) => !p.departed);
-    if (members.length < MIN_PLAYERS) {
-      throw new RoomError('NOT_ENOUGH_PLAYERS', `At least ${MIN_PLAYERS} players are needed`);
-    }
-    const notReady = members.filter(
-      (p) => p.id !== room.hostId && (!p.ready || (!p.socketId && !p.isComputer)),
+    const notReady = room.players.filter(
+      (p) => !p.departed && p.id !== room.hostId && (!p.ready || (!p.socketId && !p.isComputer)),
     );
     if (notReady.length > 0) {
       throw new RoomError(
         'PLAYERS_NOT_READY',
         `Waiting for ${notReady.map((p) => p.name).join(', ')} to be ready`,
       );
+    }
+    if (fillWithComputers) {
+      const seated = room.players.filter((p) => !p.departed);
+      const computers = seated.filter((p) => p.isComputer).length;
+      const open = room.settings.maxPlayers - seated.length;
+      this.addComputers(room, Math.max(0, Math.min(open, MAX_COMPUTERS - computers)));
+    }
+    const members = room.players.filter((p) => !p.departed);
+    if (members.length < MIN_PLAYERS) {
+      throw new RoomError('NOT_ENOUGH_PLAYERS', `At least ${MIN_PLAYERS} players are needed`);
     }
     for (const p of members) p.score = 0;
     this.beginRound(room);
@@ -216,9 +222,10 @@ export class RoomManager {
     room.game = null;
     room.lastResult = null;
     room.roundNumber = 0;
-    room.players = room.players.filter((p) => !p.departed);
+    // Computers leave with the round, so the open seats are free for people again.
+    room.players = room.players.filter((p) => !p.departed && !p.isComputer);
     for (const p of room.players) {
-      p.ready = p.id === room.hostId || p.isComputer;
+      p.ready = p.id === room.hostId;
       p.score = 0;
     }
     return room;
@@ -283,11 +290,22 @@ export class RoomManager {
       players: members.map((p) => ({ id: p.id, name: p.name })),
       dealerIndex: room.dealerIndex,
       rng: this.options.rng,
+      // With computers at the table, the round ends once its people are all out.
+      endWhenOut: members.some((p) => p.isComputer)
+        ? members.filter((p) => !p.isComputer).map((p) => p.id)
+        : [],
     });
     room.game = state;
     room.status = 'inGame';
     room.lastResult = null;
     this.scheduleComputers(room);
+  }
+
+  private addComputers(room: Room, count: number): void {
+    const taken = room.players.filter((p) => !p.departed).map((p) => p.name);
+    for (const name of computerNames(count, taken, this.options.rng)) {
+      room.players.push({ ...this.newPlayer(name, null), isComputer: true, ready: true });
+    }
   }
 
   private computerIds(room: Room): string[] {

@@ -24,16 +24,24 @@ export function GameOverModal({ room, game, meId }: GameOverModalProps) {
   return (
     <Modal title={iWon ? 'You win!' : 'Game over'} dismissible={false}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
-          <Crown size={34} />
-        </div>
+        {phase.reason === 'peopleOut' ? (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/20 text-rose-300">
+            <Skull size={34} />
+          </div>
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+            <Crown size={34} />
+          </div>
+        )}
         <p className="font-display text-3xl">
           {winner ? (iWon ? 'Victory!' : `${winner.name} wins`) : 'No winner'}
         </p>
         <p className="text-white/70">
           {phase.reason === 'emptyHand'
             ? 'Played their final card.'
-            : 'Last player standing — everyone else was knocked out.'}
+            : phase.reason === 'peopleOut'
+              ? 'Everyone at the table was knocked out, so the round ends here.'
+              : 'Last player standing — everyone else was knocked out.'}
         </p>
       </div>
 
