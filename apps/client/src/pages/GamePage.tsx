@@ -73,7 +73,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
-  useGameSounds(
+  const nudge = useGameSounds(
     view,
     meId,
     !finished && (isMyTurn || actions.canChooseRouletteColor),
@@ -238,6 +238,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 playableIds={playable}
                 isMyTurn={isMyTurn && !finished}
                 onCardClick={onCardClick}
+                nudge={nudge}
               />
             </div>
             <div className="flex items-center justify-center gap-2 px-4 pb-1 text-sm">

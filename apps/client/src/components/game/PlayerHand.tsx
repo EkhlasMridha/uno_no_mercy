@@ -8,10 +8,12 @@ interface PlayerHandProps {
   playableIds: ReadonlySet<string>;
   isMyTurn: boolean;
   onCardClick: (card: Card) => void;
+  /** Goes up each time the idle turn reminder fires; each step makes the cards hop. 0 = still. */
+  nudge: number;
 }
 
 /** Your cards held in a fan over the table edge. */
-export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick }: PlayerHandProps) {
+export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: PlayerHandProps) {
   const sorted = useMemo(() => sortHand(hand), [hand]);
   const previous = useRef<Set<string> | null>(null);
   const prevIds = previous.current;
@@ -55,14 +57,21 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick }: PlayerH
                 transformOrigin: '50% 100%',
               }}
             >
-              <PlayingCard
-                card={card}
-                size="md"
-                playable={playable}
-                dimmed={isMyTurn && !playable}
-                onClick={() => onCardClick(card)}
-                animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
-              />
+              {/* Re-keyed on every nudge so the hop replays, rippling across the fan. */}
+              <div
+                key={nudge}
+                className={nudge ? 'anim-nudge' : undefined}
+                style={nudge ? { animationDelay: `${Math.min(i * 18, 220)}ms` } : undefined}
+              >
+                <PlayingCard
+                  card={card}
+                  size="md"
+                  playable={playable}
+                  dimmed={isMyTurn && !playable}
+                  onClick={() => onCardClick(card)}
+                  animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
+                />
+              </div>
             </li>
           );
         })}

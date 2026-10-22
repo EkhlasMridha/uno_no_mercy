@@ -1,10 +1,25 @@
 import { useState } from 'react';
-import { Bell, Play, Shuffle, Trophy, Volume2, VolumeX, type LucideIcon } from 'lucide-react';
+import {
+  Bell,
+  Layers,
+  Play,
+  Shuffle,
+  Trophy,
+  Volume2,
+  VolumeX,
+  type LucideIcon,
+} from 'lucide-react';
 import { playSound, type SoundKind } from '../lib/sound';
 import { setSoundPref, useAppState } from '../state/store';
 import { Modal } from './ui/Modal';
 
 const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: LucideIcon }[] = [
+  {
+    kind: 'cardPlay',
+    label: 'Card play',
+    description: 'A flick and a soft landing on the felt whenever anyone plays a card.',
+    Icon: Layers,
+  },
   {
     kind: 'turnReminder',
     label: 'Turn reminder',
