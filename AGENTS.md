@@ -62,7 +62,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
 7. **Validate every payload.** Each client event has a strict Zod schema in `packages/shared/src/schemas.ts`.
    Unknown keys are rejected. Commands never carry the actor's player id; the socket binding decides that.
 8. **Nothing persists.** No database, no cloud. The browser keeps only the reconnect token
-   (`sessionStorage`) and the last display name (`localStorage`).
+   (`sessionStorage`), and the last display name and sound settings (`localStorage`).
 
 ## Coding standards
 
@@ -117,6 +117,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
   every CSS animation and transition; motion started from script must check the media query itself).
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
+- Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files),
+  `useGameSounds` plays them only from state the server sent, and the Sound panel
+  (`SoundSettings.tsx`) switches each one off or mutes them all.
 
 ### Tests
 
@@ -211,7 +214,8 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
   as well as on desktop.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
-  the turn pulse. No decorative entrance animations.
+  hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
+  `handsPassed.passes` pairs the server sends), the turn pulse. No decorative entrance animations.
 
 ## Copy and voice
 

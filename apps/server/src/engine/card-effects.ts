@@ -61,17 +61,19 @@ export function swapHands(state: GameState, a: number, b: number, events: EventS
 export function passHands(state: GameState, events: EventSink): void {
   const snapshot = state.players.map((p) => p.hand);
   const nextHands = state.players.map((p) => p.hand);
+  const passes: { fromId: string; toId: string }[] = [];
   state.players.forEach((player, index) => {
     if (!isActive(player)) return;
     const receiver = nextActiveIndex(state, index);
     nextHands[receiver] = snapshot[index] as Card[];
+    passes.push({ fromId: player.id, toId: playerAt(state, receiver).id });
   });
   state.players.forEach((player, index) => {
     if (!isActive(player)) return;
     player.hand = nextHands[index] as Card[];
     player.uno = 'none';
   });
-  events.push({ type: 'handsPassed', direction: state.direction });
+  events.push({ type: 'handsPassed', direction: state.direction, passes });
 }
 
 function reverseDirection(state: GameState, events: EventSink): void {

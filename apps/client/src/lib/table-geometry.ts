@@ -14,12 +14,18 @@ export function seatAngle(offset: number, count: number): number {
   return MY_SEAT_ANGLE + (offset * 360) / Math.max(count, 1);
 }
 
-export function seatPosition(angle: number): { left: string; top: string } {
+/** A point on the seat ring in stage percentages; `reach` below 1 pulls it in toward the middle. */
+export function seatPoint(angle: number, reach = 1): { x: number; y: number } {
   const rad = (angle * Math.PI) / 180;
   return {
-    left: `${50 + SEAT_RADIUS.x * Math.cos(rad)}%`,
-    top: `${50 + SEAT_RADIUS.y * Math.sin(rad)}%`,
+    x: 50 + SEAT_RADIUS.x * reach * Math.cos(rad),
+    y: 50 + SEAT_RADIUS.y * reach * Math.sin(rad),
   };
+}
+
+export function seatPosition(angle: number): { left: string; top: string } {
+  const { x, y } = seatPoint(angle);
+  return { left: `${x}%`, top: `${y}%` };
 }
 
 /** Stable 0..1 value for a given seed, so a card keeps its spot on the table across renders. */
