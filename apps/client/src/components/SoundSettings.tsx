@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Bell, Play, Shuffle, Trophy, Volume2, VolumeX, type LucideIcon } from 'lucide-react';
 import { playSound, type SoundKind } from '../lib/sound';
 import { setSoundPref, useAppState } from '../state/store';
@@ -55,8 +55,6 @@ function Toggle({
 export function SoundSettings({ className }: { className: string }) {
   const [open, setOpen] = useState(false);
   const prefs = useAppState((s) => s.sound);
-  // Stable, so the open panel keeps focus while game updates re-render the page.
-  const close = useCallback(() => setOpen(false), []);
   const Icon = !prefs.muted && SOUNDS.some(({ kind }) => prefs[kind]) ? Volume2 : VolumeX;
 
   return (
@@ -70,7 +68,7 @@ export function SoundSettings({ className }: { className: string }) {
         <Icon size={16} /> <span className="hidden sm:inline">Sound</span>
       </button>
       {open && (
-        <Modal title="Sound" onClose={close}>
+        <Modal title="Sound" onClose={() => setOpen(false)}>
           <label className="mb-3 flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-white/5 px-3 py-2.5">
             <span className="flex items-center gap-2 font-semibold">
               <VolumeX size={16} className="text-brass" /> Mute all
