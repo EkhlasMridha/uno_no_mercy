@@ -1,5 +1,5 @@
 /** The game sounds. Each is synthesized with Web Audio, so the client ships no audio files. */
-export type SoundKind = 'cardPlay' | 'turnReminder' | 'handExchange' | 'win';
+export type SoundKind = 'cardPlay' | 'yourTurn' | 'turnReminder' | 'handExchange' | 'win';
 
 /** Which sounds the player has switched on, and whether all of them are muted. */
 export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
@@ -93,6 +93,14 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
     noise(ac, at + 0.02, 0.14, 0.035, vary(2200), vary(900));
     noise(ac, land, 0.045, 0.25, vary(900), vary(550), 0.04);
     tone(ac, ac.destination, 'sine', land, 0.08, 0.2, vary(140), 70);
+  },
+  // A soft rising chime, A5 then E6, in pure sine so it stays clear without being shrill. A faint
+  // octave above the second note gives it a little shine.
+  yourTurn(ac, at) {
+    const out = ac.destination;
+    tone(ac, out, 'sine', at, 0.32, 0.2, 880);
+    tone(ac, out, 'sine', at + 0.14, 0.6, 0.22, 1318.5);
+    tone(ac, out, 'sine', at + 0.14, 0.35, 0.03, 2637);
   },
   // Two knuckle knocks on the rail, then a small brass bell.
   turnReminder(ac, at) {

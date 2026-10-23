@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Bell,
+  BellRing,
   Layers,
   Play,
   Shuffle,
@@ -19,6 +20,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Card play',
     description: 'A flick and a soft landing on the felt whenever anyone plays a card.',
     Icon: Layers,
+  },
+  {
+    kind: 'yourTurn',
+    label: 'Your turn',
+    description: 'A soft chime the moment it becomes your move.',
+    Icon: BellRing,
   },
   {
     kind: 'turnReminder',

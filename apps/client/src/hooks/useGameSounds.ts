@@ -20,9 +20,9 @@ export interface IdleNudge {
 }
 
 /**
- * Plays the card play, turn reminder, hand exchange and win sounds the player has switched on, and
- * returns the idle nudge so the hand can shake with the reminder. Purely presentational: every trigger
- * is state the server already sent.
+ * Plays the card play, your turn, turn reminder, hand exchange and win sounds the player has
+ * switched on, and returns the idle nudge so the hand can shake with the reminder. Purely
+ * presentational: every trigger is state the server already sent.
  */
 export function useGameSounds(
   view: PublicGameView,
@@ -43,6 +43,8 @@ export function useGameSounds(
   }, [mustAct, version]);
 
   const lastSeq = useRef<number | null>(null);
+  // Starts as the current state, so loading or reconnecting into your own turn stays quiet.
+  const actingBefore = useRef(mustAct);
   useEffect(() => {
     const newest = view.log[view.log.length - 1]?.seq ?? 0;
     // A new round restarts the log while this page stays mounted, so a lower seq means "from the top".
@@ -53,10 +55,21 @@ export function useGameSounds(
     const played = fresh.some((e) => e.event.type === 'cardPlayed');
     if (played) playIfOn('cardPlay');
     // A 0 or 7 is played and passed in one update: let the card land before the hands move.
-    if (fresh.some((e) => e.event.type === 'handsSwapped' || e.event.type === 'handsPassed')) {
-      playIfOn('handExchange', played ? 0.25 : 0);
+    const exchanged = fresh.some(
+      (e) => e.event.type === 'handsSwapped' || e.event.type === 'handsPassed',
+    );
+    if (exchanged) playIfOn('handExchange', played ? 0.25 : 0);
+
+    // Your turn: when the move comes round to you, or straight back (a Skip with two players).
+    const othersPlayed = fresh.some(
+      (e) => e.event.type === 'cardPlayed' && e.event.playerId !== meId,
+    );
+    if (mustAct && (!actingBefore.current || othersPlayed)) {
+      // Chime once the card has landed and any hands have finished passing.
+      playIfOn('yourTurn', exchanged ? 0.8 : played ? 0.3 : 0);
     }
-  }, [view.log]);
+    actingBefore.current = mustAct;
+  }, [view.log, mustAct, meId]);
 
   // Only the moment of winning cheers, after the final card lands; reloading into a finished game
   // stays quiet.

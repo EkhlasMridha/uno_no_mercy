@@ -13,6 +13,7 @@ import { EventBanner } from '../components/game/EventBanner';
 import { EventFeed } from '../components/game/EventFeed';
 import { GameTable } from '../components/game/GameTable';
 import { PlayerHand } from '../components/game/PlayerHand';
+import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SoundSettings } from '../components/SoundSettings';
 import { ColorPickerModal } from '../components/modals/ColorPickerModal';
 import { DiscardChoiceModal } from '../components/modals/DiscardChoiceModal';
@@ -75,6 +76,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  const myMove = isMyTurn && !finished && me?.status === 'active';
   const nudge = useGameSounds(
     view,
     meId,
@@ -235,6 +237,13 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             aria-label="Your hand"
             className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28"
           >
+            {/* brass light pools behind the hand while it's your move */}
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[150%] bg-[radial-gradient(ellipse_60%_70%_at_50%_100%,rgba(231,200,134,0.32),rgba(208,166,80,0.1)_45%,transparent_75%)] transition-opacity duration-500 ${
+                myMove ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
             <div key={shake} className={shake ? 'anim-shake' : ''}>
               <PlayerHand
                 hand={heldHand}
@@ -244,14 +253,27 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 nudge={nudge}
               />
             </div>
-            <div className="flex items-center justify-center gap-2 px-4 pb-1 text-sm">
+            <div className="flex items-center justify-center gap-2.5 px-4 pb-1 text-sm">
+              <span
+                className={`relative h-10 w-10 shrink-0 rounded-full shadow-seat ring-2 ${
+                  myMove ? 'anim-turn ring-brass' : 'ring-walnut-light/70'
+                }`}
+              >
+                {myMove && <span aria-hidden className="turn-orbit" />}
+                <PlayerAvatar traits={avatarOf(meId)} className="h-full w-full" />
+              </span>
               <span
                 className={`rounded-sm px-2 py-0.5 font-semibold shadow transition-colors ${
-                  isMyTurn && !finished ? 'anim-turn bg-brass text-room' : 'bg-room/85 text-chalk'
+                  myMove ? 'bg-brass text-room' : 'bg-room/85 text-chalk'
                 }`}
               >
                 {me?.name ?? 'You'}
               </span>
+              {myMove && (
+                <span className="font-display text-lg leading-none text-brass-soft drop-shadow-[0_0_8px_rgba(231,200,134,0.6)]">
+                  Your turn
+                </span>
+              )}
               <span className="text-chalk/60">{hand.length} cards</span>
               {me?.uno === 'declared' && (
                 <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">

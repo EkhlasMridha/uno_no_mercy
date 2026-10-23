@@ -122,7 +122,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files): every
-  card play, the turn reminder, 0/7 hand exchanges and the win. `useGameSounds` plays them only from
+  card play, the chime when your turn starts, the turn reminder, 0/7 hand exchanges and the win. `useGameSounds` plays them only from
   state the server sent, and the Sound panel
   (`SoundSettings.tsx`) switches each one off or mutes them all.
 

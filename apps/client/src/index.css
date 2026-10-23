@@ -224,6 +224,41 @@ body {
 .anim-turn {
   animation: turn-pulse 1.6s ease-in-out infinite;
 }
+/* the seat whose turn it is: a brass comet orbits the chip on a faint track.
+   The glow sits on the wrapper because a filter on the masked ring would be masked away. */
+.turn-orbit {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255, 236, 190, 0.9));
+}
+.turn-orbit::before,
+.turn-orbit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3.5px),
+    #000 calc(100% - 3px)
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+}
+.turn-orbit::before {
+  background: rgba(231, 200, 134, 0.18);
+}
+.turn-orbit::after {
+  background: conic-gradient(
+    rgba(208, 166, 80, 0) 0deg 170deg,
+    rgba(208, 166, 80, 0.7) 270deg,
+    #e7c886 330deg,
+    #fffdf7 356deg,
+    rgba(255, 253, 247, 0) 360deg
+  );
+  animation: slow-spin 2.4s linear infinite;
+}
 .anim-shake {
   animation: shake 360ms ease-in-out;
 }
@@ -258,6 +293,13 @@ body {
   .anim-banner {
     animation: none;
     transform: translate(-50%, -50%);
+  }
+  /* a frozen comet would read as a glitch: keep the track as a still brass halo instead */
+  .turn-orbit::after {
+    display: none;
+  }
+  .turn-orbit::before {
+    background: rgba(231, 200, 134, 0.7);
   }
 }
 

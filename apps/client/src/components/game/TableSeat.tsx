@@ -94,6 +94,7 @@ export function TableSeat({
             isCurrent ? 'anim-turn ring-brass' : 'ring-walnut-light/70',
           ].join(' ')}
         >
+          {isCurrent && !out && <span aria-hidden className="turn-orbit" />}
           <PlayerAvatar traits={avatar} className="h-full w-full" />
           {out && (
             <span
