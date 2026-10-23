@@ -50,8 +50,8 @@ function place(
     const vy = Math.sin(fr) * dist;
     const r = (-rot * Math.PI) / 180;
     toss = {
-      '--tx': `${vx * Math.cos(r) - vy * Math.sin(r)}px`,
-      '--ty': `${vx * Math.sin(r) + vy * Math.cos(r)}px`,
+      '--tx': `calc(${vx * Math.cos(r) - vy * Math.sin(r)} * var(--heap-px))`,
+      '--ty': `calc(${vx * Math.sin(r) + vy * Math.cos(r)} * var(--heap-px))`,
       '--tr': `${scatter(index, 4) > 0.5 ? '' : '-'}${Math.round(40 + scatter(index, 5) * 50)}deg`,
     } as CSSProperties;
   }
@@ -60,7 +60,7 @@ function place(
     entry,
     index,
     style: {
-      transform: `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${rot}deg)`,
+      transform: `translate(-50%, -50%) translate(calc(${x} * var(--heap-px)), calc(${y} * var(--heap-px))) rotate(${rot}deg)`,
       zIndex: depth,
     },
     toss,
@@ -95,7 +95,8 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
       onClick={onShowPlayed}
       aria-live="polite"
       aria-label={`Top card: ${cardName(top.card)}${thrower ? `, played by ${thrower}` : ''}. Show all played cards`}
-      className="group relative isolate h-48 w-56 rounded-[40%] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72"
+      // --heap-px scales the scatter with the cards, so short screens get a tighter heap.
+      className="group relative isolate h-48 w-56 rounded-[40%] [--heap-px:1px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72 short:h-40 short:w-52 short:[--heap-px:0.7px] shorter:h-32 shorter:w-44 shorter:[--heap-px:0.55px]"
     >
       <ColorGlow color={view.currentColor} />
       {placements.map((p) => (

@@ -147,8 +147,8 @@ describe('computer players', { timeout: 60_000 }, () => {
       onRoomUpdated: () => {},
       onRoomClosed: () => {},
     });
-    const { room, player: host } = manager.createRoom('Host', 'socket-1', 4);
-    const { player: guest } = manager.joinRoom(room.code, 'Guest', 'socket-2');
+    const { room, player: host } = manager.createRoom('Host', 'male', 'socket-1', 4);
+    const { player: guest } = manager.joinRoom(room.code, 'Guest', 'female', 'socket-2');
     manager.setReady(room.code, guest.id, true);
     manager.startGame(room.code, host.id, true);
     expect(room.players.filter((p) => p.isComputer)).toHaveLength(2);
@@ -164,7 +164,12 @@ describe('computer players', { timeout: 60_000 }, () => {
     expect(room.players.map((p) => p.name)).toEqual(['Host', 'Guest']);
 
     // A big room fills only up to the computer limit.
-    const { room: big, player: loner } = manager.createRoom('Loner', 'socket-3', MAX_PLAYERS);
+    const { room: big, player: loner } = manager.createRoom(
+      'Loner',
+      'female',
+      'socket-3',
+      MAX_PLAYERS,
+    );
     manager.startGame(big.code, loner.id, true);
     expect(big.players.filter((p) => p.isComputer)).toHaveLength(MAX_COMPUTERS);
     manager.closeAll('done');
@@ -182,7 +187,7 @@ describe('computer players', { timeout: 60_000 }, () => {
         onRoomUpdated: () => {},
         onRoomClosed: () => {},
       });
-      const { room, player } = manager.createRoom('Solo', 'socket-1', 2, 1);
+      const { room, player } = manager.createRoom('Solo', 'male', 'socket-1', 2, 1);
       const game = room.game!;
       game.currentIndex = game.players.findIndex((p) => p.id !== player.id);
       game.phase = { type: 'turn' };

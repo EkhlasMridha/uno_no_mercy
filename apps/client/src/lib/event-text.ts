@@ -1,4 +1,4 @@
-import type { GameEvent, PublicPlayerView } from '@nomercy/shared';
+import type { GameEvent, GameLogEntry, PublicPlayerView } from '@nomercy/shared';
 import { cardName, COLOR_LABEL } from './cards';
 
 export type NameLookup = (playerId: string) => string;
@@ -6,6 +6,11 @@ export type NameLookup = (playerId: string) => string;
 export function nameLookup(players: PublicPlayerView[], meId: string): NameLookup {
   const names = new Map(players.map((p) => [p.id, p.name]));
   return (id) => (id === meId ? 'You' : (names.get(id) ?? 'Someone'));
+}
+
+/** Seq of the newest card played among these entries, or 0. Any popup older than it is stale. */
+export function latestPlaySeq(entries: GameLogEntry[]): number {
+  return entries.filter((e) => e.event.type === 'cardPlayed').pop()?.seq ?? 0;
 }
 
 const verb = (subject: string, you: string, other: string) => (subject === 'You' ? you : other);

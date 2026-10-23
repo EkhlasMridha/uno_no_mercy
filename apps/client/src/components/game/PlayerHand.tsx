@@ -24,10 +24,10 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
 
   const overlap =
     sorted.length > 16
-      ? '-ml-10 sm:-ml-12'
+      ? '-ml-10 sm:-ml-12 short:-ml-10'
       : sorted.length > 9
-        ? '-ml-7 sm:-ml-9'
-        : '-ml-4 sm:-ml-5';
+        ? '-ml-7 sm:-ml-9 short:-ml-7'
+        : '-ml-4 sm:-ml-5 short:-ml-4';
 
   if (sorted.length === 0) {
     return <p className="py-8 text-center text-chalk/50">No cards in hand</p>;
@@ -39,14 +39,11 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   // The outermost cards sit lowest in the arc and tip a corner further down as they tilt on their
   // foot (half the widest card, 40px). Lift the fan by that much, plus room for the shadow, so the
   // scroller never clips a corner.
-  const edge = spread / 2;
-  const overhang = Math.ceil((edge * edge) / 28 + 40 * Math.sin((edge * Math.PI) / 180)) + 8;
+  // const edge = spread / 2;
+  // const overhang = Math.ceil((edge * edge) / 28 + 40 * Math.sin((edge * Math.PI) / 180)) + 8;
 
   return (
-    <div
-      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pt-6"
-      style={{ paddingBottom: overhang }}
-    >
+    <div className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4">
       <ul
         className="mx-auto flex w-max items-end px-6"
         aria-label={`Your hand, ${sorted.length} cards`}

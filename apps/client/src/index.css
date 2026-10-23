@@ -213,16 +213,51 @@ body {
 }
 
 .anim-card-in {
-  animation: card-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: card-in 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 .anim-draw-in {
-  animation: draw-in 320ms ease-out both;
+  animation: draw-in 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 .anim-banner {
   animation: banner-pop 1700ms ease-out both;
 }
 .anim-turn {
   animation: turn-pulse 1.6s ease-in-out infinite;
+}
+/* the seat whose turn it is: a brass comet orbits the chip on a faint track.
+   The glow sits on the wrapper because a filter on the masked ring would be masked away. */
+.turn-orbit {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255, 236, 190, 0.9));
+}
+.turn-orbit::before,
+.turn-orbit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3.5px),
+    #000 calc(100% - 3px)
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+}
+.turn-orbit::before {
+  background: rgba(231, 200, 134, 0.18);
+}
+.turn-orbit::after {
+  background: conic-gradient(
+    rgba(208, 166, 80, 0) 0deg 170deg,
+    rgba(208, 166, 80, 0.7) 270deg,
+    #e7c886 330deg,
+    #fffdf7 356deg,
+    rgba(255, 253, 247, 0) 360deg
+  );
+  animation: slow-spin 2.4s linear infinite;
 }
 .anim-shake {
   animation: shake 360ms ease-in-out;
@@ -238,13 +273,40 @@ body {
   animation: slow-spin 6s linear infinite;
 }
 .anim-toss {
-  animation: toss 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: toss 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 .anim-track {
   animation: track-flow 1.4s linear infinite;
 }
 .anim-toast {
   animation: toast-in 200ms ease-out both;
+}
+/* the draw tally springs up as the first flying card reaches the seat */
+@keyframes tally-in {
+  from {
+    transform: translateY(8px) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-2px) scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes tally-out {
+  to {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+.anim-tally-in {
+  animation: tally-in 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 780ms both;
+}
+.anim-tally-out {
+  animation: tally-out 220ms ease-in both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -258,6 +320,17 @@ body {
   .anim-banner {
     animation: none;
     transform: translate(-50%, -50%);
+  }
+  /* a frozen comet would read as a glitch: keep the track as a still brass halo instead */
+  .turn-orbit::after {
+    display: none;
+  }
+  .turn-orbit::before {
+    background: rgba(231, 200, 134, 0.7);
+  }
+  /* no cards fly, so there is nothing to wait for */
+  .anim-tally-in {
+    animation-delay: 0ms;
   }
 }
 

@@ -34,7 +34,8 @@ apps/server
   src/engine      Pure rules engine: no I/O, no Socket.IO, no Express
   src/rooms       Room lifecycle, sessions, reconnects, per-player projections, scoring
   src/net         Socket.IO handlers: validate, route, broadcast
-  test/           Vitest: engine.test.ts, simulation.test.ts, multiplayer.test.ts
+  test/           Vitest: engine.test.ts, simulation.test.ts, multiplayer.test.ts,
+                  turn-hold.test.ts
 apps/client       React + Vite + Tailwind. Presentation only
 docs              RULES.md, ARCHITECTURE.md, GAME-FLOW.md, LAN-SETUP.md
 ```
@@ -122,7 +123,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files): every
-  card play, the turn reminder, 0/7 hand exchanges and the win. `useGameSounds` plays them only from
+  card play, the chime when your turn starts, the turn reminder, 0/7 hand exchanges, the
+  mocking trombone everyone hears when a player takes penalty cards, the danger alarm when the Mercy Rule knocks a player out at 25 cards, and the
+  win. `useGameSounds` plays them only from
   state the server sent, and the Sound panel
   (`SoundSettings.tsx`) switches each one off or mutes them all.
 
@@ -218,8 +221,12 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
 - **Seat scale:** seats shrink for crowded tables (`lg` ≤ 6, `md` ≤ 10, `sm` above; rooms allow up to
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
   as well as on desktop.
+- **Short screens:** laptops leave little height for the felt, so the `short` (≤ 860 px tall) and
+  `shorter` (≤ 640 px) variants in `tailwind.config.js` shrink the table and hand cards, the heap's
+  scatter (`--heap-px`) and the seat fans (`--fan-px`). Check 1280 × 575 (a 1080p laptop at 150%).
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
-  hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
+  drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
+  popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
   `handsPassed.passes` pairs the server sends), the turn pulse, and your cards hopping in a ripple
   with the knock after 10 s idle on your move (`anim-nudge`, not `anim-shake`, which means "can't play
   that"). No decorative entrance animations.

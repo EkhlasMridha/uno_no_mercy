@@ -1,10 +1,12 @@
-import type { Ack, RoomSettings, RoomStatus, RoundResultView } from '@nomercy/shared';
+import type { Ack, Gender, RoomSettings, RoomStatus, RoundResultView } from '@nomercy/shared';
 import type { GameState } from '../engine/index.js';
 import type { CommandCache } from '../net/command-cache.js';
 
 export interface RoomPlayer {
   id: string;
   name: string;
+  /** Picks the avatar. Null for computer players. */
+  gender: Gender | null;
   /** Secret, room-scoped. Only ever sent to this player's own socket. */
   reconnectToken: string;
   ready: boolean;
@@ -32,4 +34,8 @@ export interface Room {
   createdAt: number;
   /** Pending computer move, if any. */
   computerTimer: ReturnType<typeof setTimeout> | null;
+  /** When the UNO breather after the last play or turn change ends (epoch ms; 0 for none). */
+  turnHoldUntil: number;
+  /** Re-sends the table when the breather ends, so clients see their actions open again. */
+  holdTimer: ReturnType<typeof setTimeout> | null;
 }

@@ -108,28 +108,35 @@ expected state version. When a game finishes it records the round result and sco
 copies only that player's hand. Swaps and passes therefore reach each player only as their own new hand.
 Opponents' card ids are never sent. The integration test checks this byte for byte.
 
+**UNO breather.** After a command that plays a card or changes whose turn it is, `RoomManager` sets
+`room.turnHoldUntil` to `TURN_HOLD_MS` (2 s) ahead (docs/RULES.md §5.9). Until then `executeGameCommand`
+refuses play, draw, take-penalty, roulette-color and catch commands with `TURN_HOLD`; `callUno` and leaving
+still go through. `toGameView` sends `turnHoldMs` and strips every action except `canCallUno` from
+`validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
+Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+
 ## Network protocol
 
 All client→server events are acknowledged with `Ack<T> = { ok: true, data } | { ok: false, error: { code, message } }`.
 
-| Event                        | Payload                                                              | Notes                                                       |
-| ---------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `room:create`                | `{ name, maxPlayers, computers? }`                                   | returns `SessionInfo`; `computers` (1–9) deals at once      |
-| `room:join`                  | `{ code, name }`                                                     | lobby only; max 6; unique names                             |
-| `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat |
-| `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                     |
-| `room:ready`                 | `{ ready }`                                                          |                                                             |
-| `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                            |
-| `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats    |
-| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)         |
-| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                         |
-| `game:request-state`         | `{}`                                                                 | resends this player's projection                            |
-| `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                  |
-| `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette    |
-| `game:accept-penalty`        | `{ commandId, version }`                                             | take the whole stack                                        |
-| `game:choose-roulette-color` | `{ commandId, version, color }`                                      | roulette victim only                                        |
-| `game:call-uno`              | `{ commandId }`                                                      |                                                             |
-| `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                             |
+| Event                        | Payload                                                              | Notes                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `room:create`                | `{ name, gender, maxPlayers, computers? }`                           | returns `SessionInfo`; `computers` (1–9) deals at once; `gender` (`male`/`female`) picks the avatar set |
+| `room:join`                  | `{ code, name, gender }`                                             | lobby only; max 6; unique names                                                                         |
+| `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
+| `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
+| `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
+| `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
+| `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
+| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)                                                     |
+| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                                                                     |
+| `game:request-state`         | `{}`                                                                 | resends this player's projection                                                                        |
+| `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                                                              |
+| `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette                                                |
+| `game:accept-penalty`        | `{ commandId, version }`                                             | take the whole stack                                                                                    |
+| `game:choose-roulette-color` | `{ commandId, version, color }`                                      | roulette victim only                                                                                    |
+| `game:call-uno`              | `{ commandId }`                                                      |                                                                                                         |
+| `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                                                                         |
 
 Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `room:closed`.
 

@@ -82,7 +82,7 @@ async function openPlayerTab(debugPort) {
 
 const profileDir = await mkdtemp(path.join(tmpdir(), 'nomercy-e2e-'));
 const chrome = spawn(
-  'google-chrome',
+  process.env.CHROME_BIN ?? 'google-chrome',
   [
     '--headless=new',
     '--no-sandbox',

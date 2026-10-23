@@ -1,10 +1,13 @@
+import { useRef, type RefObject } from 'react';
 import { ChevronRight, RotateCcw, RotateCw } from 'lucide-react';
 import type { PublicGameView } from '@nomercy/shared';
 import { COLOR_BG, COLOR_LABEL } from '../../lib/cards';
+import type { TableAvatars } from '../../lib/avatar';
 import type { NameLookup } from '../../lib/event-text';
 import { seatAngle } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
 import { DiscardHeap } from './DiscardHeap';
+import { DrawFlight } from './DrawFlight';
 import { HandExchange } from './HandExchange';
 import { RouletteReveal } from './RouletteReveal';
 import { TableSeat, type SeatScale } from './TableSeat';
@@ -13,6 +16,7 @@ interface GameTableProps {
   view: PublicGameView;
   meId: string;
   name: NameLookup;
+  avatarOf: TableAvatars;
   canDraw: boolean;
   catchableIds: readonly string[];
   targetName: string | null;
@@ -33,6 +37,7 @@ export function GameTable({
   view,
   meId,
   name,
+  avatarOf,
   canDraw,
   catchableIds,
   targetName,
@@ -52,6 +57,7 @@ export function GameTable({
   const scale: SeatScale = count <= 6 ? 'lg' : count <= 10 ? 'md' : 'sm';
   const clockwise = view.direction === 1;
   const DirectionIcon = clockwise ? RotateCw : RotateCcw;
+  const pileRef = useRef<HTMLButtonElement>(null);
 
   return (
     // `isolate` keeps every z-index on the table below page-level popups.
@@ -63,9 +69,14 @@ export function GameTable({
           <DirectionTrack color={COLOR_STROKE[view.currentColor]} clockwise={clockwise} />
           <RouletteReveal view={view} meId={meId} name={name} canDraw={canDraw} onDraw={onDraw} />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82] short:gap-1.5 short:pb-10">
             <div className="flex flex-col items-center gap-1 landscape:flex-row landscape:gap-6">
-              <DrawPile count={view.drawCount} canDraw={canDraw} onDraw={onDraw} />
+              <DrawPile
+                pileRef={pileRef}
+                count={view.drawCount}
+                canDraw={canDraw}
+                onDraw={onDraw}
+              />
               <DiscardHeap
                 view={view}
                 name={name}
@@ -114,6 +125,7 @@ export function GameTable({
         <TableSeat
           key={p.id}
           player={p}
+          avatar={avatarOf(p.id)}
           angle={angles.get(p.id) ?? 270}
           scale={scale}
           isCurrent={p.id === view.currentPlayerId}
@@ -121,6 +133,14 @@ export function GameTable({
           onCatch={() => onCatch(p.id)}
         />
       ))}
+
+      <DrawFlight
+        log={view.log}
+        meId={meId}
+        angleOf={(id) => angles.get(id) ?? null}
+        pileRef={pileRef}
+        scale={scale}
+      />
 
       <HandExchange
         log={view.log}
@@ -133,10 +153,12 @@ export function GameTable({
 }
 
 function DrawPile({
+  pileRef,
   count,
   canDraw,
   onDraw,
 }: {
+  pileRef: RefObject<HTMLButtonElement>;
   count: number;
   canDraw: boolean;
   onDraw: () => void;
@@ -146,6 +168,7 @@ function DrawPile({
   return (
     <div className="flex flex-col items-center gap-3">
       <button
+        ref={pileRef}
         type="button"
         onClick={onDraw}
         disabled={!canDraw}

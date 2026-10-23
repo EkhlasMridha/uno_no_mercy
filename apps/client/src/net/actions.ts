@@ -1,4 +1,4 @@
-import type { Ack, CardColor, CommandResult } from '@nomercy/shared';
+import type { Ack, CardColor, CommandResult, Gender } from '@nomercy/shared';
 import { getState, pushNotice } from '../state/store';
 import { adoptSession, forgetSession, request } from './socket';
 
@@ -20,14 +20,19 @@ function report<T>(result: Ack<T>): Ack<T> {
 // ---- room ----
 
 /** With `computers`, the server seats computer opponents and deals straight away. */
-export async function createRoom(name: string, maxPlayers: number, computers?: number) {
-  const result = await request('room:create', { name, maxPlayers, computers });
+export async function createRoom(
+  name: string,
+  gender: Gender,
+  maxPlayers: number,
+  computers?: number,
+) {
+  const result = await request('room:create', { name, gender, maxPlayers, computers });
   if (result.ok) adoptSession(result.data);
   return report(result);
 }
 
-export async function joinRoom(code: string, name: string) {
-  const result = await request('room:join', { code, name });
+export async function joinRoom(code: string, name: string, gender: Gender) {
+  const result = await request('room:join', { code, name, gender });
   if (result.ok) adoptSession(result.data);
   return report(result);
 }

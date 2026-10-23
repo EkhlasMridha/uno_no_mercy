@@ -35,5 +35,14 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Height variants as plugins, not `screens`: a raw screen would switch off every `max-*` variant.
+    // `:root &` lifts them over `sm:`, which Tailwind always emits after plugin variants.
+    ({ addVariant }) => {
+      // Laptop-height viewports: the felt is too short for full-size table cards.
+      addVariant('short', '@media (min-width: 640px) and (max-height: 860px) { :root & }');
+      // e.g. a 1080p laptop at 150% scaling: about 575px of page under the browser bar.
+      addVariant('shorter', '@media (min-width: 640px) and (max-height: 640px) { :root & }');
+    },
+  ],
 };

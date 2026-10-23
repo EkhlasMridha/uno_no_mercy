@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, DoorOpen, Layers, ScrollText, Skull, Wifi } from 'lucide-react';
 import {
   colorOf,
@@ -13,6 +13,7 @@ import { EventBanner } from '../components/game/EventBanner';
 import { EventFeed } from '../components/game/EventFeed';
 import { GameTable } from '../components/game/GameTable';
 import { PlayerHand } from '../components/game/PlayerHand';
+import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SoundSettings } from '../components/SoundSettings';
 import { ColorPickerModal } from '../components/modals/ColorPickerModal';
 import { DiscardChoiceModal } from '../components/modals/DiscardChoiceModal';
@@ -23,8 +24,9 @@ import { SwapTargetModal } from '../components/modals/SwapTargetModal';
 import { Modal } from '../components/ui/Modal';
 import { useEventBanners } from '../hooks/useEventBanners';
 import { useGameSounds } from '../hooks/useGameSounds';
+import { avatarsForTable } from '../lib/avatar';
 import { cardName, COLOR_LABEL } from '../lib/cards';
-import { nameLookup } from '../lib/event-text';
+import { latestPlaySeq, nameLookup } from '../lib/event-text';
 import {
   acceptPenalty,
   callUno,
@@ -34,7 +36,7 @@ import {
   leaveRoom,
   playCard,
 } from '../net/actions';
-import { pushNotice } from '../state/store';
+import { clearNotices, pushNotice } from '../state/store';
 
 type PendingChoice = { card: Card; step: 'color' | 'swap' | 'discard' };
 
@@ -51,6 +53,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const heldHand = onTable ? hand.filter((c) => !onTable.has(c.id)) : hand;
 
   const name = useMemo(() => nameLookup(view.players, meId), [view.players, meId]);
+  const avatarOf = useMemo(() => avatarsForTable(view.players), [view.players]);
   const banner = useEventBanners(view.log, name);
   const [pending, setPending] = useState<PendingChoice | null>(null);
   const [unoArmed, setUnoArmed] = useState(false);
@@ -61,6 +64,14 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [shake, setShake] = useState(0);
 
   const playable = useMemo(() => new Set(actions.playableCardIds), [actions.playableCardIds]);
+
+  // Toasts answer the moment they came from; once someone plays, they're out of date.
+  const playSeq = latestPlaySeq(view.log);
+  const seenPlaySeq = useRef(playSeq);
+  useEffect(() => {
+    if (playSeq > seenPlaySeq.current) clearNotices();
+    seenPlaySeq.current = playSeq;
+  }, [playSeq]);
 
   useEffect(() => {
     if (!actions.canDeclareWithPlay) setUnoArmed(false);
@@ -73,6 +84,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
+  const held = game.turnHoldMs > 0;
+  const myMove = isMyTurn && !finished && me?.status === 'active';
   const nudge = useGameSounds(
     view,
     meId,
@@ -111,6 +125,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const onCardClick = (card: Card) => {
     if (finished) return;
+    if (held) {
+      pushNotice('info', 'Hold on: everyone gets 2 seconds to call UNO after a play.', 2000);
+      return;
+    }
     if (!isMyTurn) {
       pushNotice('info', current ? `It's ${current.name}'s turn.` : 'Not your turn.', 2500);
       return;
@@ -135,6 +153,12 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const statusText = (() => {
     if (finished) return 'Game over';
     if (me?.status === 'eliminated') return 'You are out — watching the rest of the game.';
+    if (held) {
+      if (actions.canCallUno) return 'One card left — call UNO before anyone catches you!';
+      return isMyTurn
+        ? 'Your turn in a moment…'
+        : `${current?.name ?? 'Next player'} is up in a moment…`;
+    }
     if (view.phase.type === 'rouletteColor') {
       return view.phase.victimId === meId
         ? 'Color Roulette! Name a color.'
@@ -216,6 +240,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               view={view}
               meId={meId}
               name={name}
+              avatarOf={avatarOf}
               canDraw={actions.canDraw}
               catchableIds={actions.catchablePlayerIds}
               onDraw={() => void drawCards()}
@@ -230,8 +255,15 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           {/* your seat: the hand is held over the near edge of the table */}
           <section
             aria-label="Your hand"
-            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28"
+            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28 short:-mt-16"
           >
+            {/* brass light pools behind the hand while it's your move */}
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[150%] bg-[radial-gradient(ellipse_60%_70%_at_50%_100%,rgba(231,200,134,0.32),rgba(208,166,80,0.1)_45%,transparent_75%)] transition-opacity duration-500 ${
+                myMove ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
             <div key={shake} className={shake ? 'anim-shake' : ''}>
               <PlayerHand
                 hand={heldHand}
@@ -240,6 +272,42 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 onCardClick={onCardClick}
                 nudge={nudge}
               />
+            </div>
+            <div className="flex items-center justify-center gap-2.5 px-4 pb-1 text-sm">
+              <span
+                className={`relative h-10 w-10 shrink-0 rounded-full shadow-seat ring-2 ${
+                  myMove ? 'anim-turn ring-brass' : 'ring-walnut-light/70'
+                }`}
+              >
+                {myMove && <span aria-hidden className="turn-orbit" />}
+                <PlayerAvatar traits={avatarOf(meId)} className="h-full w-full" />
+              </span>
+              <span
+                className={`rounded-sm px-2 py-0.5 font-semibold shadow transition-colors ${
+                  myMove ? 'bg-brass text-room' : 'bg-room/85 text-chalk'
+                }`}
+              >
+                {me?.name ?? 'You'}
+              </span>
+              {myMove && (
+                <span className="font-display text-lg leading-none text-brass-soft drop-shadow-[0_0_8px_rgba(231,200,134,0.6)]">
+                  Your turn
+                </span>
+              )}
+              <span className="text-chalk/60">{hand.length} cards</span>
+              {me?.uno === 'declared' && (
+                <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">
+                  UNO!
+                </span>
+              )}
+              {me?.status === 'eliminated' && (
+                <span className="flex items-center gap-1 text-rose-300">
+                  <Skull size={14} /> Out
+                </span>
+              )}
+              {hand.length >= 20 && me?.status === 'active' && (
+                <span className="text-rose-300">{25 - hand.length} cards from knockout!</span>
+              )}
             </div>
             <ActionBar
               seat={
@@ -308,6 +376,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       {pending?.step === 'swap' && (
         <SwapTargetModal
           players={swapTargets}
+          avatarOf={avatarOf}
           onPick={(id) => void send(pending.card, { swapTargetId: id })}
           onCancel={() => setPending(null)}
         />
