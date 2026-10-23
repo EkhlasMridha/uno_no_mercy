@@ -20,7 +20,7 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
   {
     kind: 'cardPlay',
     label: 'Card play',
-    description: 'A flick and a soft landing on the felt whenever anyone plays a card.',
+    description: 'A card slapped down on the table whenever anyone plays one.',
     Icon: Layers,
   },
   {

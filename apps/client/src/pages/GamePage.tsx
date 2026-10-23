@@ -310,6 +310,37 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               )}
             </div>
             <ActionBar
+              seat={
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm sm:justify-end">
+                  {/* Your turn lights the tag with the brass ring the seats use, leaving Draw the
+                      only solid brass in the row. */}
+                  <span
+                    className={`rounded-sm bg-room/85 px-2 py-0.5 font-semibold shadow ${
+                      isMyTurn && !finished ? 'anim-turn text-brass-soft' : 'text-chalk'
+                    }`}
+                  >
+                    {me?.name ?? 'You'}
+                  </span>
+                  <span className="text-chalk/60">
+                    {hand.length} {hand.length === 1 ? 'card' : 'cards'}
+                  </span>
+                  {me?.uno === 'declared' && (
+                    <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">
+                      UNO!
+                    </span>
+                  )}
+                  {me?.status === 'eliminated' && (
+                    <span className="flex items-center gap-1 text-rose-300">
+                      <Skull size={14} /> Out
+                    </span>
+                  )}
+                  {hand.length >= 20 && me?.status === 'active' && (
+                    <span className="text-rose-300">
+                      {25 - hand.length} {25 - hand.length === 1 ? 'card' : 'cards'} from knockout!
+                    </span>
+                  )}
+                </div>
+              }
               actions={actions}
               statusText={statusText}
               emphasize={isMyTurn || actions.canChooseRouletteColor}

@@ -56,8 +56,10 @@ export function useGameSounds(
       lastSeq.current === null ? newest : newest < lastSeq.current ? 0 : lastSeq.current;
     lastSeq.current = newest;
     const fresh = view.log.filter((e) => e.seq > since);
-    const played = fresh.some((e) => e.event.type === 'cardPlayed');
-    if (played) playIfOn('cardPlay');
+    // Every card played gets its own slap, a beat apart when several arrive in one update.
+    const plays = fresh.filter((e) => e.event.type === 'cardPlayed').length;
+    for (let i = 0; i < Math.min(plays, 3); i++) playIfOn('cardPlay', i * 0.12);
+    const played = plays > 0;
     // A 0 or 7 is played and passed in one update: let the card land before the hands move.
     const exchanged = fresh.some(
       (e) => e.event.type === 'handsSwapped' || e.event.type === 'handsPassed',

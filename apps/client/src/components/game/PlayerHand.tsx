@@ -36,6 +36,11 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   // The fan opens wider with more cards, up to a comfortable grip.
   const spread = Math.min(sorted.length * 4, 44);
   const step = sorted.length > 1 ? spread / (sorted.length - 1) : 0;
+  // The outermost cards sit lowest in the arc and tip a corner further down as they tilt on their
+  // foot (half the widest card, 40px). Lift the fan by that much, plus room for the shadow, so the
+  // scroller never clips a corner.
+  // const edge = spread / 2;
+  // const overhang = Math.ceil((edge * edge) / 28 + 40 * Math.sin((edge * Math.PI) / 180)) + 8;
 
   return (
     <div className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4">
