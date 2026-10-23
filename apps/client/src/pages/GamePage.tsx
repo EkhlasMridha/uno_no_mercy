@@ -23,6 +23,7 @@ import { SwapTargetModal } from '../components/modals/SwapTargetModal';
 import { Modal } from '../components/ui/Modal';
 import { useEventBanners } from '../hooks/useEventBanners';
 import { useGameSounds } from '../hooks/useGameSounds';
+import { avatarsForTable } from '../lib/avatar';
 import { cardName, COLOR_LABEL } from '../lib/cards';
 import { nameLookup } from '../lib/event-text';
 import {
@@ -51,6 +52,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const heldHand = onTable ? hand.filter((c) => !onTable.has(c.id)) : hand;
 
   const name = useMemo(() => nameLookup(view.players, meId), [view.players, meId]);
+  const avatarOf = useMemo(() => avatarsForTable(view.players), [view.players]);
   const banner = useEventBanners(view.log, name);
   const [pending, setPending] = useState<PendingChoice | null>(null);
   const [unoArmed, setUnoArmed] = useState(false);
@@ -216,6 +218,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               view={view}
               meId={meId}
               name={name}
+              avatarOf={avatarOf}
               canDraw={actions.canDraw}
               catchableIds={actions.catchablePlayerIds}
               onDraw={() => void drawCards()}
@@ -300,6 +303,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       {pending?.step === 'swap' && (
         <SwapTargetModal
           players={swapTargets}
+          avatarOf={avatarOf}
           onPick={(id) => void send(pending.card, { swapTargetId: id })}
           onCancel={() => setPending(null)}
         />

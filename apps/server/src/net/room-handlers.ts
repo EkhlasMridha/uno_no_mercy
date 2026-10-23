@@ -46,17 +46,17 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
 
   registerHandler(socket, limiter, 'room:create', createRoomSchema, (payload) => {
     requireUnbound();
-    const { name, maxPlayers, computers } = payload;
-    const { room, player } = manager.createRoom(name, socket.id, maxPlayers, computers);
+    const { name, gender, maxPlayers, computers } = payload;
+    const { room, player } = manager.createRoom(name, gender, socket.id, maxPlayers, computers);
     socket.data.session = { roomCode: room.code, playerId: player.id };
     console.info(`[room ${room.code}] created${computers ? ` with ${computers} computers` : ''}`);
     broadcaster.room(room);
     return { ok: true, data: sessionInfo(room, player) };
   });
 
-  registerHandler(socket, limiter, 'room:join', joinRoomSchema, ({ code, name }) => {
+  registerHandler(socket, limiter, 'room:join', joinRoomSchema, ({ code, name, gender }) => {
     requireUnbound();
-    const { room, player } = manager.joinRoom(code, name, socket.id);
+    const { room, player } = manager.joinRoom(code, name, gender, socket.id);
     socket.data.session = { roomCode: room.code, playerId: player.id };
     console.info(`[room ${room.code}] player joined (${room.players.length} seated)`);
     broadcaster.room(room);

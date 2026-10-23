@@ -6,10 +6,12 @@ import {
   playerNameSchema,
   roomCodeSchema,
   ROOM_CODE_LENGTH,
+  type Gender,
 } from '@nomercy/shared';
 import { createRoom, joinRoom } from '../net/actions';
 import { loadName, saveName } from '../net/session-storage';
 import { useAppState } from '../state/store';
+import { GenderPickerModal } from '../components/modals/GenderPickerModal';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayingCard } from '../components/card/PlayingCard';
 import { PlayerCountInput } from '../components/PlayerCountInput';
@@ -27,6 +29,9 @@ export function HomePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showComputer, setShowComputer] = useState(false);
   const [computers, setComputers] = useState(3);
+  // Creating or joining first asks which avatars to draw this player from.
+  const [askGender, setAskGender] = useState<'create' | 'computer' | 'join' | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
 
   const validName = () => {
     const parsed = playerNameSchema.safeParse(name);
@@ -40,20 +45,20 @@ export function HomePage() {
 
   const openCreate = () => {
     setError(null);
-    if (validName()) setShowCreate(true);
+    if (validName()) setAskGender('create');
   };
 
   const openComputer = () => {
     setError(null);
-    if (validName()) setShowComputer(true);
+    if (validName()) setAskGender('computer');
   };
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
     const n = validName();
-    if (!n) return;
+    if (!n || !gender) return;
     setBusy(true);
-    const result = await createRoom(n, maxPlayers);
+    const result = await createRoom(n, gender, maxPlayers);
     setBusy(false);
     if (!result.ok) setShowCreate(false);
   };
@@ -61,26 +66,44 @@ export function HomePage() {
   const onPlayComputer = async (e: FormEvent) => {
     e.preventDefault();
     const n = validName();
-    if (!n) return;
+    if (!n || !gender) return;
     setBusy(true);
-    const result = await createRoom(n, computers + 1, computers);
+    const result = await createRoom(n, gender, computers + 1, computers);
     setBusy(false);
     if (!result.ok) setShowComputer(false);
   };
 
-  const onJoin = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const n = validName();
-    if (!n) return;
+  const validCode = () => {
     const parsedCode = roomCodeSchema.safeParse(code);
     if (!parsedCode.success) {
       setError(`Room codes are ${ROOM_CODE_LENGTH} letters/numbers`);
-      return;
+      return null;
     }
+    return parsedCode.data;
+  };
+
+  const onJoin = (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (validName() && validCode()) setAskGender('join');
+  };
+
+  const join = async (chosen: Gender) => {
+    const n = validName();
+    const c = validCode();
+    if (!n || !c) return;
     setBusy(true);
-    await joinRoom(parsedCode.data, n);
+    await joinRoom(c, n, chosen);
     setBusy(false);
+  };
+
+  const onPickGender = (chosen: Gender) => {
+    const next = askGender;
+    setGender(chosen);
+    setAskGender(null);
+    if (next === 'create') setShowCreate(true);
+    if (next === 'computer') setShowComputer(true);
+    if (next === 'join') void join(chosen);
   };
 
   const online = connection === 'connected';
@@ -155,7 +178,7 @@ export function HomePage() {
           <span className="h-px flex-1 bg-white/10" />
         </div>
 
-        <form className="flex gap-2" onSubmit={(e) => void onJoin(e)}>
+        <form className="flex gap-2" onSubmit={onJoin}>
           <input
             className="input text-center font-display text-xl uppercase tracking-[0.35em]"
             value={code}
@@ -182,6 +205,7 @@ export function HomePage() {
         <BookOpen size={16} /> How to play
       </button>
       {showRules && <RulesPanel onClose={() => setShowRules(false)} />}
+      {askGender && <GenderPickerModal onPick={onPickGender} onCancel={() => setAskGender(null)} />}
       {showCreate && (
         <Modal title="Create a room" onClose={() => setShowCreate(false)}>
           <form className="space-y-5" onSubmit={(e) => void onCreate(e)}>

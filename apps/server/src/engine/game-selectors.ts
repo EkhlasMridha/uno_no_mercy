@@ -1,5 +1,6 @@
 import type {
   GamePhaseView,
+  Gender,
   PublicGameView,
   PublicPlayerView,
   ValidActions,
@@ -14,6 +15,7 @@ import { isActive, playerAt } from './turn-manager.js';
 export interface SeatPresence {
   connected: (playerId: string) => boolean;
   isComputer: (playerId: string) => boolean;
+  gender: (playerId: string) => Gender | null;
   hostId: string;
 }
 
@@ -98,6 +100,7 @@ export function toPublicGameView(state: GameState, presence: SeatPresence): Publ
     uno: p.uno,
     isHost: p.id === presence.hostId,
     isComputer: presence.isComputer(p.id),
+    gender: presence.gender(p.id),
   }));
   return {
     players,

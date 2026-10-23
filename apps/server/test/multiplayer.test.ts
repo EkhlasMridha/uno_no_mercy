@@ -91,16 +91,29 @@ describe('multiplayer over Socket.IO', () => {
     const host = await newClient();
     const guest = await newClient();
 
-    const created = await emit<SessionInfo>(host, 'room:create', { name: 'Host', maxPlayers: 4 });
+    const created = await emit<SessionInfo>(host, 'room:create', {
+      name: 'Host',
+      gender: 'male',
+      maxPlayers: 4,
+    });
     expect(created.ok).toBe(true);
     const session = (created as { data: SessionInfo }).data;
 
-    const badJoin = await emit(guest, 'room:join', { code: '!!', name: 'Guest' });
+    const badJoin = await emit(guest, 'room:join', { code: '!!', name: 'Guest', gender: 'female' });
     expect(badJoin).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const noGender = await emit(guest, 'room:join', { code: session.roomCode, name: 'Guest' });
+    expect(noGender).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const badGender = await emit(guest, 'room:join', {
+      code: session.roomCode,
+      name: 'Guest',
+      gender: 'robot',
+    });
+    expect(badGender).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
 
     const joined = await emit<SessionInfo>(guest, 'room:join', {
       code: session.roomCode,
       name: 'Guest',
+      gender: 'female',
     });
     expect(joined.ok).toBe(true);
     const guestSession = (joined as { data: SessionInfo }).data;
@@ -125,7 +138,11 @@ describe('multiplayer over Socket.IO', () => {
 
     // Late joiners are rejected once the game started.
     const late = await newClient();
-    const lateJoin = await emit(late, 'room:join', { code: session.roomCode, name: 'Late' });
+    const lateJoin = await emit(late, 'room:join', {
+      code: session.roomCode,
+      name: 'Late',
+      gender: 'male',
+    });
     expect(lateJoin).toMatchObject({ ok: false, error: { code: 'GAME_IN_PROGRESS' } });
 
     // Out-of-turn and stale commands are rejected.
@@ -179,11 +196,12 @@ describe('multiplayer over Socket.IO', () => {
     const b = await newClient();
     const created = (await emit<SessionInfo>(a, 'room:create', {
       name: 'Alpha',
+      gender: 'male',
       maxPlayers: 2,
     })) as {
       data: SessionInfo;
     };
-    await emit(b, 'room:join', { code: created.data.roomCode, name: 'Beta' });
+    await emit(b, 'room:join', { code: created.data.roomCode, name: 'Beta', gender: 'female' });
 
     const bad = await newClient();
     const rejected = await emit(bad, 'room:reconnect', {
@@ -207,10 +225,15 @@ describe('multiplayer over Socket.IO', () => {
 
   it('lets the host choose how many players the room seats', async () => {
     const host = await newClient();
-    const badCreate = await emit(host, 'room:create', { name: 'Hosty', maxPlayers: 1 });
+    const badCreate = await emit(host, 'room:create', {
+      name: 'Hosty',
+      gender: 'male',
+      maxPlayers: 1,
+    });
     expect(badCreate).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
     const created = (await emit<SessionInfo>(host, 'room:create', {
       name: 'Hosty',
+      gender: 'male',
       maxPlayers: 4,
     })) as { data: SessionInfo };
     const code = created.data.roomCode;
@@ -225,9 +248,11 @@ describe('multiplayer over Socket.IO', () => {
     const second = await newClient();
     const third = await newClient();
     const fourth = await newClient();
-    expect((await emit(second, 'room:join', { code, name: 'Two' })).ok).toBe(true);
-    expect((await emit(third, 'room:join', { code, name: 'Three' })).ok).toBe(true);
-    const full = await emit(fourth, 'room:join', { code, name: 'Four' });
+    expect((await emit(second, 'room:join', { code, name: 'Two', gender: 'female' })).ok).toBe(
+      true,
+    );
+    expect((await emit(third, 'room:join', { code, name: 'Three', gender: 'male' })).ok).toBe(true);
+    const full = await emit(fourth, 'room:join', { code, name: 'Four', gender: 'female' });
     expect(full).toMatchObject({ ok: false, error: { code: 'ROOM_FULL' } });
 
     const shrink = await emit(host, 'room:settings', { maxPlayers: 2 });
@@ -240,6 +265,7 @@ describe('multiplayer over Socket.IO', () => {
     const solo = await newClient();
     const tooMany = await emit(solo, 'room:create', {
       name: 'Solo',
+      gender: 'female',
       maxPlayers: 20,
       computers: 10,
     });
@@ -247,6 +273,7 @@ describe('multiplayer over Socket.IO', () => {
 
     const created = await emit<SessionInfo>(solo, 'room:create', {
       name: 'Solo',
+      gender: 'female',
       maxPlayers: 4,
       computers: 3,
     });
@@ -257,6 +284,10 @@ describe('multiplayer over Socket.IO', () => {
     expect(new Set([...computers.map((p) => p.name), 'Solo']).size).toBe(4);
     expect(computers.every((p) => p.connected && p.ready)).toBe(true);
     expect(computers.every((p) => playerNameSchema.safeParse(p.name).success)).toBe(true);
+    // Avatars: people keep the gender they chose; computers have none and are drawn as robots.
+    expect(computers.every((p) => p.gender === null)).toBe(true);
+    expect(solo.room!.players.find((p) => !p.isComputer)?.gender).toBe('female');
+    expect(solo.game!.public.players.find((p) => !p.isComputer)?.gender).toBe('female');
 
     const computerIds = new Set(computers.map((p) => p.id));
     const computerMoved = () =>
@@ -294,7 +325,7 @@ describe('multiplayer over Socket.IO', () => {
 
   it('lets a lone host start by filling the open seats with computers', async () => {
     const host = await newClient();
-    await emit(host, 'room:create', { name: 'Loner', maxPlayers: 3 });
+    await emit(host, 'room:create', { name: 'Loner', gender: 'male', maxPlayers: 3 });
     const alone = await emit(host, 'game:start', {});
     expect(alone).toMatchObject({ ok: false, error: { code: 'NOT_ENOUGH_PLAYERS' } });
     const bad = await emit(host, 'game:start', { fillWithComputers: 'yes' });

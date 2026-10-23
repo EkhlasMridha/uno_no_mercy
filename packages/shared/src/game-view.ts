@@ -1,4 +1,5 @@
 import type { Card, CardColor } from './cards.js';
+import type { Gender } from './room-view.js';
 
 /** 1 = clockwise, -1 = counterclockwise. */
 export type Direction = 1 | -1;
@@ -93,6 +94,8 @@ export interface PublicPlayerView {
   isHost: boolean;
   /** A computer player run by the host server. */
   isComputer: boolean;
+  /** Picks the player's avatar. Null for computer players, who are drawn as robots. */
+  gender: Gender | null;
 }
 
 /** One card that went onto the discard pile this round. `playerId` is null for the starting card. */

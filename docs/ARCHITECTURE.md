@@ -112,24 +112,24 @@ Opponents' card ids are never sent. The integration test checks this byte for by
 
 All client→server events are acknowledged with `Ack<T> = { ok: true, data } | { ok: false, error: { code, message } }`.
 
-| Event                        | Payload                                                              | Notes                                                       |
-| ---------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `room:create`                | `{ name, maxPlayers, computers? }`                                   | returns `SessionInfo`; `computers` (1–9) deals at once      |
-| `room:join`                  | `{ code, name }`                                                     | lobby only; max 6; unique names                             |
-| `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat |
-| `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                     |
-| `room:ready`                 | `{ ready }`                                                          |                                                             |
-| `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                            |
-| `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats    |
-| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)         |
-| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                         |
-| `game:request-state`         | `{}`                                                                 | resends this player's projection                            |
-| `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                  |
-| `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette    |
-| `game:accept-penalty`        | `{ commandId, version }`                                             | take the whole stack                                        |
-| `game:choose-roulette-color` | `{ commandId, version, color }`                                      | roulette victim only                                        |
-| `game:call-uno`              | `{ commandId }`                                                      |                                                             |
-| `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                             |
+| Event                        | Payload                                                              | Notes                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `room:create`                | `{ name, gender, maxPlayers, computers? }`                           | returns `SessionInfo`; `computers` (1–9) deals at once; `gender` (`male`/`female`) picks the avatar set |
+| `room:join`                  | `{ code, name, gender }`                                             | lobby only; max 6; unique names                                                                         |
+| `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
+| `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
+| `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
+| `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
+| `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
+| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)                                                     |
+| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                                                                     |
+| `game:request-state`         | `{}`                                                                 | resends this player's projection                                                                        |
+| `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                                                              |
+| `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette                                                |
+| `game:accept-penalty`        | `{ commandId, version }`                                             | take the whole stack                                                                                    |
+| `game:choose-roulette-color` | `{ commandId, version, color }`                                      | roulette victim only                                                                                    |
+| `game:call-uno`              | `{ commandId }`                                                      |                                                                                                         |
+| `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                                                                         |
 
 Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `room:closed`.
 

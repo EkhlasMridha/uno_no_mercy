@@ -1,12 +1,15 @@
-import { Bot, Crown, Hand, Skull, WifiOff } from 'lucide-react';
+import { Crown, Hand, Skull, WifiOff } from 'lucide-react';
 import type { PublicPlayerView } from '@nomercy/shared';
 import { seatPosition } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
+import type { AvatarTraits } from '../../lib/avatar';
+import { PlayerAvatar } from '../PlayerAvatar';
 
 export type SeatScale = 'lg' | 'md' | 'sm';
 
 interface TableSeatProps {
   player: PublicPlayerView;
+  avatar: AvatarTraits;
   angle: number;
   scale: SeatScale;
   isCurrent: boolean;
@@ -16,22 +19,30 @@ interface TableSeatProps {
 
 const SCALE: Record<SeatScale, { avatar: string; name: string; fan: number; fanGap: number }> = {
   lg: {
-    avatar: 'h-11 w-11 text-xl sm:h-12 sm:w-12',
+    avatar: 'h-12 w-12 sm:h-14 sm:w-14',
     name: 'text-sm max-w-[7.5rem]',
     fan: 5,
-    fanGap: 60,
+    fanGap: 64,
   },
   md: {
-    avatar: 'h-9 w-9 text-lg sm:h-10 sm:w-10',
+    avatar: 'h-10 w-10 sm:h-11 sm:w-11',
     name: 'text-xs max-w-[5.5rem]',
     fan: 3,
-    fanGap: 50,
+    fanGap: 52,
   },
-  sm: { avatar: 'h-8 w-8 text-base', name: 'text-[10px] max-w-[4.25rem]', fan: 0, fanGap: 0 },
+  sm: { avatar: 'h-8 w-8', name: 'text-[10px] max-w-[4.25rem]', fan: 0, fanGap: 0 },
 };
 
 /** A player sitting on the rail: their held cards face the middle of the table. */
-export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }: TableSeatProps) {
+export function TableSeat({
+  player,
+  avatar,
+  angle,
+  scale,
+  isCurrent,
+  canCatch,
+  onCatch,
+}: TableSeatProps) {
   const s = SCALE[scale];
   const out = player.status === 'eliminated';
   const danger = player.handCount >= 20 && !out;
@@ -78,24 +89,24 @@ export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }
         )}
         <div
           className={[
-            'relative flex shrink-0 items-center justify-center rounded-full bg-leather font-display text-chalk ring-2 shadow-seat',
+            'relative shrink-0 rounded-full ring-2 shadow-seat',
             s.avatar,
             isCurrent ? 'anim-turn ring-brass' : 'ring-walnut-light/70',
           ].join(' ')}
         >
-          {out ? <Skull size={18} aria-hidden /> : player.name.slice(0, 1).toUpperCase()}
-          {player.isComputer && (
+          <PlayerAvatar traits={avatar} className="h-full w-full" />
+          {out && (
             <span
               aria-hidden
               className="absolute -left-1.5 -top-1 flex h-[1.15rem] w-[1.15rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-walnut"
             >
-              <Bot size={11} strokeWidth={2.5} />
+              <Skull size={11} strokeWidth={2.5} />
             </span>
           )}
           <span
             key={player.handCount}
             className={[
-              'anim-bump absolute -bottom-1 -right-2 min-w-[1.4rem] rounded-full px-1 text-center font-sans text-[11px] font-bold leading-[1.15rem] tabular-nums ring-2 ring-walnut',
+              'anim-bump absolute -bottom-1 -right-2 z-10 min-w-[1.4rem] rounded-full px-1 text-center font-sans text-[11px] font-bold leading-[1.15rem] tabular-nums ring-2 ring-walnut',
               danger ? 'bg-rose-500 text-white' : 'bg-chalk text-room',
             ].join(' ')}
           >
@@ -104,7 +115,7 @@ export function TableSeat({ player, angle, scale, isCurrent, canCatch, onCatch }
         </div>
         <span
           className={[
-            'flex items-center gap-1 rounded-sm px-1.5 py-px font-semibold leading-tight shadow',
+            'relative -mt-1.5 flex items-center gap-1 rounded-sm px-1.5 py-px font-semibold leading-tight shadow ring-1 ring-walnut-light/40',
             s.name,
             isCurrent ? 'bg-brass text-room' : 'bg-room/85 text-chalk',
           ].join(' ')}

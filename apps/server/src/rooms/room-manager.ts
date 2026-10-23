@@ -6,6 +6,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   type ErrorCode,
+  type Gender,
   type RoomSettingsPayload,
 } from '@nomercy/shared';
 import { applyCommand, createGame, type GameCommand, type Rng } from '../engine/index.js';
@@ -79,11 +80,17 @@ export class RoomManager {
   }
 
   /** With `computers`, seats that many computer opponents and deals the first round at once. */
-  createRoom(name: string, socketId: string, maxPlayers: number, computers = 0): JoinResult {
+  createRoom(
+    name: string,
+    gender: Gender,
+    socketId: string,
+    maxPlayers: number,
+    computers = 0,
+  ): JoinResult {
     if (this.rooms.size >= (this.options.maxRooms ?? 50)) {
       throw new RoomError('ROOM_FULL', 'The server has reached its room limit');
     }
-    const player = this.newPlayer(name, socketId);
+    const player = this.newPlayer(name, gender, socketId);
     const room: Room = {
       code: this.generateRoomCode(),
       hostId: player.id,
@@ -104,7 +111,7 @@ export class RoomManager {
     return { room, player };
   }
 
-  joinRoom(code: string, name: string, socketId: string): JoinResult {
+  joinRoom(code: string, name: string, gender: Gender, socketId: string): JoinResult {
     const room = this.requireRoom(code);
     if (room.status !== 'lobby') {
       throw new RoomError('GAME_IN_PROGRESS', 'This game has already started. Wait for the lobby.');
@@ -115,7 +122,7 @@ export class RoomManager {
     if (members.some((p) => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
       throw new RoomError('NAME_TAKEN', 'Someone in this room already uses that name');
     }
-    const player = this.newPlayer(name, socketId);
+    const player = this.newPlayer(name, gender, socketId);
     room.players.push(player);
     return { room, player };
   }
@@ -304,7 +311,7 @@ export class RoomManager {
   private addComputers(room: Room, count: number): void {
     const taken = room.players.filter((p) => !p.departed).map((p) => p.name);
     for (const name of computerNames(count, taken, this.options.rng)) {
-      room.players.push({ ...this.newPlayer(name, null), isComputer: true, ready: true });
+      room.players.push({ ...this.newPlayer(name, null, null), isComputer: true, ready: true });
     }
   }
 
@@ -456,10 +463,11 @@ export class RoomManager {
     player.expiryTimer = null;
   }
 
-  private newPlayer(name: string, socketId: string | null): RoomPlayer {
+  private newPlayer(name: string, gender: Gender | null, socketId: string | null): RoomPlayer {
     return {
       id: generatePlayerId(),
       name,
+      gender,
       reconnectToken: generateReconnectToken(),
       ready: false,
       socketId,

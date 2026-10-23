@@ -7,6 +7,7 @@ import {
   PLAYER_NAME_MAX_LENGTH,
   ROOM_CODE_LENGTH,
 } from './constants.js';
+import { GENDERS } from './room-view.js';
 
 /** Runtime validation for every client-to-server payload. */
 
@@ -29,17 +30,21 @@ export const cardIdSchema = z.string().regex(/^c[a-z0-9]{6,16}$/, 'Invalid card 
 export const commandIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'Invalid command id');
 export const cardColorSchema = z.enum(CARD_COLORS);
 export const stateVersionSchema = z.number().int().nonnegative();
+export const genderSchema = z.enum(GENDERS);
 export const maxPlayersSchema = z.number().int().min(MIN_PLAYERS).max(MAX_PLAYERS);
 
 export const createRoomSchema = z
   .object({
     name: playerNameSchema,
+    gender: genderSchema,
     maxPlayers: maxPlayersSchema,
     /** Play with computer: seats this many computer opponents and deals straight away. */
     computers: z.number().int().min(1).max(MAX_COMPUTERS).optional(),
   })
   .strict();
-export const joinRoomSchema = z.object({ code: roomCodeSchema, name: playerNameSchema }).strict();
+export const joinRoomSchema = z
+  .object({ code: roomCodeSchema, name: playerNameSchema, gender: genderSchema })
+  .strict();
 export const reconnectSchema = z
   .object({ code: roomCodeSchema, token: reconnectTokenSchema })
   .strict();

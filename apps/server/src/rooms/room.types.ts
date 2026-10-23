@@ -1,10 +1,12 @@
-import type { Ack, RoomSettings, RoomStatus, RoundResultView } from '@nomercy/shared';
+import type { Ack, Gender, RoomSettings, RoomStatus, RoundResultView } from '@nomercy/shared';
 import type { GameState } from '../engine/index.js';
 import type { CommandCache } from '../net/command-cache.js';
 
 export interface RoomPlayer {
   id: string;
   name: string;
+  /** Picks the avatar. Null for computer players. */
+  gender: Gender | null;
   /** Secret, room-scoped. Only ever sent to this player's own socket. */
   reconnectToken: string;
   ready: boolean;
