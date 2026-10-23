@@ -2,9 +2,11 @@ import { useState } from 'react';
 import {
   Bell,
   BellRing,
+  Laugh,
   Layers,
   Play,
   Shuffle,
+  Siren,
   Trophy,
   Volume2,
   VolumeX,
@@ -38,6 +40,18 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Hand exchange',
     description: 'A card riffle when a 0 passes or a 7 swaps hands.',
     Icon: Shuffle,
+  },
+  {
+    kind: 'penalty',
+    label: 'Penalty',
+    description: 'A mocking sad trombone for everyone when a player takes penalty cards.',
+    Icon: Laugh,
+  },
+  {
+    kind: 'knockout',
+    label: 'Knockout',
+    description: 'A danger alarm for everyone when a player reaches 25 cards and is out.',
+    Icon: Siren,
   },
   { kind: 'win', label: 'Win', description: 'A fanfare when you win the round.', Icon: Trophy },
 ];

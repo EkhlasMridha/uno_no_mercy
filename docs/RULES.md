@@ -123,10 +123,18 @@ and **before the next player begins their turn**, you draw 2 (official).
 - **Catch window (server-enforced):** a player who reaches one card without declaring is _vulnerable_. The
   window closes as soon as **any other player performs a turn action** (play, draw, take a penalty, or name a
   roulette color). That is how "the next player begins their turn" is measured. After that the player is
-  _safe_ until their hand size changes. No timers are involved.
+  _safe_ until their hand size changes. The window itself has no timer, but no one can act on it during
+  the UNO breather below.
 - **One card through swaps, passes and other effects:** the same rule applies. Anyone whose hand becomes
   exactly one card for any reason (a 7 swap, a 0 pass, and so on) becomes vulnerable and must call UNO.
 - Only active players can catch, and you cannot catch yourself.
+- **UNO breather (server-enforced):** after every card play, and whenever the turn passes to another
+  player, the table pauses for **2 seconds** (`TURN_HOLD_MS`). During the pause only **calling UNO** (and
+  leaving) is open: nobody may play, draw, take a penalty, name a roulette color or catch. So a player who
+  just reached one card always has 2 seconds to press UNO before anyone can catch them, and the next
+  player cannot close the window early either. Drawing again within your own turn does not start a pause.
+  The pause always ends on its own (the server re-sends the table when it does), so it cannot stall a
+  game.
 
 ### 5.10 Stacking
 
@@ -198,7 +206,7 @@ carry over from round to round, and the first to **1,000** wins the match. This 
 | A4  | Recipient knocked out by a stack                                                         | Drawing stops at 25, the rest is void, the stack is cleared, the turn goes to the next active player                                                                                               | `stacking.ts`                                           |
 | A5  | Draw pile **and** discards empty (every card is in hands or set aside after a reshuffle) | A manual draw with nothing to draw passes the turn (refused if you still hold a playable card). Penalty and roulette draws give what is available and the rest is void. Nothing is ever duplicated | `pile.ts`, `game.reducer.ts`                            |
 | A6  | Who sets the active color after Roulette?                                                | The victim's named color                                                                                                                                                                           | `card-effects.ts`                                       |
-| A7  | UNO catch window length                                                                  | Until another player's next turn action (no timer)                                                                                                                                                 | `uno-manager.ts`                                        |
+| A7  | UNO catch window length                                                                  | Until another player's next turn action, which can't come sooner than the 2-second UNO breather after each play or turn change (§5.9); catches wait for the breather too                           | `uno-manager.ts`, `RoomManager` (`TURN_HOLD_MS`)        |
 | A8  | One card left after a swap or pass                                                       | Must call UNO, same catch window                                                                                                                                                                   | `uno-manager.ts`                                        |
 | A9  | Last card is a 7, 0, Draw or Discard All                                                 | The win is checked first, so no effect resolves                                                                                                                                                    | `game.reducer.ts`                                       |
 | A10 | Ignored opening action cards                                                             | Stay in the discard pile underneath the starting card                                                                                                                                              | `game.factory.ts`                                       |

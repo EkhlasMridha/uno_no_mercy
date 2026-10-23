@@ -34,4 +34,8 @@ export interface Room {
   createdAt: number;
   /** Pending computer move, if any. */
   computerTimer: ReturnType<typeof setTimeout> | null;
+  /** When the UNO breather after the last play or turn change ends (epoch ms; 0 for none). */
+  turnHoldUntil: number;
+  /** Re-sends the table when the breather ends, so clients see their actions open again. */
+  holdTimer: ReturnType<typeof setTimeout> | null;
 }

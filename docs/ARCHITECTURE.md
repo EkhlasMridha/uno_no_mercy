@@ -108,6 +108,13 @@ expected state version. When a game finishes it records the round result and sco
 copies only that player's hand. Swaps and passes therefore reach each player only as their own new hand.
 Opponents' card ids are never sent. The integration test checks this byte for byte.
 
+**UNO breather.** After a command that plays a card or changes whose turn it is, `RoomManager` sets
+`room.turnHoldUntil` to `TURN_HOLD_MS` (2 s) ahead (docs/RULES.md §5.9). Until then `executeGameCommand`
+refuses play, draw, take-penalty, roulette-color and catch commands with `TURN_HOLD`; `callUno` and leaving
+still go through. `toGameView` sends `turnHoldMs` and strips every action except `canCallUno` from
+`validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
+Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+
 ## Network protocol
 
 All client→server events are acknowledged with `Ack<T> = { ok: true, data } | { ok: false, error: { code, message } }`.

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameLogEntry } from '@nomercy/shared';
-import { bannerFor, type BannerSpec, type NameLookup } from '../lib/event-text';
+import { bannerFor, latestPlaySeq, type BannerSpec, type NameLookup } from '../lib/event-text';
 
 export interface ActiveBanner extends BannerSpec {
   key: number;
@@ -29,7 +29,11 @@ export function useEventBanners(log: GameLogEntry[], name: NameLookup): ActiveBa
         return spec ? { ...spec, key: e.seq } : null;
       })
       .filter((b): b is ActiveBanner => b !== null);
-    if (banners.length > 0) setQueue((q) => [...q, ...banners].slice(-4));
+    // A new play retires every banner from before it, so the table never shows stale news.
+    const playSeq = latestPlaySeq(fresh);
+    if (banners.length > 0 || playSeq > 0) {
+      setQueue((q) => [...q, ...banners].filter((b) => b.key >= playSeq).slice(-4));
+    }
   }, [log, name]);
 
   const current = queue[0] ?? null;

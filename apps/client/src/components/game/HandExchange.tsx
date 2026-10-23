@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RotateCcw, RotateCw } from 'lucide-react';
 import type { GameEvent, GameLogEntry } from '@nomercy/shared';
-import type { NameLookup } from '../../lib/event-text';
+import { latestPlaySeq, type NameLookup } from '../../lib/event-text';
 import { seatPoint } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
 
@@ -106,7 +106,10 @@ function useLatestExchange(log: GameLogEntry[]): { seq: number; event: Exchange 
     // A new round restarts the log while the table stays mounted, so a lower seq means "from the top".
     const since = newest < lastSeq.current ? 0 : lastSeq.current;
     lastSeq.current = newest;
-    const entry = log.filter((e) => e.seq > since && isExchange(e.event)).pop();
+    const fresh = log.filter((e) => e.seq > since);
+    const playSeq = latestPlaySeq(fresh);
+    if (playSeq > 0) setCurrent((c) => (c && c.seq < playSeq ? null : c));
+    const entry = fresh.filter((e) => isExchange(e.event)).pop();
     if (entry && isExchange(entry.event)) setCurrent({ seq: entry.seq, event: entry.event });
   }, [log]);
 

@@ -5,6 +5,7 @@ import {
   MIN_PLAYERS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
+  TURN_HOLD_MS,
   type ErrorCode,
   type Gender,
   type RoomSettingsPayload,
@@ -20,6 +21,15 @@ import {
 import { scoreRound } from './match-scoring.js';
 import type { Room, RoomPlayer } from './room.types.js';
 import { generatePlayerId, generateReconnectToken, tokensMatch } from './session.js';
+
+/** Commands that wait out the UNO breather. Calling UNO and leaving never wait. */
+const HELD_COMMANDS: ReadonlySet<GameCommand['type']> = new Set([
+  'playCard',
+  'draw',
+  'acceptPenalty',
+  'chooseRouletteColor',
+  'catchUno',
+]);
 
 export class RoomError extends Error {
   constructor(
@@ -40,6 +50,8 @@ export interface RoomManagerOptions {
   now?: () => number;
   /** Pause before a computer player moves, so people can follow the table. */
   computerMoveDelayMs?: number;
+  /** Length of the UNO breather after each play or turn change. Defaults to `TURN_HOLD_MS`. */
+  turnHoldMs?: number;
   /** Called when a room changes outside a client request (e.g. a reconnect window expired). */
   onRoomUpdated: (room: Room) => void;
   onRoomClosed: (room: Room, reason: string) => void;
@@ -103,6 +115,8 @@ export class RoomManager {
       lastResult: null,
       createdAt: this.now(),
       computerTimer: null,
+      turnHoldUntil: 0,
+      holdTimer: null,
     };
     player.ready = true;
     this.addComputers(room, computers);
@@ -256,12 +270,25 @@ export class RoomManager {
         'The game moved on before your action arrived. Try again.',
       );
     }
+    if (HELD_COMMANDS.has(command.type) && this.now() < room.turnHoldUntil) {
+      throw new RoomError(
+        'TURN_HOLD',
+        'Hold on a moment: everyone gets 2 seconds to call UNO after a play.',
+      );
+    }
+    const turnBefore = room.game.currentIndex;
     const outcome = applyCommand(room.game, playerId, command, this.options.rng, {
       checkInvariants: this.options.checkInvariants,
     });
     if (!outcome.ok) throw new RoomError(outcome.error.code, outcome.error.message);
     room.game = outcome.state;
     if (room.game.phase.type === 'finished') this.finishRound(room);
+    else if (
+      room.game.currentIndex !== turnBefore ||
+      outcome.events.some((e) => e.type === 'cardPlayed')
+    ) {
+      this.startTurnHold(room);
+    }
     this.scheduleComputers(room);
     return { room, version: room.game.version };
   }
@@ -305,6 +332,7 @@ export class RoomManager {
     room.game = state;
     room.status = 'inGame';
     room.lastResult = null;
+    room.turnHoldUntil = 0;
     this.scheduleComputers(room);
   }
 
@@ -329,14 +357,29 @@ export class RoomManager {
     // Fuller tables move faster so a lap doesn't keep the human waiting; draw streaks faster still.
     const crowd = Math.max(0.35, Math.min(1, 6 / computers.length));
     const streak = game.phase.type === 'drawing' || game.phase.type === 'rouletteReveal' ? 0.5 : 1;
+    const thinking = (this.options.computerMoveDelayMs ?? 900) * crowd * streak;
     room.computerTimer = setTimeout(
       () => {
         room.computerTimer = null;
         this.runComputerMove(room);
       },
-      (this.options.computerMoveDelayMs ?? 900) * crowd * streak,
+      // Computers wait out the UNO breather like everyone else.
+      Math.max(thinking, room.turnHoldUntil - this.now() + 10),
     );
     room.computerTimer.unref?.();
+  }
+
+  /** Starts the UNO breather (docs/RULES.md §5.9) and re-sends the table when it ends. */
+  private startTurnHold(room: Room): void {
+    const holdMs = this.options.turnHoldMs ?? TURN_HOLD_MS;
+    if (holdMs <= 0) return;
+    room.turnHoldUntil = this.now() + holdMs;
+    if (room.holdTimer) clearTimeout(room.holdTimer);
+    room.holdTimer = setTimeout(() => {
+      room.holdTimer = null;
+      if (this.rooms.has(room.code) && room.status === 'inGame') this.options.onRoomUpdated(room);
+    }, holdMs);
+    room.holdTimer.unref?.();
   }
 
   private runComputerMove(room: Room): void {
@@ -349,6 +392,7 @@ export class RoomManager {
     )) {
       for (const attempt of [command, fallbackComputerMove(game, playerId)]) {
         if (!attempt) continue;
+        if (HELD_COMMANDS.has(attempt.type) && this.now() < room.turnHoldUntil) continue;
         try {
           this.executeGameCommand(room.code, playerId, attempt, null);
           this.options.onRoomUpdated(room);
@@ -417,8 +461,10 @@ export class RoomManager {
           checkInvariants: this.options.checkInvariants,
         });
         if (outcome.ok) {
+          const turnBefore = room.game.currentIndex;
           room.game = outcome.state;
           if (room.game.phase.type === 'finished') this.finishRound(room);
+          else if (room.game.currentIndex !== turnBefore) this.startTurnHold(room);
           this.scheduleComputers(room);
         }
       }
@@ -447,6 +493,8 @@ export class RoomManager {
     for (const p of room.players) this.clearExpiry(p);
     if (room.computerTimer) clearTimeout(room.computerTimer);
     room.computerTimer = null;
+    if (room.holdTimer) clearTimeout(room.holdTimer);
+    room.holdTimer = null;
     this.rooms.delete(room.code);
     this.options.onRoomClosed(room, reason);
   }

@@ -147,4 +147,9 @@ export interface GameStateView {
   version: number;
   public: PublicGameView;
   me: PrivatePlayerView;
+  /**
+   * Milliseconds left in the UNO breather after a play or turn change (docs/RULES.md §5.9). While
+   * it runs, `validActions` only offers calling UNO; 0 when the table is open.
+   */
+  turnHoldMs: number;
 }

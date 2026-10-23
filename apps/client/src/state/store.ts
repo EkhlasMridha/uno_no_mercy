@@ -65,6 +65,10 @@ export function dismissNotice(id: number): void {
   setState((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
 }
 
+export function clearNotices(): void {
+  setState({ notices: [] });
+}
+
 export function setSoundPref(key: keyof SoundPrefs, value: boolean): void {
   setState((s) => ({ sound: { ...s.sound, [key]: value } }));
   saveSoundPrefs(state.sound);

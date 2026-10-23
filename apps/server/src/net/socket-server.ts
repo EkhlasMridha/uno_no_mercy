@@ -14,6 +14,8 @@ export interface SocketServerOptions {
   reconnectGraceMs: number;
   checkInvariants: boolean;
   computerMoveDelayMs?: number;
+  /** Length of the UNO breather after each play or turn change. Defaults to `TURN_HOLD_MS`. */
+  turnHoldMs?: number;
   /** Allowed browser origins for cross-origin dev setups. Same-origin needs nothing. */
   corsOrigins?: string[];
   /** Extra hostnames accepted in the Host header, besides IPs, localhost and this machine. */
@@ -71,6 +73,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     reconnectGraceMs: options.reconnectGraceMs,
     checkInvariants: options.checkInvariants,
     computerMoveDelayMs: options.computerMoveDelayMs,
+    turnHoldMs: options.turnHoldMs,
     onRoomUpdated: (room) => broadcaster.room(room),
     onRoomClosed: (room, reason) => {
       console.info(`[room ${room.code}] closed: ${reason}`);

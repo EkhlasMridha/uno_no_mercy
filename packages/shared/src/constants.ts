@@ -17,3 +17,8 @@ export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const PLAYER_NAME_MAX_LENGTH = 20;
 /** Most computer players a room can seat. */
 export const MAX_COMPUTERS = 9;
+/**
+ * The UNO breather: after a card play or a change of turn, only calling UNO is open for this long,
+ * so a player who reached one card can call it before anyone catches them (docs/RULES.md §5.9).
+ */
+export const TURN_HOLD_MS = 2000;

@@ -58,6 +58,8 @@ const DEFAULT_SOUND: SoundPrefs = {
   yourTurn: true,
   turnReminder: true,
   handExchange: true,
+  penalty: true,
+  knockout: true,
   win: true,
   muted: false,
 };

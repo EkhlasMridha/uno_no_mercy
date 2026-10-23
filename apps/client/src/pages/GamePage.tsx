@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, DoorOpen, Layers, ScrollText, Skull, Wifi } from 'lucide-react';
 import {
   colorOf,
@@ -26,7 +26,7 @@ import { useEventBanners } from '../hooks/useEventBanners';
 import { useGameSounds } from '../hooks/useGameSounds';
 import { avatarsForTable } from '../lib/avatar';
 import { cardName, COLOR_LABEL } from '../lib/cards';
-import { nameLookup } from '../lib/event-text';
+import { latestPlaySeq, nameLookup } from '../lib/event-text';
 import {
   acceptPenalty,
   callUno,
@@ -36,7 +36,7 @@ import {
   leaveRoom,
   playCard,
 } from '../net/actions';
-import { pushNotice } from '../state/store';
+import { clearNotices, pushNotice } from '../state/store';
 
 type PendingChoice = { card: Card; step: 'color' | 'swap' | 'discard' };
 
@@ -65,6 +65,14 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const playable = useMemo(() => new Set(actions.playableCardIds), [actions.playableCardIds]);
 
+  // Toasts answer the moment they came from; once someone plays, they're out of date.
+  const playSeq = latestPlaySeq(view.log);
+  const seenPlaySeq = useRef(playSeq);
+  useEffect(() => {
+    if (playSeq > seenPlaySeq.current) clearNotices();
+    seenPlaySeq.current = playSeq;
+  }, [playSeq]);
+
   useEffect(() => {
     if (!actions.canDeclareWithPlay) setUnoArmed(false);
   }, [actions.canDeclareWithPlay]);
@@ -76,6 +84,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
+  const held = game.turnHoldMs > 0;
   const myMove = isMyTurn && !finished && me?.status === 'active';
   const nudge = useGameSounds(
     view,
@@ -115,6 +125,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const onCardClick = (card: Card) => {
     if (finished) return;
+    if (held) {
+      pushNotice('info', 'Hold on: everyone gets 2 seconds to call UNO after a play.', 2000);
+      return;
+    }
     if (!isMyTurn) {
       pushNotice('info', current ? `It's ${current.name}'s turn.` : 'Not your turn.', 2500);
       return;
@@ -139,6 +153,12 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const statusText = (() => {
     if (finished) return 'Game over';
     if (me?.status === 'eliminated') return 'You are out — watching the rest of the game.';
+    if (held) {
+      if (actions.canCallUno) return 'One card left — call UNO before anyone catches you!';
+      return isMyTurn
+        ? 'Your turn in a moment…'
+        : `${current?.name ?? 'Next player'} is up in a moment…`;
+    }
     if (view.phase.type === 'rouletteColor') {
       return view.phase.victimId === meId
         ? 'Color Roulette! Name a color.'

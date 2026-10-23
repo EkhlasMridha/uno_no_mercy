@@ -40,6 +40,7 @@ beforeAll(async () => {
     reconnectGraceMs: 60_000,
     checkInvariants: true,
     computerMoveDelayMs: 5,
+    turnHoldMs: 0,
   });
   closeServer = () => io.close();
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
