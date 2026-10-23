@@ -69,7 +69,7 @@ export function GameTable({
           <DirectionTrack color={COLOR_STROKE[view.currentColor]} clockwise={clockwise} />
           <RouletteReveal view={view} meId={meId} name={name} canDraw={canDraw} onDraw={onDraw} />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82] short:gap-1.5 short:pb-10">
             <div className="flex flex-col items-center gap-1 landscape:flex-row landscape:gap-6">
               <DrawPile
                 pileRef={pileRef}

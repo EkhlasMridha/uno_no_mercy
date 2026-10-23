@@ -221,6 +221,9 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
 - **Seat scale:** seats shrink for crowded tables (`lg` ≤ 6, `md` ≤ 10, `sm` above; rooms allow up to
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
   as well as on desktop.
+- **Short screens:** laptops leave little height for the felt, so the `short` (≤ 860 px tall) and
+  `shorter` (≤ 640 px) variants in `tailwind.config.js` shrink the table and hand cards, the heap's
+  scatter (`--heap-px`) and the seat fans (`--fan-px`). Check 1280 × 575 (a 1080p laptop at 150%).
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
   drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
   popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the

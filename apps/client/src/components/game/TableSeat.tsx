@@ -58,9 +58,10 @@ export function TableSeat({
       {fan > 0 && (
         <div
           aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 max-sm:hidden"
+          // Short screens pull the fan in so it stays clear of the cards in the middle.
+          className="pointer-events-none absolute left-1/2 top-1/2 [--fan-px:1px] max-sm:hidden short:[--fan-px:0.75px] shorter:[--fan-px:0.6px]"
           style={{
-            transform: `translate(-50%, -50%) translate(${-Math.cos(rad) * s.fanGap}px, ${-Math.sin(rad) * s.fanGap}px) rotate(${angle - 90}deg)`,
+            transform: `translate(-50%, -50%) translate(calc(${-Math.cos(rad) * s.fanGap} * var(--fan-px)), calc(${-Math.sin(rad) * s.fanGap} * var(--fan-px))) rotate(${angle - 90}deg)`,
           }}
         >
           <div className="flex">

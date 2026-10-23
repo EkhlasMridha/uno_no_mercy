@@ -6,8 +6,8 @@ import { CardBack } from '../card/PlayingCard';
 import type { SeatScale } from './TableSeat';
 
 /** How long one card takes from the draw pile to its seat, and the gap between cards of a penalty. */
-const TRAVEL_MS = 620;
-const STAGGER_MS = 70;
+const TRAVEL_MS = 950;
+const STAGGER_MS = 120;
 /** A big penalty sends a short volley rather than burying the felt; the tally tells the full count. */
 const MAX_CARDS = 6;
 /** Opponents' cards land on their avatar; yours land on the fan over the near edge. */

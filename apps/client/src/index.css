@@ -213,10 +213,10 @@ body {
 }
 
 .anim-card-in {
-  animation: card-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: card-in 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 .anim-draw-in {
-  animation: draw-in 320ms ease-out both;
+  animation: draw-in 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 .anim-banner {
   animation: banner-pop 1700ms ease-out both;
@@ -273,7 +273,7 @@ body {
   animation: slow-spin 6s linear infinite;
 }
 .anim-toss {
-  animation: toss 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: toss 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 .anim-track {
   animation: track-flow 1.4s linear infinite;
@@ -303,7 +303,7 @@ body {
   }
 }
 .anim-tally-in {
-  animation: tally-in 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 480ms both;
+  animation: tally-in 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 780ms both;
 }
 .anim-tally-out {
   animation: tally-out 220ms ease-in both;

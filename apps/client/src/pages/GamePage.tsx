@@ -255,7 +255,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           {/* your seat: the hand is held over the near edge of the table */}
           <section
             aria-label="Your hand"
-            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28"
+            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28 short:-mt-16"
           >
             {/* brass light pools behind the hand while it's your move */}
             <div
