@@ -84,15 +84,17 @@ function noise(
 }
 
 const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
-  // A card flicked from the fingers, a breath of air in flight, and a soft slap on the felt as the
-  // toss lands. Each play varies a little, so a run of plays never sounds machine-made.
+  // A card slapped down on the table: a quick "fwip" as it leaves the hand, then a crisp crack, a
+  // papery thwap and a light thump as the toss lands. Most of the energy sits in 1-4 kHz so it cuts
+  // through laptop and phone speakers. Each play varies a little, so a run never sounds machine-made.
   cardPlay(ac, at) {
     const vary = (v: number) => v * (0.88 + Math.random() * 0.24);
-    const land = at + 0.18 + Math.random() * 0.04;
-    noise(ac, at, 0.012, 0.18, vary(4500), vary(5200), 0.1);
-    noise(ac, at + 0.02, 0.14, 0.035, vary(2200), vary(900));
-    noise(ac, land, 0.045, 0.25, vary(900), vary(550), 0.04);
-    tone(ac, ac.destination, 'sine', land, 0.08, 0.2, vary(140), 70);
+    const land = at + 0.15 + Math.random() * 0.03;
+    noise(ac, at, 0.12, vary(0.18), vary(1800), vary(4200), 0.6);
+    noise(ac, land, 0.05, vary(0.9), vary(3800), vary(2400), 0.02);
+    noise(ac, land, 0.09, vary(0.8), vary(1100), vary(700), 0.03);
+    noise(ac, land + 0.03, 0.02, 0.25, vary(5000), vary(4500), 0.1);
+    tone(ac, ac.destination, 'sine', land, 0.07, 0.35, vary(170), 80);
   },
   // Two knuckle knocks on the rail, then a small brass bell.
   turnReminder(ac, at) {
