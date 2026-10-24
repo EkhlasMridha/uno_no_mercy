@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TURN_HOLD_MS } from '@nomercy/shared';
 import { seededRng, type GameCommand } from '../src/engine/index.js';
 import { toGameView } from '../src/rooms/projections.js';
-import { RoomError, RoomManager } from '../src/rooms/room-manager.js';
+import { RoomError, RoomManager, type RoomManagerOptions } from '../src/rooms/room-manager.js';
 import type { Room } from '../src/rooms/room.types.js';
 import { buildState, cardId, n } from './helpers.js';
 
@@ -15,7 +15,12 @@ afterEach(() => {
 });
 
 /** Two people at a hand-built table: Ana (to move) holds two reds, Ben holds a red and two blues. */
-function table(): { manager: RoomManager; room: Room; ana: string; ben: string } {
+function table(options: Partial<RoomManagerOptions> = {}): {
+  manager: RoomManager;
+  room: Room;
+  ana: string;
+  ben: string;
+} {
   const manager = new RoomManager({
     rng: seededRng(7),
     reconnectGraceMs: 60_000,
@@ -23,6 +28,7 @@ function table(): { manager: RoomManager; room: Room; ana: string; ben: string }
     now: () => clock,
     onRoomUpdated: () => {},
     onRoomClosed: () => {},
+    ...options,
   });
   managers.push(manager);
   const { room, player: host } = manager.createRoom('Ana', 'female', 's1', 4);
@@ -96,6 +102,23 @@ describe('UNO breather after a play (docs/RULES.md §5.9)', () => {
     expect(toGameView(room, ben, clock)!.me.validActions.catchablePlayerIds).toEqual([ana]);
     manager.executeGameCommand(room.code, ben, { type: 'catchUno', targetId: ana }, null);
     expect(room.game!.players[0]!.hand).toHaveLength(3);
+  });
+
+  it('ends the breather when its timer fires, even if the clock still reads inside it', async () => {
+    let resent = 0;
+    const { manager, room, ana, ben } = table({ turnHoldMs: 5, onRoomUpdated: () => resent++ });
+    manager.executeGameCommand(
+      room.code,
+      ana,
+      { type: 'playCard', cardId: cardId(room.game!, 0) },
+      null,
+    );
+    // The clock stays put: Node timers can fire a millisecond before Date.now() passes the hold.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(resent).toBe(1);
+    const view = toGameView(room, ben, clock)!;
+    expect(view.turnHoldMs).toBe(0);
+    expect(view.me.validActions.playableCardIds).not.toEqual([]);
   });
 
   it('does not pause between draws within one turn', () => {
