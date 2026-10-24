@@ -35,6 +35,7 @@ const { io, manager } = createSocketServer(httpServer, {
   reconnectGraceMs: config.reconnectGraceMs,
   checkInvariants: config.dev,
   maxConnectionsPerIp: config.maxConnectionsPerIp,
+  maxRooms: config.maxRooms,
   ...guardOptions,
 });
 

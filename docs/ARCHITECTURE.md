@@ -178,7 +178,7 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   machine's name or a name in `ALLOWED_HOSTS`; anything else gets `421`, which defeats DNS-rebinding pages.
   The Socket.IO handshake also requires a same-origin `Origin` (WebSockets skip CORS, so without it any
   website a player visits could drive the game socket). One address may hold `MAX_CONNECTIONS_PER_IP`
-  sockets (default 32), so a single device can't fill the 50-room limit or exhaust memory. Each refusal is
+  sockets (default 32), so a single device can't fill the room limit (`MAX_ROOMS`, default 50) or exhaust memory. Each refusal is
   logged once with its reason, so a misconfigured proxy is easy to spot.
 - **Container:** non-root user, read-only file system, every Linux capability dropped,
   `no-new-privileges`, 64 processes and 512 MB at most (`compose.yaml`). The image holds only `node`, one
