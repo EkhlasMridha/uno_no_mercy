@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card } from '@nomercy/shared';
 import type { IdleNudge } from '../../hooks/useGameSounds';
 import { sortHand } from '../../lib/cards';
@@ -22,30 +22,56 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
     previous.current = new Set(hand.map((c) => c.id));
   }, [hand]);
 
-  const overlap =
-    sorted.length > 16
-      ? '-ml-10 sm:-ml-12 short:-ml-10'
-      : sorted.length > 9
-        ? '-ml-7 sm:-ml-9 short:-ml-7'
-        : '-ml-4 sm:-ml-5 short:-ml-4';
+  // The felt's width and one card's, measured so the fan can open to fill the space it has.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState({ width: 0, card: 0 });
+  const empty = sorted.length === 0;
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () =>
+      setRoom({
+        // Less the scroller's px-4 and the list's px-6, which hold the outer cards' tilted corners.
+        width: el.clientWidth - 80,
+        card: el.querySelector('li')?.offsetWidth ?? 0,
+      });
+    measure();
+    // Card size follows width and height breakpoints; both resize the scroller too.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [empty]);
 
-  if (sorted.length === 0) {
+  if (empty) {
     return <p className="py-8 text-center text-chalk/50">No cards in hand</p>;
   }
+
+  // Each card bares a strip under the next: as wide as the felt allows, up to three quarters of a
+  // card. A big hand may pack tighter, down to a strip that still shows the corner index, then scrolls.
+  const cardWidth = room.card;
+  const tightest = sorted.length > 16 ? 0.4 : sorted.length > 9 ? 0.55 : 0.75;
+  const fit = sorted.length > 1 ? (room.width - cardWidth) / (sorted.length - 1) : cardWidth;
+  const strip = Math.max(cardWidth * tightest, Math.min(cardWidth * 0.75, fit));
 
   // The fan opens wider with more cards, up to a comfortable grip.
   const spread = Math.min(sorted.length * 4, 44);
   const step = sorted.length > 1 ? spread / (sorted.length - 1) : 0;
   // The outermost cards sit lowest in the arc and tip a corner further down as they tilt on their
-  // foot (half the widest card, 40px). Lift the fan by that much, plus room for the shadow, so the
-  // scroller never clips a corner.
-  // const edge = spread / 2;
-  // const overhang = Math.ceil((edge * edge) / 28 + 40 * Math.sin((edge * Math.PI) / 180)) + 8;
+  // foot. Room for that, plus the shadow, goes under the list so the scroller never clips a corner;
+  // the scroller gives it back with a negative margin so the seat below doesn't move.
+  const edge = spread / 2;
+  const overhang =
+    Math.ceil((edge * edge) / 28 + (cardWidth / 2) * Math.sin((edge * Math.PI) / 180)) + 8;
 
   return (
-    <div className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4">
+    <div
+      ref={scroller}
+      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4"
+      style={{ marginBottom: -overhang }}
+    >
       <ul
         className="mx-auto flex w-max items-end px-6"
+        style={{ paddingBottom: overhang }}
         aria-label={`Your hand, ${sorted.length} cards`}
       >
         {sorted.map((card, i) => {
@@ -56,8 +82,8 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
           return (
             <li
               key={card.id}
-              className={i > 0 ? overlap : ''}
               style={{
+                marginLeft: i > 0 ? strip - cardWidth : 0,
                 zIndex: i,
                 transform: `translateY(${drop}px) rotate(${tilt}deg)`,
                 transformOrigin: '50% 100%',
