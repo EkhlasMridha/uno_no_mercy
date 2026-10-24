@@ -40,6 +40,7 @@ Options:
 | Reconnect grace period | env `RECONNECT_GRACE_SECONDS=180` (default 120)            |
 | Join by a custom name  | env `ALLOWED_HOSTS=gamebox.lan` (IP addresses always work) |
 | Sockets per device     | env `MAX_CONNECTIONS_PER_IP=32` (default 32)               |
+| Rooms at once          | env `MAX_ROOMS=50` (default 50)                            |
 | Behind nginx           | env `TRUST_PROXY=1` (see _Behind nginx_ below)             |
 
 ### Or run it in Docker

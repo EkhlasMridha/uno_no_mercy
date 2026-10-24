@@ -12,6 +12,7 @@ export interface ServerConfig {
   /** Hostnames accepted besides IPs, localhost and this machine's name (DNS-rebinding guard). */
   allowedHosts: string[];
   maxConnectionsPerIp: number;
+  maxRooms: number;
   /** Running behind a reverse proxy that sets X-Forwarded-Host and X-Forwarded-For. */
   trustProxy: boolean;
 }
@@ -31,7 +32,7 @@ function argValue(args: string[], name: string): string | undefined {
  *   --dev            development mode (card-conservation checks on every move)
  *   --trust-proxy    behind a reverse proxy: trust its X-Forwarded-Host and X-Forwarded-For
  * Env: HOST, PORT, RECONNECT_GRACE_SECONDS, CLIENT_DIST, ALLOWED_HOSTS (comma-separated),
- *      MAX_CONNECTIONS_PER_IP (default 32), TRUST_PROXY=1
+ *      MAX_CONNECTIONS_PER_IP (default 32), MAX_ROOMS (default 50), TRUST_PROXY=1
  */
 export function loadConfig(args = process.argv.slice(2), env = process.env): ServerConfig {
   const lanMode = args.includes('--lan') || env.LAN === '1';
@@ -42,6 +43,7 @@ export function loadConfig(args = process.argv.slice(2), env = process.env): Ser
   }
   const graceSeconds = Number(env.RECONNECT_GRACE_SECONDS ?? 120);
   const perIp = Number(env.MAX_CONNECTIONS_PER_IP ?? 32);
+  const maxRooms = Number(env.MAX_ROOMS ?? 50);
   const here = path.dirname(fileURLToPath(import.meta.url));
   const defaultDist = path.resolve(here, '../../client/dist');
   const clientDist = env.CLIENT_DIST ? path.resolve(env.CLIENT_DIST) : defaultDist;
@@ -57,6 +59,7 @@ export function loadConfig(args = process.argv.slice(2), env = process.env): Ser
       .map((h) => h.trim())
       .filter(Boolean),
     maxConnectionsPerIp: Number.isInteger(perIp) && perIp > 0 ? perIp : 32,
+    maxRooms: Number.isInteger(maxRooms) && maxRooms > 0 ? maxRooms : 50,
     trustProxy: args.includes('--trust-proxy') || ['1', 'true'].includes(env.TRUST_PROXY ?? ''),
   };
 }

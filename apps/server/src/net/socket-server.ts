@@ -22,6 +22,8 @@ export interface SocketServerOptions {
   allowedHosts?: string[];
   /** Open game sockets one address may hold, so one device can't exhaust rooms or memory. */
   maxConnectionsPerIp?: number;
+  /** Rooms open at once. Defaults to 50. */
+  maxRooms?: number;
   /** Behind a reverse proxy: read the public host and player address from X-Forwarded-*. */
   trustProxy?: boolean;
   /** Told why a handshake was refused. */
@@ -72,6 +74,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     rng: options.rng,
     reconnectGraceMs: options.reconnectGraceMs,
     checkInvariants: options.checkInvariants,
+    maxRooms: options.maxRooms,
     computerMoveDelayMs: options.computerMoveDelayMs,
     turnHoldMs: options.turnHoldMs,
     onRoomUpdated: (room) => broadcaster.room(room),
