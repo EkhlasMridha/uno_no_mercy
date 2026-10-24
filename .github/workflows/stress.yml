@@ -1,0 +1,51 @@
+name: Stress
+
+# Bots fill the configured number of rooms on a production server and play them all at once.
+# Fails if any room can't be opened, stalls, or gets an unexpected refusal.
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/server/**'
+      - 'packages/shared/**'
+      - 'scripts/stress-rooms.mjs'
+      - '.github/workflows/stress.yml'
+      - 'package-lock.json'
+  workflow_dispatch:
+    inputs:
+      rooms:
+        description: 'Rooms that must all stay playable at once (rooms × players stays ≤ 1000 sockets)'
+        default: '50'
+      players_per_room:
+        description: 'Bot players per room'
+        default: '4'
+      step_seconds:
+        description: 'Seconds of play after each batch of 10 rooms'
+        default: '20'
+
+concurrency:
+  group: stress-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  rooms:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:shared && npm run build -w @nomercy/server
+      - name: All configured rooms can be played at once
+        env:
+          ROOMS: ${{ inputs.rooms || '50' }}
+          PLAYERS_PER_ROOM: ${{ inputs.players_per_room || '4' }}
+          STEP_SECONDS: ${{ inputs.step_seconds || '20' }}
+        run: node scripts/stress-rooms.mjs | tee stress.log
+      - name: Report
+        if: always() && hashFiles('stress.log') != ''
+        run: |
+          { echo '### Stress test'; echo '```'; cat stress.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
