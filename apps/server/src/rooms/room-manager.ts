@@ -377,6 +377,9 @@ export class RoomManager {
     if (room.holdTimer) clearTimeout(room.holdTimer);
     room.holdTimer = setTimeout(() => {
       room.holdTimer = null;
+      // The timer ends the hold: it can fire a millisecond before `now()` passes `turnHoldUntil`,
+      // and a table re-sent inside the hold hides every action, so nobody could move again.
+      room.turnHoldUntil = 0;
       if (this.rooms.has(room.code) && room.status === 'inGame') this.options.onRoomUpdated(room);
     }, holdMs);
     room.holdTimer.unref?.();
