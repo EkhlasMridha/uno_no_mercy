@@ -11,6 +11,7 @@ import { DrawFlight } from './DrawFlight';
 import { HandExchange } from './HandExchange';
 import { RouletteReveal } from './RouletteReveal';
 import { TableSeat, type SeatScale } from './TableSeat';
+import type { LastPlay } from '../../hooks/useLastPlay';
 
 interface GameTableProps {
   view: PublicGameView;
@@ -23,6 +24,8 @@ interface GameTableProps {
   onDraw: () => void;
   onCatch: (playerId: string) => void;
   onShowPlayed: () => void;
+  /** The last play, shown on its player's seat until the next player finishes their move. */
+  lastPlay: LastPlay | null;
 }
 
 const COLOR_STROKE = {
@@ -44,6 +47,7 @@ export function GameTable({
   onDraw,
   onCatch,
   onShowPlayed,
+  lastPlay,
 }: GameTableProps) {
   const count = view.players.length;
   const myIndex = Math.max(
@@ -131,6 +135,7 @@ export function GameTable({
           isCurrent={p.id === view.currentPlayerId}
           canCatch={catchableIds.includes(p.id)}
           onCatch={() => onCatch(p.id)}
+          lastPlayed={lastPlay?.playerId === p.id ? lastPlay : null}
         />
       ))}
 

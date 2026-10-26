@@ -36,9 +36,12 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
 3. The server validates and applies the command, increments the version, and broadcasts new projections.
    Clients animate the change; animations never hold up or alter the state. A 7 or a 0 shows each hand
    sliding face down from its old owner's seat to its new one, with a caption naming who swapped.
+   The played card also sits on the player's avatar until the next player has finished their move, so
+   everyone can see who played what.
    For the next 2 seconds the table pauses (the UNO breather, RULES.md §5.9): only **UNO** can be pressed,
    so a player left on one card can call it before anyone catches them. Then the server re-sends the table
-   with the next player's actions open.
+   with the next player's actions open. A play that gives the turn straight back to you (Skip Everyone,
+   or a Skip or Reverse with two players) skips the pause, unless it left you on one card.
 4. The player may press **Draw** (or the draw pile) at any time on their turn, one card per press. From then
    on only the card drawn last is playable, if it matches. The player can play it or keep drawing; each new
    draw locks the previous one.

@@ -4,7 +4,7 @@ import { seededRng, type GameCommand } from '../src/engine/index.js';
 import { toGameView } from '../src/rooms/projections.js';
 import { RoomError, RoomManager } from '../src/rooms/room-manager.js';
 import type { Room } from '../src/rooms/room.types.js';
-import { buildState, cardId, n } from './helpers.js';
+import { act, buildState, card, cardId, n } from './helpers.js';
 
 let clock = 1_000_000;
 const managers: RoomManager[] = [];
@@ -106,5 +106,52 @@ describe('UNO breather after a play (docs/RULES.md §5.9)', () => {
     expect(room.turnHoldUntil).toBe(0);
     manager.executeGameCommand(room.code, ana, { type: 'draw' }, null);
     expect(room.game!.players[0]!.hand).toHaveLength(4);
+  });
+
+  it('goes straight on when a play hands the turn back to its player', () => {
+    const { manager, room, ana } = table();
+    // With two players a Skip comes straight back to Ana.
+    room.game!.players[0]!.hand = [card(act('skip', 'red')), card(n('red', 5)), card(n('red', 6))];
+    manager.executeGameCommand(
+      room.code,
+      ana,
+      { type: 'playCard', cardId: cardId(room.game!, 0) },
+      null,
+    );
+    expect(room.game!.currentIndex).toBe(0);
+    expect(room.turnHoldUntil).toBe(0);
+    expect(toGameView(room, ana, clock)!.me.validActions.playableCardIds).toHaveLength(2);
+    manager.executeGameCommand(
+      room.code,
+      ana,
+      { type: 'playCard', cardId: cardId(room.game!, 0) },
+      null,
+    );
+    expect(room.game!.players[0]!.hand).toHaveLength(1);
+  });
+
+  it('still holds a turn that comes back when the play left its player open to a catch', () => {
+    const { manager, room, ana, ben } = table();
+    room.game!.players[0]!.hand = [card(act('skip', 'red')), card(n('red', 5))];
+    manager.executeGameCommand(
+      room.code,
+      ana,
+      { type: 'playCard', cardId: cardId(room.game!, 0) },
+      null,
+    );
+    expect(room.game!.currentIndex).toBe(0);
+    expect(room.game!.players[0]!.uno).toBe('vulnerable');
+    const lastCard = cardId(room.game!, 0);
+    expect(
+      refusal(() =>
+        manager.executeGameCommand(room.code, ana, { type: 'playCard', cardId: lastCard }, null),
+      ),
+    ).toBe('TURN_HOLD');
+    expect(
+      refusal(() =>
+        manager.executeGameCommand(room.code, ben, { type: 'catchUno', targetId: ana }, null),
+      ),
+    ).toBe('TURN_HOLD');
+    expect(toGameView(room, ana, clock)!.me.validActions.canCallUno).toBe(true);
   });
 });

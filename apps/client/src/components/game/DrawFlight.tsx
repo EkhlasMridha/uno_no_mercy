@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Layers } from 'lucide-react';
 import type { GameLogEntry } from '@nomercy/shared';
 import { latestPlaySeq } from '../../lib/event-text';
 import { seatPoint } from '../../lib/table-geometry';
@@ -27,8 +28,12 @@ interface Flight {
   count: number;
 }
 
-/** Cards a player has drawn in quick succession, shown in the popup over their seat. */
+/**
+ * Cards a player has drawn in quick succession, or shed with a Discard All, shown in the popup over
+ * their seat.
+ */
 interface Tally {
+  /** Positive for cards drawn; negative for cards a Discard All took out of the hand. */
   count: number;
   /** The newest draw it counts. */
   seq: number;
@@ -46,8 +51,9 @@ interface DrawFlightProps {
 
 /**
  * Cards sliding face down from the draw pile to whoever drew them (a single draw, a stacked
- * penalty, a missed UNO or a roulette haul) and a red tally over their seat saying how many.
- * Cosmetic only; the cards are already in the hand.
+ * penalty, a missed UNO or a roulette haul) and a red tally over their seat saying how many. A
+ * Discard All puts the same tally up with the cards it shed, as a negative count. Cosmetic only; the
+ * cards are already in the hand.
  */
 export function DrawFlight({ log, meId, angleOf, pileRef, scale }: DrawFlightProps) {
   const stage = useRef<HTMLDivElement>(null);
@@ -111,9 +117,14 @@ function useNewDraws(log: GameLogEntry[]): { flights: Flight[]; tallies: Record<
     const since = newest < lastSeq.current ? 0 : lastSeq.current;
     lastSeq.current = newest;
     const fresh: Flight[] = [];
+    const discards: Flight[] = [];
     for (const { seq, event } of log) {
       if (seq > since && event.type === 'cardsDrawn') {
         fresh.push({ seq, playerId: event.playerId, count: event.count });
+      }
+      // The extras plus the Discard All itself: every card that just left the hand.
+      if (seq > since && event.type === 'discardedAll') {
+        discards.push({ seq, playerId: event.playerId, count: event.count + 1 });
       }
     }
     // The next play takes down every tally from before it.
@@ -123,6 +134,7 @@ function useNewDraws(log: GameLogEntry[]): { flights: Flight[]; tallies: Record<
         Object.fromEntries(Object.entries(current).filter(([, t]) => t.seq > playSeq)),
       );
     }
+    discards.forEach((d) => showTally(d.playerId, { count: -d.count, seq: d.seq, leaving: false }));
     if (fresh.length === 0) return;
 
     setFlights((current) => [...current, ...fresh]);
@@ -142,41 +154,42 @@ function useNewDraws(log: GameLogEntry[]): { flights: Flight[]; tallies: Record<
     added.forEach((f, playerId) => {
       if (f.count === 0) added.delete(playerId);
     });
-    setTallies((current) => {
-      const next = { ...current };
-      added.forEach(({ count, seq }, playerId) => {
-        const prior = current[playerId];
-        next[playerId] = {
-          count: (prior && !prior.leaving ? prior.count : 0) + count,
-          seq,
-          leaving: false,
-        };
-      });
-      return next;
-    });
-    added.forEach((_, playerId) => {
-      tallyTimers.current.get(playerId)?.forEach((id) => window.clearTimeout(id));
-      tallyTimers.current.set(playerId, [
-        window.setTimeout(
-          () =>
-            setTallies((current) =>
-              current[playerId]
-                ? { ...current, [playerId]: { ...current[playerId], leaving: true } }
-                : current,
-            ),
-          TALLY_MS,
-        ),
-        window.setTimeout(() => {
-          tallyTimers.current.delete(playerId);
-          setTallies((current) => {
-            const rest = { ...current };
-            delete rest[playerId];
-            return rest;
-          });
-        }, TALLY_MS + TALLY_FADE_MS),
-      ]);
-    });
+    added.forEach(({ count, seq }, playerId) =>
+      // A draw adds to a draw tally still showing; a discard tally is a different story, so it restarts.
+      showTally(playerId, { count, seq, leaving: false }, (prior) =>
+        prior.count > 0 ? prior.count : 0,
+      ),
+    );
   }, [log]);
+
+  /** Puts a tally up over a seat, or updates it, and takes it down after a while. */
+  function showTally(playerId: string, tally: Tally, carried: (prior: Tally) => number = () => 0) {
+    setTallies((current) => {
+      const prior = current[playerId];
+      const base = prior && !prior.leaving ? carried(prior) : 0;
+      return { ...current, [playerId]: { ...tally, count: base + tally.count } };
+    });
+    tallyTimers.current.get(playerId)?.forEach((id) => window.clearTimeout(id));
+    tallyTimers.current.set(playerId, [
+      window.setTimeout(
+        () =>
+          setTallies((current) =>
+            current[playerId]
+              ? { ...current, [playerId]: { ...current[playerId], leaving: true } }
+              : current,
+          ),
+        TALLY_MS,
+      ),
+      window.setTimeout(() => {
+        tallyTimers.current.delete(playerId);
+        setTallies((current) => {
+          const rest = { ...current };
+          delete rest[playerId];
+          return rest;
+        });
+      }, TALLY_MS + TALLY_FADE_MS),
+    ]);
+  }
 
   return { flights, tallies };
 }
@@ -188,10 +201,14 @@ interface DrawTallyProps {
   offset: number;
 }
 
-/** A red tag pinned over the drawer's avatar, its tail pointing at them. */
+/**
+ * A tag pinned over the player's avatar, its tail pointing at them: red "+N cards" with two card
+ * backs for cards drawn, green "−N cards" with the Discard All mark for cards shed.
+ */
 function DrawTally({ tally, point, offset }: DrawTallyProps) {
   // Seats along the top edge would push the tag off the stage, so it hangs below them instead.
   const below = point.y < 25;
+  const shed = tally.count < 0;
   return (
     <div
       className="absolute"
@@ -204,20 +221,31 @@ function DrawTally({ tally, point, offset }: DrawTallyProps) {
       }}
     >
       <div
-        className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-rose-700 py-1 pl-1.5 pr-2.5 text-chalk shadow-lifted ring-2 ring-brass ${
+        className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-lg ${shed ? 'bg-ink-green' : 'bg-rose-700'} py-1 pl-1.5 pr-2.5 text-chalk shadow-lifted ring-2 ring-brass ${
           tally.leaving ? 'anim-tally-out' : 'anim-tally-in'
         }`}
-        style={{ transformOrigin: below ? '50% 0%' : '50% 100%' }}
+        style={{
+          transformOrigin: below ? '50% 0%' : '50% 100%',
+          // A draw tag waits for the flying cards to land; nothing flies for a discard.
+          animationDelay: shed && !tally.leaving ? '0ms' : undefined,
+        }}
       >
-        <CardPair />
+        {shed ? (
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[4px] bg-chalk text-ink-green">
+            <Layers size={14} strokeWidth={2.75} aria-hidden />
+          </span>
+        ) : (
+          <CardPair />
+        )}
         <span key={tally.count} className="anim-bump font-display text-xl leading-none">
-          +{tally.count}
+          {shed ? '−' : '+'}
+          {Math.abs(tally.count)}
         </span>
         <span className="text-[11px] font-semibold leading-none text-chalk/85">
-          {tally.count === 1 ? 'card' : 'cards'}
+          {Math.abs(tally.count) === 1 ? 'card' : 'cards'}
         </span>
         <span
-          className={`absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-rose-700 ${
+          className={`absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 ${shed ? 'bg-ink-green' : 'bg-rose-700'} ${
             below
               ? '-top-[6px] border-l-2 border-t-2 border-brass'
               : '-bottom-[6px] border-b-2 border-r-2 border-brass'

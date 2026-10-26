@@ -2,11 +2,15 @@ import { useState } from 'react';
 import {
   Bell,
   BellRing,
+  Download,
   Laugh,
   Layers,
+  Layers3,
+  Megaphone,
   Play,
   Shuffle,
   Siren,
+  Sparkles,
   Trophy,
   Volume2,
   VolumeX,
@@ -22,6 +26,32 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Card play',
     description: 'A card slapped down on the table whenever anyone plays one.',
     Icon: Layers,
+  },
+  {
+    kind: 'discardAll',
+    label: 'Discard All',
+    description: 'A handful of cards hitting the pile when anyone plays a Discard All.',
+    Icon: Layers3,
+  },
+  {
+    kind: 'cardDraw',
+    label: 'Card draw',
+    description:
+      'A soft swish whenever anyone draws from the pile, including Color Roulette draws.',
+    Icon: Download,
+  },
+  {
+    kind: 'rouletteHit',
+    label: 'Roulette hit',
+    description: 'A short ding when a Color Roulette draw turns up the named color.',
+    Icon: Sparkles,
+  },
+  {
+    kind: 'unoCall',
+    label: 'UNO call',
+    description:
+      'A voice shouts "UNO!" when a player calls it: a man or a woman, matching their avatar.',
+    Icon: Megaphone,
   },
   {
     kind: 'yourTurn',
@@ -134,7 +164,11 @@ export function SoundSettings({ className }: { className: string }) {
                 <button
                   type="button"
                   className="btn-ghost p-2"
-                  onClick={() => playSound(kind)}
+                  // The UNO call previews both voices, a man and then a woman.
+                  onClick={() => {
+                    playSound(kind);
+                    if (kind === 'unoCall') playSound(kind, 0.8, 'female');
+                  }}
                   aria-label={`Play the ${label.toLowerCase()} sound`}
                 >
                   <Play size={18} />
