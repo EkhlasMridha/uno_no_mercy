@@ -135,7 +135,8 @@ try {
     [alpha, 'Alpha', 'Bravo'],
     [bravo, 'Bravo', 'Alpha'],
   ]) {
-    const hand = `ul[aria-label="Your hand, ${STARTING_HAND_SIZE} cards"] > li`;
+    // A big hand splits into two tiers, so match cards in any row of the hand.
+    const hand = `[aria-label="Your hand, ${STARTING_HAND_SIZE} cards"] li`;
     await waitFor(
       () => player(`document.querySelectorAll('${hand}').length === ${STARTING_HAND_SIZE}`),
       `${me} to hold ${STARTING_HAND_SIZE} cards`,
