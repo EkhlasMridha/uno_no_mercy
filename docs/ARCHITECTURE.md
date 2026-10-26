@@ -113,7 +113,8 @@ Opponents' card ids are never sent. The integration test checks this byte for by
 refuses play, draw, take-penalty, roulette-color and catch commands with `TURN_HOLD`; `callUno` and leaving
 still go through. `toGameView` sends `turnHoldMs` and strips every action except `canCallUno` from
 `validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
-Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+A play that hands the turn straight back to its player skips the hold unless a player is left
+vulnerable to a catch (`needsTurnHold`). Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
 
 ## Network protocol
 

@@ -1,9 +1,12 @@
 import { Crown, Hand, Skull, WifiOff } from 'lucide-react';
 import type { PublicPlayerView } from '@nomercy/shared';
+import type { LastPlay } from '../../hooks/useLastPlay';
+import { cardName } from '../../lib/cards';
 import { seatPosition } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
 import type { AvatarTraits } from '../../lib/avatar';
 import { PlayerAvatar } from '../PlayerAvatar';
+import { LastPlayedCard } from './LastPlayedCard';
 
 export type SeatScale = 'lg' | 'md' | 'sm';
 
@@ -15,6 +18,8 @@ interface TableSeatProps {
   isCurrent: boolean;
   canCatch: boolean;
   onCatch: () => void;
+  /** This player's card, while it is the last play and the next player hasn't finished their move. */
+  lastPlayed: LastPlay | null;
 }
 
 const SCALE: Record<SeatScale, { avatar: string; name: string; fan: number; fanGap: number }> = {
@@ -42,6 +47,7 @@ export function TableSeat({
   isCurrent,
   canCatch,
   onCatch,
+  lastPlayed,
 }: TableSeatProps) {
   const s = SCALE[scale];
   const out = player.status === 'eliminated';
@@ -53,7 +59,7 @@ export function TableSeat({
     <div
       className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
       style={seatPosition(angle)}
-      aria-label={`${player.name}${player.isComputer ? ', computer' : ''}, ${player.handCount} cards${isCurrent ? ', playing now' : ''}${out ? ', out' : ''}`}
+      aria-label={`${player.name}${player.isComputer ? ', computer' : ''}, ${player.handCount} cards${isCurrent ? ', playing now' : ''}${out ? ', out' : ''}${lastPlayed ? `, played ${cardName(lastPlayed.card)}` : ''}`}
     >
       {fan > 0 && (
         <div
@@ -97,6 +103,13 @@ export function TableSeat({
         >
           {isCurrent && !out && <span aria-hidden className="turn-orbit" />}
           <PlayerAvatar traits={avatar} className="h-full w-full" />
+          {lastPlayed && (
+            <LastPlayedCard
+              key={lastPlayed.seq}
+              play={lastPlayed}
+              side={Math.cos(rad) < -0.3 ? 'left' : 'right'}
+            />
+          )}
           {out && (
             <span
               aria-hidden

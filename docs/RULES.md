@@ -132,7 +132,10 @@ and **before the next player begins their turn**, you draw 2 (official).
   player, the table pauses for **2 seconds** (`TURN_HOLD_MS`). During the pause only **calling UNO** (and
   leaving) is open: nobody may play, draw, take a penalty, name a roulette color or catch. So a player who
   just reached one card always has 2 seconds to press UNO before anyone can catch them, and the next
-  player cannot close the window early either. Drawing again within your own turn does not start a pause.
+  player cannot close the window early either. Drawing again within your own turn does not start a pause,
+  and neither does a play that hands the turn straight back to you (Skip Everyone, or a Skip or Reverse
+  with two players): you play on at once, unless that play left someone open to a catch (usually you, on
+  one card), in which case the 2 seconds still apply so they can call UNO.
   The pause always ends on its own (the server re-sends the table when it does), so it cannot stall a
   game.
 

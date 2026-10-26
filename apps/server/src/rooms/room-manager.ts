@@ -7,10 +7,17 @@ import {
   ROOM_CODE_LENGTH,
   TURN_HOLD_MS,
   type ErrorCode,
+  type GameEvent,
   type Gender,
   type RoomSettingsPayload,
 } from '@nomercy/shared';
-import { applyCommand, createGame, type GameCommand, type Rng } from '../engine/index.js';
+import {
+  applyCommand,
+  createGame,
+  type GameCommand,
+  type GameState,
+  type Rng,
+} from '../engine/index.js';
 import { CommandCache } from '../net/command-cache.js';
 import {
   chooseComputerMove,
@@ -30,6 +37,18 @@ const HELD_COMMANDS: ReadonlySet<GameCommand['type']> = new Set([
   'chooseRouletteColor',
   'catchUno',
 ]);
+
+/**
+ * Whether a command starts the UNO breather (docs/RULES.md §5.9): the turn passed to someone else, or
+ * a card was played. A play that hands the turn straight back to its player (Skip Everyone, or a Skip
+ * or Reverse with two players) goes on at once, unless it left someone open to an UNO catch: they
+ * still get the 2 seconds to call it.
+ */
+function needsTurnHold(game: GameState, turnBefore: number, events: GameEvent[]): boolean {
+  if (game.currentIndex !== turnBefore) return true;
+  if (!events.some((e) => e.type === 'cardPlayed')) return false;
+  return game.players.some((p) => p.uno === 'vulnerable');
+}
 
 export class RoomError extends Error {
   constructor(
@@ -283,12 +302,7 @@ export class RoomManager {
     if (!outcome.ok) throw new RoomError(outcome.error.code, outcome.error.message);
     room.game = outcome.state;
     if (room.game.phase.type === 'finished') this.finishRound(room);
-    else if (
-      room.game.currentIndex !== turnBefore ||
-      outcome.events.some((e) => e.type === 'cardPlayed')
-    ) {
-      this.startTurnHold(room);
-    }
+    else if (needsTurnHold(room.game, turnBefore, outcome.events)) this.startTurnHold(room);
     this.scheduleComputers(room);
     return { room, version: room.game.version };
   }

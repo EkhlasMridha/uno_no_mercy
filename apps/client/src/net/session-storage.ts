@@ -55,6 +55,10 @@ export function saveName(name: string): void {
 const SOUND_KEY = 'nomercy.sound.v1';
 const DEFAULT_SOUND: SoundPrefs = {
   cardPlay: true,
+  discardAll: true,
+  cardDraw: true,
+  rouletteHit: true,
+  unoCall: true,
   yourTurn: true,
   turnReminder: true,
   handExchange: true,

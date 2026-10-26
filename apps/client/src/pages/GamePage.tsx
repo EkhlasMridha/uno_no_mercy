@@ -3,6 +3,7 @@ import { BookOpen, DoorOpen, Layers, ScrollText, Skull, Wifi } from 'lucide-reac
 import {
   colorOf,
   isWildCard,
+  MERCY_HAND_LIMIT,
   type Card,
   type CardColor,
   type GameStateView,
@@ -12,6 +13,8 @@ import { ActionBar } from '../components/game/ActionBar';
 import { EventBanner } from '../components/game/EventBanner';
 import { EventFeed } from '../components/game/EventFeed';
 import { GameTable } from '../components/game/GameTable';
+import { LastPlayedCard } from '../components/game/LastPlayedCard';
+import { MercyGauge } from '../components/game/MercyGauge';
 import { PlayerHand } from '../components/game/PlayerHand';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SoundSettings } from '../components/SoundSettings';
@@ -24,6 +27,7 @@ import { SwapTargetModal } from '../components/modals/SwapTargetModal';
 import { Modal } from '../components/ui/Modal';
 import { useEventBanners } from '../hooks/useEventBanners';
 import { useGameSounds } from '../hooks/useGameSounds';
+import { useLastPlay } from '../hooks/useLastPlay';
 import { avatarsForTable } from '../lib/avatar';
 import { cardName, COLOR_LABEL } from '../lib/cards';
 import { latestPlaySeq, nameLookup } from '../lib/event-text';
@@ -55,6 +59,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const name = useMemo(() => nameLookup(view.players, meId), [view.players, meId]);
   const avatarOf = useMemo(() => avatarsForTable(view.players), [view.players]);
   const banner = useEventBanners(view.log, name);
+  const lastPlay = useLastPlay(view);
+  const myLastPlay = lastPlay?.playerId === meId ? lastPlay : null;
   const [pending, setPending] = useState<PendingChoice | null>(null);
   const [unoArmed, setUnoArmed] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -92,6 +98,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     meId,
     !finished && (isMyTurn || actions.canChooseRouletteColor),
     game.version,
+    avatarOf,
   );
 
   const send = async (
@@ -246,6 +253,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               onDraw={() => void drawCards()}
               onCatch={(id) => void catchUno(id)}
               onShowPlayed={() => setShowPlayed(true)}
+              lastPlay={lastPlay}
               targetName={
                 view.pendingDraw && current ? (current.id === meId ? 'You' : current.name) : null
               }
@@ -273,72 +281,51 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 nudge={nudge}
               />
             </div>
-            <div className="flex items-center justify-center gap-2.5 px-4 pb-1 text-sm">
-              <span
-                className={`relative h-10 w-10 shrink-0 rounded-full shadow-seat ring-2 ${
-                  myMove ? 'anim-turn ring-brass' : 'ring-walnut-light/70'
-                }`}
-              >
-                {myMove && <span aria-hidden className="turn-orbit" />}
-                <PlayerAvatar traits={avatarOf(meId)} className="h-full w-full" />
-              </span>
-              <span
-                className={`rounded-sm px-2 py-0.5 font-semibold shadow transition-colors ${
-                  myMove ? 'bg-brass text-room' : 'bg-room/85 text-chalk'
-                }`}
-              >
-                {me?.name ?? 'You'}
-              </span>
-              {myMove && (
-                <span className="font-display text-lg leading-none text-brass-soft drop-shadow-[0_0_8px_rgba(231,200,134,0.6)]">
-                  Your turn
-                </span>
-              )}
-              <span className="text-chalk/60">{hand.length} cards</span>
-              {me?.uno === 'declared' && (
-                <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">
-                  UNO!
-                </span>
-              )}
-              {me?.status === 'eliminated' && (
-                <span className="flex items-center gap-1 text-rose-300">
-                  <Skull size={14} /> Out
-                </span>
-              )}
-              {hand.length >= 20 && me?.status === 'active' && (
-                <span className="text-rose-300">{25 - hand.length} cards from knockout!</span>
-              )}
-            </div>
             <ActionBar
               seat={
-                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm sm:justify-end">
-                  {/* Your turn lights the tag with the brass ring the seats use, leaving Draw the
-                      only solid brass in the row. */}
+                <div className="flex items-center gap-3">
                   <span
-                    className={`rounded-sm bg-room/85 px-2 py-0.5 font-semibold shadow ${
-                      isMyTurn && !finished ? 'anim-turn text-brass-soft' : 'text-chalk'
+                    className={`relative h-9 w-9 shrink-0 rounded-full shadow-seat ring-2 ${
+                      myMove ? 'anim-turn ring-brass' : 'ring-walnut-light/70'
                     }`}
                   >
-                    {me?.name ?? 'You'}
+                    {myMove && <span aria-hidden className="turn-orbit" />}
+                    <PlayerAvatar traits={avatarOf(meId)} className="h-full w-full" />
+                    {myLastPlay && <LastPlayedCard key={myLastPlay.seq} play={myLastPlay} />}
                   </span>
-                  <span className="text-chalk/60">
-                    {hand.length} {hand.length === 1 ? 'card' : 'cards'}
-                  </span>
-                  {me?.uno === 'declared' && (
-                    <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">
-                      UNO!
-                    </span>
-                  )}
-                  {me?.status === 'eliminated' && (
-                    <span className="flex items-center gap-1 text-rose-300">
-                      <Skull size={14} /> Out
-                    </span>
-                  )}
-                  {hand.length >= 20 && me?.status === 'active' && (
-                    <span className="text-rose-300">
-                      {25 - hand.length} {25 - hand.length === 1 ? 'card' : 'cards'} from knockout!
-                    </span>
-                  )}
+                  <div className="flex flex-col items-start gap-1.5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      {/* Your turn lights the tag with the brass ring the seats use, leaving Draw the
+                          only solid brass in the row. */}
+                      <span
+                        className={`rounded-sm bg-room/85 px-2 py-0.5 font-semibold shadow ${
+                          myMove ? 'anim-turn text-brass-soft' : 'text-chalk'
+                        }`}
+                      >
+                        {me?.name ?? 'You'}
+                      </span>
+                      <span className="text-chalk/60">
+                        {hand.length} {hand.length === 1 ? 'card' : 'cards'}
+                      </span>
+                      {me?.uno === 'declared' && (
+                        <span className="rounded-sm bg-brass px-1.5 font-display text-xs leading-5 text-room">
+                          UNO!
+                        </span>
+                      )}
+                      {me?.status === 'eliminated' && (
+                        <span className="flex items-center gap-1 text-rose-300">
+                          <Skull size={14} /> Out
+                        </span>
+                      )}
+                      {hand.length >= MERCY_HAND_LIMIT - 5 && me?.status === 'active' && (
+                        <span className="text-rose-300">
+                          {MERCY_HAND_LIMIT - hand.length}{' '}
+                          {MERCY_HAND_LIMIT - hand.length === 1 ? 'card' : 'cards'} from knockout!
+                        </span>
+                      )}
+                    </div>
+                    {me?.status === 'active' && <MercyGauge hand={hand} />}
+                  </div>
                 </div>
               }
               actions={actions}
