@@ -106,7 +106,7 @@ interface PlayingCardProps {
   onClick?: () => void;
   className?: string;
   animate?: 'in' | 'draw' | null;
-  /** Privacy mode: show the back until hovered or focused. Never on touch screens. */
+  /** Privacy mode: show the back instead of the face. Never on touch screens. */
   concealed?: boolean;
 }
 
@@ -142,7 +142,7 @@ export function PlayingCard({
       aria-label={label + (playable ? ' (playable)' : '')}
       title={label}
       className={[
-        'group/card relative aspect-[5/7] shrink-0 select-none border-white shadow-card transition duration-150',
+        'relative aspect-[5/7] shrink-0 select-none border-white shadow-card transition duration-150',
         concealed ? 'hoverable:overflow-hidden' : '',
         s.box,
         face,
@@ -201,10 +201,7 @@ export function PlayingCard({
         </>
       )}
       {concealed && (
-        <span
-          aria-hidden
-          className="absolute inset-0 hidden bg-oxblood transition-opacity duration-150 group-hover/card:opacity-0 group-focus-visible/card:opacity-0 hoverable:block"
-        >
+        <span aria-hidden className="absolute inset-0 hidden bg-oxblood hoverable:block">
           <BackFace size={size} />
         </span>
       )}

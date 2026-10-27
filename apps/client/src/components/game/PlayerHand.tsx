@@ -11,7 +11,7 @@ interface PlayerHandProps {
   onCardClick: (card: Card) => void;
   /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
   nudge: IdleNudge;
-  /** Privacy mode: cards show their backs until you hover one (screens with a mouse only). */
+  /** Privacy mode: cards show their backs until you point at one (screens with a mouse only). */
   concealed: boolean;
 }
 
@@ -98,6 +98,8 @@ export function PlayerHand({
   // Card size follows the breakpoints in PlayingCard, so it's measured rather than repeated here.
   const scroller = useRef<HTMLDivElement>(null);
   const hasCards = sorted.length > 0;
+  // In privacy mode, pointing at or focusing any card shows the whole hand until you leave it.
+  const [revealed, setRevealed] = useState(false);
   const [room, setRoom] = useState<{
     width: number;
     cardWidth: number;
@@ -149,6 +151,11 @@ export function PlayerHand({
         role="group"
         aria-label={`Your hand, ${sorted.length} cards`}
         className="w-max min-w-full"
+        onPointerLeave={() => setRevealed(false)}
+        onFocus={() => setRevealed(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setRevealed(false);
+        }}
       >
         {layout.rows.map((row, r) => {
           // A flatter arc for two tiers, so the back tier's corners stay above the front one.
@@ -185,6 +192,7 @@ export function PlayerHand({
                     key={card.id}
                     // Hovering or focusing a card brings it to the front so you can read all of it.
                     className="hover:!z-[300] focus-within:!z-[300]"
+                    onPointerEnter={() => setRevealed(true)}
                     style={{
                       marginLeft,
                       zIndex: r * 100 + i,
@@ -209,7 +217,7 @@ export function PlayerHand({
                         dimmed={isMyTurn && !playable}
                         onClick={() => onCardClick(card)}
                         animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
-                        concealed={concealed}
+                        concealed={concealed && !revealed}
                       />
                     </div>
                   </li>

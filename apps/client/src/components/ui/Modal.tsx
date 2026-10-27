@@ -9,9 +9,18 @@ interface ModalProps {
   /** Mandatory choices (7 swap target, roulette color) cannot be dismissed. */
   dismissible?: boolean;
   wide?: boolean;
+  /** Sit at the top over a backdrop that clears toward the bottom, so your hand stays readable. */
+  overHand?: boolean;
 }
 
-export function Modal({ title, children, onClose, dismissible = true, wide = false }: ModalProps) {
+export function Modal({
+  title,
+  children,
+  onClose,
+  dismissible = true,
+  wide = false,
+  overHand = false,
+}: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Focus once on open; refocusing on every render would pull focus out of inputs inside.
@@ -28,14 +37,20 @@ export function Modal({ title, children, onClose, dismissible = true, wide = fal
 
   // Rendered at the end of <body> so no stacking context on the page (the table, the hand) can cover it.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+    <div
+      className={`fixed inset-0 z-50 flex justify-center p-4 ${
+        overHand
+          ? 'items-start bg-gradient-to-b from-black/75 via-black/45 to-transparent pt-3 sm:pt-[7vh] short:pt-4'
+          : 'items-end bg-black/60 backdrop-blur-sm sm:items-center'
+      }`}
+    >
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel anim-toast max-h-[90vh] w-full overflow-y-auto p-5 outline-none ${wide ? 'max-w-2xl' : 'max-w-md'}`}
+        className={`panel anim-toast max-h-[90vh] w-full overflow-y-auto p-5 outline-none ${wide || overHand ? 'max-w-2xl' : 'max-w-md'} ${overHand ? 'short:p-4' : ''}`}
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="font-display text-2xl tracking-wide">{title}</h2>

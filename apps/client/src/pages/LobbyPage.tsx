@@ -1,14 +1,27 @@
 import { useState } from 'react';
-import { BookOpen, Check, Copy, Crown, DoorOpen, Play, Trophy, Users, WifiOff } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  Copy,
+  Crown,
+  DoorOpen,
+  Link,
+  Play,
+  Trophy,
+  Users,
+  WifiOff,
+} from 'lucide-react';
 import type { RoomView } from '@nomercy/shared';
+import { copyText, inviteText } from '../lib/invite';
 import { leaveRoom, setMaxPlayers, setReady, setScoring, startGame } from '../net/actions';
+import { pushNotice } from '../state/store';
 import { FillSeatsModal } from '../components/modals/FillSeatsModal';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayerCountInput } from '../components/PlayerCountInput';
 import { SoundSettings } from '../components/SoundSettings';
 
 export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'code' | 'invite' | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [showFill, setShowFill] = useState(false);
   const me = room.players.find((p) => p.id === meId);
@@ -20,14 +33,14 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
   // Open seats can go to computers, so a host on their own can start too.
   const canStart = isHost && waitingFor.length === 0 && (enoughPlayers || openSeats > 0);
 
-  const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(room.code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard needs a secure context; the code is visible anyway */
+  const copy = async (what: 'code' | 'invite') => {
+    const ok = await copyText(what === 'code' ? room.code : inviteText(room.code));
+    if (!ok) {
+      pushNotice('error', "Couldn't copy here. Read the room code out to your friends instead.");
+      return;
     }
+    setCopied(what);
+    window.setTimeout(() => setCopied((c) => (c === what ? null : c)), 1800);
   };
 
   const startHint =
@@ -56,21 +69,29 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
         <p className="text-sm uppercase tracking-widest text-white/50">Room code</p>
         <button
           type="button"
-          onClick={() => void copyCode()}
+          onClick={() => void copy('code')}
           className="group flex items-center gap-3 font-display text-5xl tracking-[0.3em] sm:text-6xl"
           aria-label={`Room code ${room.code.split('').join(' ')}. Copy`}
         >
           {room.code}
-          {copied ? (
+          {copied === 'code' ? (
             <Check size={24} className="text-emerald-300" />
           ) : (
             <Copy size={22} className="text-white/40 group-hover:text-white" />
           )}
         </button>
+        <button type="button" className="btn-secondary px-5" onClick={() => void copy('invite')}>
+          {copied === 'invite' ? <Check size={18} /> : <Link size={18} />}
+          {copied === 'invite' ? 'Invite link copied' : 'Copy invite link'}
+        </button>
+        <p role="status" aria-live="polite" className="sr-only">
+          {copied === 'invite' ? 'Invite link and room code copied' : ''}
+          {copied === 'code' ? 'Room code copied' : ''}
+        </p>
         <p className="text-sm text-white/60">
-          Friends on the same network open{' '}
-          <span className="font-mono text-white">{window.location.origin}</span> and enter this
-          code.
+          Send the link to friends on the same network: opening it takes them straight to this room.
+          Or they can open <span className="font-mono text-white">{window.location.origin}</span>{' '}
+          and enter the code.
         </p>
       </section>
 

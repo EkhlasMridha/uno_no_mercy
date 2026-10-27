@@ -105,6 +105,10 @@ is still refused, the server log says which host or origin it rejected and why.
 2. Open `http://<host-LAN-IP>:3000` (plain `http`, include the port).
 3. Enter a name and the 5-character room code shown in the host's lobby.
 
+Or skip steps 2 and 3: in the lobby, **Copy invite link** copies a link (`http://<host-LAN-IP>:3000/?join=CODE`)
+with the room code on its own line. Opening the link fills in the code, and if that browser already
+knows the player's name it goes straight to the avatar choice and joins.
+
 ## 4. Windows Firewall
 
 The first time Node listens on the network, Windows asks whether to allow it. Tick **Private networks** and
@@ -143,7 +147,7 @@ npm run dev:lan    # same, reachable from other devices via http://<LAN-IP>:5173
 | "That room is no longer available"                         | The server was restarted or everyone left. Rooms only live in memory, so create a new one                                                                                                             |
 | A player dropped mid-game                                  | They have 2 minutes to reopen the same tab/browser (it reconnects automatically). After that they forfeit and the game continues                                                                      |
 | "This seat was opened in another window"                   | The same player opened the game in a second tab. Only the newest tab stays connected                                                                                                                  |
-| Plain `http` page on a phone doesn't allow clipboard copy  | Expected on non-HTTPS origins. Read the room code from the screen                                                                                                                                     |
+| Plain `http` page on a phone doesn't allow clipboard copy  | The copy buttons fall back to the browser's older copy command on plain `http`. If that is blocked too, the game says so: read the room code from the screen                                          |
 | `Client bundle not found` printed                          | Run `npm run build` before `npm run start:lan`                                                                                                                                                        |
 | Page says "Open the game by the host machine's IP address" | Use the IP address the server printed, or add your hostname with `ALLOWED_HOSTS`                                                                                                                      |
 

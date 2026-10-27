@@ -198,7 +198,8 @@ still pass.
 - Face-up moments everyone should see (like the Color Roulette tray, `RouletteReveal.tsx`) render on the
   felt inside `GameTable.tsx`, not in a modal, so the table stays visible.
 - A choice the player must make before play continues goes in a modal that cannot be dismissed (see
-  `ColorPickerModal` with no `onCancel`).
+  `ColorPickerModal` with no `onCancel`). When the choice depends on what you hold, open it with
+  `overHand`: the panel sits at the top over a fading backdrop, so your hand stays readable.
 
 ### 6. Close the loop
 

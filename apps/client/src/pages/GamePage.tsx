@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Eye, EyeOff, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
+import { BookOpen, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
 import {
   colorOf,
   isWildCard,
@@ -252,18 +252,6 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           >
             <Layers size={17} /> <span className="hidden lg:inline">Played</span>
           </button>
-          {/* Privacy reveals a card on hover, so it is offered only on screens with a mouse. */}
-          <button
-            type="button"
-            className="btn-tile hidden aria-pressed:text-brass-soft aria-pressed:ring-brass/50 hoverable:inline-flex"
-            aria-pressed={privateHand}
-            aria-label="Privacy mode"
-            title={privateHand ? 'Show your cards' : 'Hide your cards until you hover one'}
-            onClick={togglePrivateHand}
-          >
-            {privateHand ? <EyeOff size={17} /> : <Eye size={17} />}{' '}
-            <span className="hidden lg:inline">Privacy</span>
-          </button>
           <SoundSettings className="btn-tile" labelClassName="hidden lg:inline" />
           <button
             type="button"
@@ -379,6 +367,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               onDraw={() => void drawCards()}
               onAccept={() => void acceptPenalty()}
               onUno={onUno}
+              privateHand={privateHand}
+              onTogglePrivacy={togglePrivateHand}
             />
           </section>
         </div>
