@@ -37,7 +37,11 @@ export function phaseView(state: GameState): GamePhaseView {
     case 'turn':
       return { type: 'turn' };
     case 'drawing':
-      return { type: 'drawing', playerId: playerAt(state, state.currentIndex).id };
+      return {
+        type: 'drawing',
+        playerId: playerAt(state, state.currentIndex).id,
+        lastChance: phase.lastChance,
+      };
     case 'rouletteColor':
       return { type: 'rouletteColor', victimId: phase.victimId };
     case 'rouletteReveal': {
@@ -73,7 +77,10 @@ export function getValidActions(state: GameState, playerId: string): ValidAction
     drawnPlayableCardId: isTurn && phase.type === 'drawing' ? phase.playableCardId : null,
     canDraw:
       (isTurn && phase.type === 'rouletteReveal') ||
-      (isTurn && phase.type === 'drawing' && (playable.length === 0 || canSupplyCard(state))) ||
+      (isTurn &&
+        phase.type === 'drawing' &&
+        !phase.lastChance &&
+        (playable.length === 0 || canSupplyCard(state))) ||
       (isTurn &&
         phase.type === 'turn' &&
         !state.pendingDraw &&

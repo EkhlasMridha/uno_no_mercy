@@ -53,6 +53,9 @@ export const startGame = async (fillWithComputers?: boolean) =>
   report(await request('game:start', fillWithComputers ? { fillWithComputers } : {}));
 export const nextRound = async () => report(await request('game:restart', {}));
 export const returnToLobby = async () => report(await request('room:return-lobby', {}));
+/** The decider's answer for a dropped player: hold their seat, or let them forfeit. */
+export const waitForPlayer = async (playerId: string, wait: boolean) =>
+  report(await request('room:wait-for-player', { playerId, wait }));
 
 // ---- game ----
 

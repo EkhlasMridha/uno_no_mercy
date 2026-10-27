@@ -224,6 +224,88 @@ describe('multiplayer over Socket.IO', () => {
     expect(b.room!.players).toHaveLength(2);
   });
 
+  it('lets a dropped player rejoin by code once the next player agrees to wait', async () => {
+    const [alpha, bravo, charlie] = [await newClient(), await newClient(), await newClient()];
+    const created = (await emit<SessionInfo>(alpha, 'room:create', {
+      name: 'Alpha',
+      gender: 'male',
+      maxPlayers: 3,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    await emit(bravo, 'room:join', { code, name: 'Bravo', gender: 'female' });
+    await emit(charlie, 'room:join', { code, name: 'Charlie', gender: 'male' });
+    await emit(bravo, 'room:ready', { ready: true });
+    await emit(charlie, 'room:ready', { ready: true });
+    expect((await emit(alpha, 'game:start', {})).ok).toBe(true);
+    await until(() => alpha.game !== null && bravo.game !== null && charlie.game !== null);
+    const alphaHand = alpha.game!.me.hand.map((c) => c.id).sort();
+    const alphaId = created.data.playerId;
+
+    alpha.socket.disconnect();
+    const seatOf = (client: TestClient) => client.room!.players.find((p) => p.id === alphaId)!;
+    await until(() => seatOf(bravo).connected === false && seatOf(bravo).waitDeciderId !== null);
+    const deciderId = seatOf(bravo).waitDeciderId!;
+    const [decider, other] =
+      bravo.room!.players.find((p) => p.id === deciderId)!.name === 'Bravo'
+        ? [bravo, charlie]
+        : [charlie, bravo];
+    expect(seatOf(other).waitDeciderId).toBe(deciderId);
+
+    // Only the decider answers, and nobody gets the seat back before they agree.
+    const notYours = await emit(other, 'room:wait-for-player', { playerId: alphaId, wait: true });
+    expect(notYours).toMatchObject({ ok: false, error: { code: 'NOT_YOUR_TURN' } });
+    const returning = await newClient();
+    const early = await emit(returning, 'room:join', { code, name: 'Alpha', gender: 'male' });
+    expect(early).toMatchObject({ ok: false, error: { code: 'GAME_IN_PROGRESS' } });
+
+    expect(
+      (await emit(decider, 'room:wait-for-player', { playerId: alphaId, wait: true })).ok,
+    ).toBe(true);
+    await until(() => seatOf(other).seatHeld);
+
+    // A held seat goes only to its own name.
+    const stranger = await newClient();
+    const stolen = await emit(stranger, 'room:join', { code, name: 'Mallory', gender: 'male' });
+    expect(stolen).toMatchObject({ ok: false, error: { code: 'GAME_IN_PROGRESS' } });
+
+    const rejoined = await emit<SessionInfo>(returning, 'room:join', {
+      code,
+      name: 'alpha',
+      gender: 'male',
+    });
+    expect(rejoined.ok).toBe(true);
+    const fresh = (rejoined as { data: SessionInfo }).data;
+    expect(fresh.playerId).toBe(alphaId);
+    expect(fresh.reconnectToken).not.toBe(created.data.reconnectToken);
+    await until(() => returning.game !== null);
+    expect(returning.game!.me.hand.map((c) => c.id).sort()).toEqual(alphaHand);
+    await until(() => seatOf(other).connected && !seatOf(other).seatHeld);
+    expect(other.room!.players).toHaveLength(3);
+
+    // The lost session's token can no longer take the seat.
+    const oldTab = await newClient();
+    const stale = await emit(oldTab, 'room:reconnect', {
+      code,
+      token: created.data.reconnectToken,
+    });
+    expect(stale).toMatchObject({ ok: false, error: { code: 'INVALID_TOKEN' } });
+
+    // Not waiting makes the dropped player forfeit at once.
+    const otherId = other.room!.players.find((p) => p.id !== alphaId && p.id !== deciderId)!.id;
+    other.socket.disconnect();
+    const otherSeat = () => returning.room!.players.find((p) => p.id === otherId)!;
+    await until(() => otherSeat().waitDeciderId !== null);
+    const nextDecider = otherSeat().waitDeciderId === alphaId ? returning : decider;
+    expect([alphaId, deciderId]).toContain(otherSeat().waitDeciderId);
+    expect(
+      (await emit(nextDecider, 'room:wait-for-player', { playerId: otherId, wait: false })).ok,
+    ).toBe(true);
+    await until(() => otherSeat().departed);
+    await until(
+      () => returning.game!.public.players.find((p) => p.id === otherId)?.status === 'eliminated',
+    );
+  });
+
   it('lets the host choose how many players the room seats', async () => {
     const host = await newClient();
     const badCreate = await emit(host, 'room:create', {

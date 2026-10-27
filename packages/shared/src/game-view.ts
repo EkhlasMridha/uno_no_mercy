@@ -75,8 +75,11 @@ export interface GameLogEntry {
 
 export type GamePhaseView =
   | { type: 'turn' }
-  /** The player has started drawing; only their last drawn card may be played. */
-  | { type: 'drawing'; playerId: string }
+  /**
+   * The player has started drawing; only their last drawn card may be played. `lastChance`: that
+   * card was their 25th and it is playable, so they must play it or be knocked out (RULES §5.13).
+   */
+  | { type: 'drawing'; playerId: string; lastChance: boolean }
   | { type: 'rouletteColor'; victimId: string }
   /** The victim draws face-up cards one at a time until a card of `color` appears. */
   | { type: 'rouletteReveal'; victimId: string; color: CardColor; revealed: Card[] }

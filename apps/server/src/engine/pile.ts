@@ -47,6 +47,7 @@ export interface DrawOutcome {
 /**
  * Draws up to `count` cards into a player's hand one at a time. Stops immediately when the
  * player reaches the Mercy limit (they are eliminated) or when no card can be supplied.
+ * `deferMercy` leaves the knockout to the caller, for the last-chance draw (docs/RULES.md §5.13).
  */
 export function drawCardsInto(
   state: GameState,
@@ -55,6 +56,7 @@ export function drawCardsInto(
   rng: Rng,
   events: EventSink,
   reason: DrawReason,
+  deferMercy = false,
 ): DrawOutcome {
   const player = playerAt(state, index);
   const drawn: Card[] = [];
@@ -73,6 +75,6 @@ export function drawCardsInto(
     events.push({ type: 'cardsDrawn', playerId: player.id, count: drawn.length, reason });
   }
   if (exhausted) events.push({ type: 'drawPileExhausted', playerId: player.id });
-  const eliminated = enforceMercy(state, index, events);
+  const eliminated = !deferMercy && enforceMercy(state, index, events);
   return { drawn, eliminated, exhausted };
 }

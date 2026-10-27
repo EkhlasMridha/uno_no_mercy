@@ -25,8 +25,10 @@ export type EnginePhase =
   /**
    * The current player has started drawing. Only the card they drew last may be played, and only
    * if it is playable (`playableCardId`); otherwise, or if they prefer, they draw again.
+   * `lastChance`: that draw was their 25th card and it is playable, so playing it is their only move
+   * (docs/RULES.md §5.13).
    */
-  | { type: 'drawing'; playableCardId: string | null }
+  | { type: 'drawing'; playableCardId: string | null; lastChance: boolean }
   /** A Wild Color Roulette was played; the victim (current player) must name a color. */
   | { type: 'rouletteColor'; victimId: string }
   /**

@@ -49,6 +49,10 @@ export const reconnectSchema = z
   .object({ code: roomCodeSchema, token: reconnectTokenSchema })
   .strict();
 export const readySchema = z.object({ ready: z.boolean() }).strict();
+/** The decider's answer for a dropped player: hold their seat, or let them forfeit (§5.16). */
+export const waitForPlayerSchema = z
+  .object({ playerId: playerIdSchema, wait: z.boolean() })
+  .strict();
 export const startGameSchema = z
   .object({
     /** Seat computer players in the open seats before dealing. */
@@ -89,6 +93,7 @@ export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
 export type ReconnectPayload = z.input<typeof reconnectSchema>;
 export type ReadyPayload = z.input<typeof readySchema>;
+export type WaitForPlayerPayload = z.input<typeof waitForPlayerSchema>;
 export type StartGamePayload = z.input<typeof startGameSchema>;
 export type RoomSettingsPayload = z.input<typeof roomSettingsSchema>;
 export type PlayCardPayload = z.input<typeof playCardSchema>;

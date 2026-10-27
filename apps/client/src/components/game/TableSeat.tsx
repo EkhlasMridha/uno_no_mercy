@@ -156,7 +156,7 @@ export function TableSeat({
         )}
         {danger && scale !== 'sm' && (
           <span className="text-[10px] font-semibold text-rose-200">
-            {25 - player.handCount} to knockout
+            {player.handCount >= 25 ? 'Last chance' : `${25 - player.handCount} to knockout`}
           </span>
         )}
       </div>

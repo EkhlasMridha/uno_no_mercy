@@ -14,6 +14,7 @@ import { EventBanner } from '../components/game/EventBanner';
 import { GameTable } from '../components/game/GameTable';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { PlayerHand } from '../components/game/PlayerHand';
+import { RejoinPrompt } from '../components/game/RejoinPrompt';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
 import { SoundSettings } from '../components/SoundSettings';
@@ -120,6 +121,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const explainUnplayable = (): string => {
     if (view.phase.type === 'drawing') {
+      if (view.phase.lastChance) {
+        return 'You hold 25 cards: only the card you just drew can keep you in. Play it.';
+      }
       return actions.drawnPlayableCardId
         ? 'Once you start drawing, only the card you drew last can be played.'
         : "Once you start drawing, only the card you drew last can be played, and it doesn't match. Draw again.";
@@ -181,6 +185,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     }
     if (isMyTurn) {
       if (view.phase.type === 'drawing') {
+        if (view.phase.lastChance) return 'Last chance! Play the card you drew to stay in.';
         return actions.drawnPlayableCardId
           ? 'You drew a playable card — play it or keep drawing.'
           : "That card can't be played — draw again.";
@@ -274,6 +279,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
+          <RejoinPrompt room={room} meId={meId} />
           {/* the table, with everyone seated around it */}
           <section aria-label="Table" className="relative min-h-[18rem] flex-1 shortest:min-h-0">
             <GameTable
@@ -351,9 +357,12 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                         </span>
                       )}
                       {hand.length >= MERCY_HAND_LIMIT - 5 && me?.status === 'active' && (
-                        <span className="text-rose-300">
-                          {MERCY_HAND_LIMIT - hand.length}{' '}
-                          {MERCY_HAND_LIMIT - hand.length === 1 ? 'card' : 'cards'} from knockout!
+                        <span className="font-semibold text-rose-300">
+                          {hand.length >= MERCY_HAND_LIMIT
+                            ? 'Last chance: play the card you drew!'
+                            : `${MERCY_HAND_LIMIT - hand.length} ${
+                                MERCY_HAND_LIMIT - hand.length === 1 ? 'card' : 'cards'
+                              } from knockout!`}
                         </span>
                       )}
                     </div>
