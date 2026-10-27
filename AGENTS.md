@@ -227,10 +227,12 @@ new UI inside that metaphor.
   `seatPosition` in `lib/table-geometry.ts`, in turn order, clockwise, with you at the bottom. Your hand is
   a fan held over the near edge (`PlayerHand.tsx`): grouped by color with a gap between colors, spaced
   to fit the width so every corner index shows, and split into two tiers when one row would hide them.
-  Under it, your seat carries the Mercy gauge (`MercyGauge.tsx`), one notch per card up to the
+  Under it, your seat shows your card count and, from 20 cards, how many are left before the
   25-card knockout. The card a player just played sits on their avatar, on the side away from the
   felt (`LastPlayedCard.tsx`, `useLastPlay`), until the player whose turn came next finishes their move.
-  The last 10 plays stay visible on the felt (`DiscardHeap.tsx`). Cards keep
+  The last 10 plays stay visible on the felt (`DiscardHeap.tsx`). The color in play is a chip left
+  of the draw pile (`ColorInPlay` in `GameTable.tsx`), and the direction shows only as the arrows on
+  the felt. A pending penalty floats under the piles, so it never pushes them into the seats. Cards keep
   their scatter between renders because placement is seeded from history position (`scatter`).
 - **Seat scale:** seats shrink for crowded tables (`lg` ≤ 6, `md` ≤ 10, `sm` above; rooms allow up to
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
@@ -238,6 +240,10 @@ new UI inside that metaphor.
 - **Short screens:** laptops leave little height for the felt, so the `short` (≤ 860 px tall) and
   `shorter` (≤ 640 px) variants in `tailwind.config.js` shrink the table and hand cards, the heap's
   scatter (`--heap-px`) and the seat fans (`--fan-px`). Check 1280 × 575 (a 1080p laptop at 150%).
+  `shortest` (≤ 500 px tall) is a phone held sideways: the cards and buttons shrink and the hand
+  stays one tier. Seats stay on screen through `--seat-inset` and lift clear of the hand through
+  `--seat-low-reach` (`seatPosition`). From `sm` up, nothing scrolls. Only a phone's hand may scroll
+  sideways, and only when it is too big to fit. Check 390 × 844, 375 × 667 and 667 × 375.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
   drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
   popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events; a Discard All raises the same tag in green (`ink-green`) as `−N cards` with the Discard All

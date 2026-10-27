@@ -1,10 +1,4 @@
-import {
-  colorOf,
-  type CardColor,
-  type GameEvent,
-  type GameLogEntry,
-  type PublicPlayerView,
-} from '@nomercy/shared';
+import { type GameEvent, type GameLogEntry, type PublicPlayerView } from '@nomercy/shared';
 import { cardName, COLOR_LABEL } from './cards';
 
 export type NameLookup = (playerId: string) => string;
@@ -102,26 +96,6 @@ export function actorOf(event: GameEvent): string | null {
       return null;
     default:
       return event.playerId;
-  }
-}
-
-/** The dot beside a log line: the card color it was about, red for penalties, or plain. */
-export function eventTone(event: GameEvent): CardColor | 'penalty' | 'plain' {
-  switch (event.type) {
-    case 'cardPlayed':
-      return event.chosenColor ?? colorOf(event.card) ?? 'plain';
-    case 'discardedAll':
-    case 'rouletteColorNamed':
-      return event.color;
-    case 'drawStackGrew':
-    case 'penaltyAccepted':
-    case 'unoCaught':
-    case 'playerEliminated':
-      return 'penalty';
-    case 'cardsDrawn':
-      return event.reason === 'noPlayableCard' ? 'plain' : 'penalty';
-    default:
-      return 'plain';
   }
 }
 

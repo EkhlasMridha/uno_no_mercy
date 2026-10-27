@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
 import {
   colorOf,
   isWildCard,
@@ -13,7 +13,6 @@ import { ActionBar } from '../components/game/ActionBar';
 import { EventBanner } from '../components/game/EventBanner';
 import { GameTable } from '../components/game/GameTable';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
-import { MercyGauge } from '../components/game/MercyGauge';
 import { PlayerHand } from '../components/game/PlayerHand';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
@@ -40,7 +39,7 @@ import {
   leaveRoom,
   playCard,
 } from '../net/actions';
-import { clearNotices, pushNotice } from '../state/store';
+import { clearNotices, pushNotice, togglePrivateHand, useAppState } from '../state/store';
 
 type PendingChoice = { card: Card; step: 'color' | 'swap' | 'discard' };
 
@@ -70,6 +69,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [showPlayed, setShowPlayed] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [shake, setShake] = useState(0);
+  const privateHand = useAppState((s) => s.privateHand);
 
   const playable = useMemo(() => new Set(actions.playableCardIds), [actions.playableCardIds]);
 
@@ -203,19 +203,22 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   };
 
   return (
-    <div className="lounge-room flex h-[100dvh] flex-col">
+    // Fixed to the screen: flights and banners in motion must never make the page scroll.
+    <div className="lounge-room flex h-[100dvh] flex-col overflow-hidden">
       {/* top bar */}
-      <header className="relative z-30 flex items-center justify-between gap-2 border-b border-white/[0.06] bg-felt-950/55 px-3 py-2 backdrop-blur sm:px-4">
+      <header className="relative z-30 flex items-center justify-between gap-2 border-b border-white/[0.06] bg-felt-950/55 px-3 py-2 backdrop-blur sm:px-4 shortest:py-1">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <span
             aria-hidden
-            className="hidden -rotate-6 font-display text-[1.75rem] leading-none text-brass drop-shadow-[0_3px_0_rgba(229,56,59,0.85)] md:block"
+            className="hidden -rotate-6 font-display text-[1.75rem] leading-none text-brass shortest:text-2xl drop-shadow-[0_3px_0_rgba(229,56,59,0.85)] md:block"
           >
             No Mercy
           </span>
           <span aria-hidden className="hidden h-9 w-px bg-white/10 md:block" />
           <div className="min-w-0 leading-tight">
-            <p className="whitespace-nowrap font-semibold sm:text-lg">Round {room.roundNumber}</p>
+            <p className="whitespace-nowrap font-semibold sm:text-lg shortest:text-base">
+              Round {room.roundNumber}
+            </p>
             <p className="truncate text-xs text-chalk/60 sm:text-sm">
               Room <span className="font-display tracking-widest text-chalk/85">{room.code}</span>
               {room.settings.scoringEnabled && `, first to ${room.matchTarget} points`}
@@ -231,7 +234,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             aria-label={`Players, ${connectedCount} online`}
             onClick={() => openSide('players')}
           >
-            <Users size={17} /> <span className="hidden sm:inline">{connectedCount} online</span>
+            <Users size={17} /> <span className="hidden lg:inline">{connectedCount} online</span>
           </button>
           <button
             type="button"
@@ -239,7 +242,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             aria-label="Game log"
             onClick={() => openSide('log')}
           >
-            <ScrollText size={17} /> <span className="hidden sm:inline">Log</span>
+            <ScrollText size={17} /> <span className="hidden lg:inline">Log</span>
           </button>
           <button
             type="button"
@@ -247,24 +250,36 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             aria-label="Played cards"
             onClick={() => setShowPlayed(true)}
           >
-            <Layers size={17} /> <span className="hidden sm:inline">Played</span>
+            <Layers size={17} /> <span className="hidden lg:inline">Played</span>
           </button>
-          <SoundSettings className="btn-tile" />
+          {/* Privacy reveals a card on hover, so it is offered only on screens with a mouse. */}
+          <button
+            type="button"
+            className="btn-tile hidden aria-pressed:text-brass-soft aria-pressed:ring-brass/50 hoverable:inline-flex"
+            aria-pressed={privateHand}
+            aria-label="Privacy mode"
+            title={privateHand ? 'Show your cards' : 'Hide your cards until you hover one'}
+            onClick={togglePrivateHand}
+          >
+            {privateHand ? <EyeOff size={17} /> : <Eye size={17} />}{' '}
+            <span className="hidden lg:inline">Privacy</span>
+          </button>
+          <SoundSettings className="btn-tile" labelClassName="hidden lg:inline" />
           <button
             type="button"
             className="btn-tile"
             aria-label="Rules"
             onClick={() => setShowRules(true)}
           >
-            <BookOpen size={17} /> <span className="hidden sm:inline">Rules</span>
+            <BookOpen size={17} /> <span className="hidden lg:inline">Rules</span>
           </button>
           <button
             type="button"
-            className="btn-danger ml-1 px-3 py-2 text-sm sm:px-4 sm:py-2.5"
+            className="btn-danger ml-1 px-3 py-2 text-sm lg:px-4 lg:py-2.5"
             aria-label="Leave game"
             onClick={() => setConfirmLeave(true)}
           >
-            <LogOut size={17} /> <span className="hidden sm:inline">Leave game</span>
+            <LogOut size={17} /> <span className="hidden lg:inline">Leave game</span>
           </button>
         </nav>
       </header>
@@ -272,7 +287,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           {/* the table, with everyone seated around it */}
-          <section aria-label="Table" className="relative min-h-[18rem] flex-1">
+          <section aria-label="Table" className="relative min-h-[18rem] flex-1 shortest:min-h-0">
             <GameTable
               view={view}
               meId={meId}
@@ -293,7 +308,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           {/* your seat: the hand is held over the near edge of the table */}
           <section
             aria-label="Your hand"
-            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28 short:-mt-16"
+            className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28 short:-mt-16 shortest:-mt-14"
           >
             {/* gold light pools behind the hand while it's your move */}
             <div
@@ -309,13 +324,14 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 isMyTurn={isMyTurn && !finished}
                 onCardClick={onCardClick}
                 nudge={nudge}
+                concealed={privateHand}
               />
             </div>
             <ActionBar
               seat={
                 <div className="flex items-center gap-3">
                   <span
-                    className={`relative h-11 w-11 shrink-0 rounded-full ${myMove ? 'anim-turn' : ''}`}
+                    className={`relative h-11 w-11 shrink-0 rounded-full shortest:h-9 shortest:w-9 ${myMove ? 'anim-turn' : ''}`}
                     style={myMove ? undefined : avatarGlow(avatarOf(meId))}
                   >
                     {myMove && <span aria-hidden className="turn-orbit" />}
@@ -353,13 +369,11 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                         </span>
                       )}
                     </div>
-                    {me?.status === 'active' && <MercyGauge hand={hand} />}
                   </div>
                 </div>
               }
               actions={actions}
               statusText={statusText}
-              emphasize={isMyTurn || actions.canChooseRouletteColor}
               pendingTotal={view.pendingDraw?.total ?? null}
               unoArmed={unoArmed}
               onDraw={() => void drawCards()}

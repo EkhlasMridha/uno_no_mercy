@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { RotateCcw, RotateCw } from 'lucide-react';
-import type { PublicGameView } from '@nomercy/shared';
+import type { CardColor, PublicGameView } from '@nomercy/shared';
 import { COLOR_BG, COLOR_LABEL } from '../../lib/cards';
 import type { TableAvatars } from '../../lib/avatar';
 import type { NameLookup } from '../../lib/event-text';
@@ -60,12 +59,12 @@ export function GameTable({
   const opponents = view.players.filter((p) => p.id !== meId);
   const scale: SeatScale = count <= 6 ? 'lg' : count <= 10 ? 'md' : 'sm';
   const clockwise = view.direction === 1;
-  const DirectionIcon = clockwise ? RotateCw : RotateCcw;
   const pileRef = useRef<HTMLButtonElement>(null);
 
   return (
     // `isolate` keeps every z-index on the table below page-level popups.
-    <div className="relative isolate h-full w-full">
+    // The seat insets match the widest seat tags and the tallest avatars, so no seat leaves the screen.
+    <div className="relative isolate h-full w-full [--seat-inset-top:2.75rem] [--seat-inset:2.6rem] sm:[--seat-inset-top:3.5rem] sm:[--seat-inset:3.5rem] shortest:[--seat-inset-top:2rem] short:[--seat-low-reach:0.8] max-sm:[@media(max-height:720px)]:[--seat-low-reach:0.85] shortest:[--seat-low-reach:0.7]">
       {/* rail */}
       <div className="table-rail absolute inset-x-[5%] inset-y-[9%] rounded-[50%] p-[clamp(12px,2.2vmin,22px)]">
         {/* felt */}
@@ -80,56 +79,44 @@ export function GameTable({
           <DirectionTrack clockwise={clockwise} />
           <RouletteReveal view={view} meId={meId} name={name} canDraw={canDraw} onDraw={onDraw} />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82] short:gap-1.5 short:pb-10">
-            <div className="flex flex-col items-center gap-1 landscape:flex-row landscape:gap-6">
-              <DrawPile
-                pileRef={pileRef}
-                count={view.drawCount}
-                canDraw={canDraw}
-                onDraw={onDraw}
-              />
+          <div className="absolute inset-0 flex flex-col items-center justify-center pb-[13%] max-sm:scale-[0.82] max-sm:[@media(max-height:720px)]:scale-[0.72] short:pb-10 shortest:pb-3">
+            {/* Only the piles take part in the layout: the penalty floats under them, so a stack
+                building up never pushes the heap into the seats above. */}
+            <div className="relative flex flex-col items-center gap-1 landscape:flex-row landscape:gap-6">
+              <div className="flex items-end gap-4 short:gap-3 shortest:gap-2">
+                <ColorInPlay color={view.currentColor} clockwise={clockwise} />
+                <DrawPile
+                  pileRef={pileRef}
+                  count={view.drawCount}
+                  setAside={view.setAsideCount}
+                  canDraw={canDraw}
+                  onDraw={onDraw}
+                />
+              </div>
               <DiscardHeap
                 view={view}
                 name={name}
                 angleOf={(id) => angles.get(id) ?? null}
                 onShowPlayed={onShowPlayed}
               />
-            </div>
 
-            <div className="pill flex-wrap justify-center gap-x-3 gap-y-0.5 px-4 py-1.5 text-sm text-chalk/90">
-              <span className="flex items-center gap-2">
-                <span
-                  className={`h-3.5 w-3.5 rounded-full ring-2 ring-white/70 ${COLOR_BG[view.currentColor]}`}
-                  style={{ boxShadow: `0 0 10px 1px ${COLOR_STROKE[view.currentColor]}` }}
-                />
-                {COLOR_LABEL[view.currentColor]}
-              </span>
-              <span aria-hidden className="h-4 w-px bg-white/15" />
-              <span className="flex items-center gap-1.5">
-                <DirectionIcon size={15} />
-                {clockwise ? 'Clockwise' : 'Counterclockwise'}
-              </span>
-              {view.setAsideCount > 0 && (
-                <span className="text-chalk/55">{view.setAsideCount} cards set aside</span>
+              {view.pendingDraw && (
+                <div
+                  role="status"
+                  className="anim-toast absolute inset-x-0 top-full z-20 mx-auto mt-1 flex w-max items-center gap-3 rounded-xl bg-rose-700 px-3 py-1.5 shadow-[0_0_28px_-4px_rgba(229,56,59,0.8)] ring-2 ring-rose-300/80"
+                >
+                  <span className="font-display text-3xl leading-none text-chalk">
+                    +{view.pendingDraw.total}
+                  </span>
+                  {targetName && (
+                    <span className="max-w-[13rem] text-xs leading-snug text-chalk/90">
+                      {targetName === 'You' ? 'You must' : `${targetName} must`} stack +
+                      {view.pendingDraw.lastValue} or higher, or take them
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-
-            {view.pendingDraw && (
-              <div
-                role="status"
-                className="anim-toast flex items-center gap-3 rounded-xl bg-rose-700 px-3 py-1.5 shadow-[0_0_28px_-4px_rgba(229,56,59,0.8)] ring-2 ring-rose-300/80"
-              >
-                <span className="font-display text-3xl leading-none text-chalk">
-                  +{view.pendingDraw.total}
-                </span>
-                {targetName && (
-                  <span className="max-w-[13rem] text-xs leading-snug text-chalk/90">
-                    {targetName === 'You' ? 'You must' : `${targetName} must`} stack +
-                    {view.pendingDraw.lastValue} or higher, or take them
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -169,18 +156,21 @@ export function GameTable({
 function DrawPile({
   pileRef,
   count,
+  setAside,
   canDraw,
   onDraw,
 }: {
   pileRef: RefObject<HTMLButtonElement>;
   count: number;
+  /** Cards out of play for the rest of the round, mentioned beside the pile's count. */
+  setAside: number;
   canDraw: boolean;
   onDraw: () => void;
 }) {
   // A thicker deck looks thicker: up to four offset backs underneath.
   const depth = Math.min(4, Math.ceil(count / 25));
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-3 shortest:gap-1">
       <button
         ref={pileRef}
         type="button"
@@ -203,6 +193,32 @@ function DrawPile({
       </button>
       <span className="pill px-2.5 py-0.5 text-xs tabular-nums text-chalk/80">
         {count === 0 ? 'Empty' : `${count} left`}
+        {setAside > 0 && `, ${setAside} set aside`}
+      </span>
+    </div>
+  );
+}
+
+/** The color play continues in, as a chip lying beside the deck. Direction shows on the felt's arrows. */
+function ColorInPlay({ color, clockwise }: { color: CardColor; clockwise: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-3 shortest:gap-1">
+      <span
+        aria-hidden
+        className={`relative h-16 w-16 rounded-full ring-4 ring-white/85 transition-colors duration-500 short:h-12 short:w-12 shorter:h-11 shorter:w-11 shortest:h-10 shortest:w-10 ${COLOR_BG[color]}`}
+        style={{
+          boxShadow: `0 0 22px 4px ${COLOR_STROKE[color]}, 0 6px 10px -2px rgba(0,0,0,0.6)`,
+        }}
+      >
+        {/* the chip's inlaid edge */}
+        <span className="absolute inset-[18%] rounded-full border-2 border-dashed border-white/70" />
+      </span>
+      <span role="status" className="pill px-2.5 py-0.5 text-xs text-chalk/90">
+        {COLOR_LABEL[color]}
+        <span className="sr-only">
+          {' '}
+          is in play, going {clockwise ? 'clockwise' : 'counterclockwise'}
+        </span>
       </span>
     </div>
   );

@@ -46,6 +46,10 @@ export default {
       addVariant('short', '@media (min-width: 640px) and (max-height: 860px) { :root & }');
       // e.g. a 1080p laptop at 150% scaling: about 575px of page under the browser bar.
       addVariant('shorter', '@media (min-width: 640px) and (max-height: 640px) { :root & }');
+      // A phone held sideways: the table, your hand and your buttons share under 500px of height.
+      addVariant('shortest', '@media (min-width: 640px) and (max-height: 500px) { :root & }');
+      // A screen with a mouse: the only place privacy mode works, since it reveals a card on hover.
+      addVariant('hoverable', '@media (min-width: 640px) and (hover: hover) { :root & }');
     },
   ],
 };

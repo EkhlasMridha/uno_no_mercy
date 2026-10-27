@@ -1,12 +1,9 @@
 import { Settings2 } from 'lucide-react';
 import type { GameLogEntry } from '@nomercy/shared';
 import type { TableAvatars } from '../../lib/avatar';
-import { COLOR_BG } from '../../lib/cards';
-import { actorOf, describeEvent, eventTone, type NameLookup } from '../../lib/event-text';
+import { actorOf, describeEvent, type NameLookup } from '../../lib/event-text';
 import { PlayingCard } from '../card/PlayingCard';
 import { PlayerAvatar } from '../PlayerAvatar';
-
-const TONE_DOT = { ...COLOR_BG, penalty: 'bg-rose-500', plain: 'bg-chalk/30' } as const;
 
 /** The game log, newest first: who did it, what happened, and the card when one was played. */
 export function EventFeed({
@@ -34,10 +31,6 @@ export function EventFeed({
               event.type === 'gameWon' ? 'font-semibold text-brass-soft' : '',
             ].join(' ')}
           >
-            <span
-              aria-hidden
-              className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[eventTone(event)]}`}
-            />
             {actor ? (
               <PlayerAvatar traits={avatarOf(actor)} className="h-8 w-8 shrink-0" />
             ) : (

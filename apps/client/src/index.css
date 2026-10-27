@@ -54,7 +54,7 @@ body {
       text-[11px] font-medium leading-tight text-chalk/85 ring-1 ring-white/10 backdrop-blur transition
       hover:bg-felt-800 hover:text-chalk hover:ring-white/25
       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
-      sm:min-w-[4.25rem] sm:px-3;
+      lg:min-w-[4.25rem] lg:px-3 shortest:py-1;
   }
   .panel {
     @apply rounded-2xl bg-felt-900/85 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.08] backdrop-blur;

@@ -104,7 +104,7 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
       aria-live="polite"
       aria-label={`Top card: ${cardName(top.card)}${thrower ? `, played by ${thrower}` : ''}. Show all played cards`}
       // --heap-px scales the scatter with the cards, so short screens get a tighter heap.
-      className="group relative isolate h-48 w-56 rounded-[40%] [--heap-px:1px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72 short:h-40 short:w-52 short:[--heap-px:0.7px] shorter:h-32 shorter:w-44 shorter:[--heap-px:0.55px]"
+      className="group relative isolate h-48 w-56 rounded-[40%] [--heap-px:1px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-chalk/70 sm:h-60 sm:w-72 short:h-40 short:w-52 short:[--heap-px:0.7px] shorter:h-32 shorter:w-44 shorter:[--heap-px:0.55px] shortest:h-24 shortest:w-36 shortest:[--heap-px:0.42px]"
     >
       <ColorGlow color={view.currentColor} />
       {placements.map((p) => (
