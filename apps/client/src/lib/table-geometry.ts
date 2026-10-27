@@ -23,9 +23,20 @@ export function seatPoint(angle: number, reach = 1): { x: number; y: number } {
   };
 }
 
+/**
+ * Where a seat's centre goes, as CSS. The stage can tune it with three custom properties:
+ * `--seat-inset` keeps side seats that far from its edges so a narrow phone doesn't clip them,
+ * `--seat-inset-top` keeps the top seats' avatars and UNO tags below the top bar, and
+ * `--seat-low-reach` pulls the seats below the middle up, clear of your hand on short screens.
+ */
 export function seatPosition(angle: number): { left: string; top: string } {
   const { x, y } = seatPoint(angle);
-  return { left: `${x}%`, top: `${y}%` };
+  const left = `clamp(var(--seat-inset, 0px), ${x}%, calc(100% - var(--seat-inset, 0px)))`;
+  const top =
+    y > 50
+      ? `calc(50% + ${y - 50}% * var(--seat-low-reach, 1))`
+      : `max(var(--seat-inset-top, 0px), ${y}%)`;
+  return { left, top };
 }
 
 /** Stable 0..1 value for a given seed, so a card keeps its spot on the table across renders. */

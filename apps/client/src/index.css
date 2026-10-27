@@ -16,12 +16,14 @@ body,
 }
 
 body {
-  /* one lamp hangs over the table; the room falls off into shadow */
+  /* a games room at night: a warm lamp in the far corner, plants in the dark, felt light spilling up */
   background:
-    radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255, 196, 120, 0.13) 0%, transparent 70%),
-    radial-gradient(ellipse at 50% 50%, #2a1b16 0%, #17100d 70%), #17100d;
+    radial-gradient(circle at 84% 3%, rgba(255, 170, 80, 0.24) 0%, transparent 20%),
+    radial-gradient(ellipse 38% 45% at 3% 88%, rgba(46, 130, 90, 0.16) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 60% at 45% 50%, rgba(122, 70, 210, 0.14) 0%, transparent 70%),
+    linear-gradient(180deg, #0e1126 0%, #070815 100%), #0a0c1a;
   background-attachment: fixed;
-  color: #f2e8da;
+  color: #eef0ff;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -31,44 +33,75 @@ body {
       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
       disabled:cursor-not-allowed disabled:opacity-40;
   }
+  /* gold with a pressed-down lip, lit from inside */
   .btn-primary {
-    @apply btn bg-brass text-room shadow-lg shadow-black/40 hover:brightness-110 active:brightness-95;
+    @apply btn bg-[linear-gradient(180deg,#ffdb63_0%,#ffc22e_55%,#f5a91a_100%)] text-room shadow-neon
+      hover:brightness-110 active:translate-y-0.5 active:shadow-none disabled:shadow-none;
   }
   .btn-secondary {
-    @apply btn bg-chalk/10 text-chalk ring-1 ring-chalk/15 hover:bg-chalk/15;
+    @apply btn bg-felt-800/90 text-chalk ring-1 ring-white/10 hover:bg-felt-700 hover:ring-white/20;
   }
   .btn-ghost {
-    @apply btn bg-transparent text-chalk/80 hover:bg-chalk/10 hover:text-chalk;
+    @apply btn bg-transparent text-chalk/80 hover:bg-white/[0.07] hover:text-chalk;
+  }
+  .btn-danger {
+    @apply btn bg-[linear-gradient(180deg,#e5383b,#b81d2c)] text-white ring-1 ring-white/10
+      shadow-[0_0_22px_-6px_rgba(229,56,59,0.75)] hover:brightness-110;
+  }
+  /* top-bar control: icon over a short label, on a dark tile */
+  .btn-tile {
+    @apply inline-flex min-w-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl bg-felt-900/80 px-2.5 py-1.5
+      text-[11px] font-medium leading-tight text-chalk/85 ring-1 ring-white/10 backdrop-blur transition
+      hover:bg-felt-800 hover:text-chalk hover:ring-white/25
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+      lg:min-w-[4.25rem] lg:px-3 shortest:py-1;
   }
   .panel {
-    @apply rounded-2xl bg-felt-900/90 ring-1 ring-walnut-light/25 backdrop-blur;
+    @apply rounded-2xl bg-felt-900/85 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.08] backdrop-blur;
   }
-  /* walnut rail with a brass inlay where it meets the felt */
+  /* a dark lozenge for small facts on the felt and the status line */
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full bg-felt-950/75 px-3 py-1 ring-1 ring-white/10 backdrop-blur-sm;
+  }
+  /* the lounge around the table, dimmed so the table, seats and panels stay readable over it */
+  .lounge-room {
+    background:
+      radial-gradient(ellipse 55% 50% at 40% 52%, rgba(8, 10, 23, 0.5) 0%, transparent 75%),
+      linear-gradient(
+        180deg,
+        rgba(8, 10, 23, 0.6) 0%,
+        rgba(8, 10, 23, 0.35) 40%,
+        rgba(8, 10, 23, 0.65) 100%
+      ),
+      url('./assets/lounge.webp') center / cover no-repeat,
+      #0a0c1a;
+  }
+  /* a lit walnut rail: the lamp catches its top edge */
   .table-rail {
     background:
       repeating-linear-gradient(
         104deg,
-        rgba(0, 0, 0, 0.09) 0 2px,
+        rgba(0, 0, 0, 0.1) 0 2px,
         transparent 2px 9px,
-        rgba(255, 220, 170, 0.04) 9px 11px,
+        rgba(255, 220, 170, 0.05) 9px 11px,
         transparent 11px 17px
       ),
-      radial-gradient(ellipse at 50% 30%, #8c5b37 0%, #5b3722 55%, #3a2214 100%);
+      radial-gradient(ellipse at 50% 22%, #b5713c 0%, #7a4524 55%, #47260f 100%);
     box-shadow:
-      0 40px 80px -20px rgba(0, 0, 0, 0.85),
-      0 12px 30px rgba(0, 0, 0, 0.5),
-      inset 0 2px 1px rgba(255, 225, 180, 0.25),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.5);
+      0 40px 90px -20px rgba(0, 0, 0, 0.9),
+      0 0 70px -12px rgba(255, 150, 60, 0.22),
+      inset 0 2px 1px rgba(255, 215, 160, 0.35),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.55);
   }
   .table-felt {
     background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-      radial-gradient(ellipse 65% 60% at 50% 46%, #643060 0%, #4b2347 45%, #2c1430 100%);
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse 65% 60% at 50% 46%, #4c2785 0%, #3a1d63 45%, #1a0d35 100%);
     box-shadow:
-      0 0 0 2px #d0a650,
-      0 0 0 4px rgba(58, 34, 20, 0.9),
-      inset 0 10px 28px rgba(0, 0, 0, 0.55),
-      inset 0 0 60px rgba(0, 0, 0, 0.35);
+      0 0 0 2px rgba(0, 0, 0, 0.55),
+      inset 0 0 0 1px rgba(176, 130, 255, 0.22),
+      inset 0 12px 30px rgba(0, 0, 0, 0.6),
+      inset 0 0 70px rgba(0, 0, 0, 0.4);
   }
   .input {
     @apply w-full rounded-xl bg-felt-950/70 px-4 py-3 text-white ring-1 ring-white/15 placeholder:text-white/35
@@ -125,13 +158,13 @@ body {
   0%,
   100% {
     box-shadow:
-      0 0 0 2px rgba(208, 166, 80, 0.95),
-      0 0 14px 3px rgba(231, 200, 134, 0.35);
+      0 0 0 3px rgba(255, 194, 46, 0.95),
+      0 0 16px 4px rgba(255, 194, 46, 0.45);
   }
   50% {
     box-shadow:
-      0 0 0 3px rgba(231, 200, 134, 1),
-      0 0 28px 8px rgba(231, 200, 134, 0.55);
+      0 0 0 3px rgba(255, 221, 122, 1),
+      0 0 32px 10px rgba(255, 194, 46, 0.6);
   }
 }
 @keyframes shake {
@@ -196,11 +229,6 @@ body {
     opacity: 1;
   }
 }
-@keyframes track-flow {
-  to {
-    stroke-dashoffset: -2;
-  }
-}
 @keyframes toast-in {
   from {
     transform: translateY(-12px);
@@ -231,7 +259,7 @@ body {
   inset: -8px;
   border-radius: 9999px;
   pointer-events: none;
-  filter: drop-shadow(0 0 4px rgba(255, 236, 190, 0.9));
+  filter: drop-shadow(0 0 5px rgba(255, 221, 122, 0.95));
 }
 .turn-orbit::before,
 .turn-orbit::after {
@@ -247,15 +275,15 @@ body {
   mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
 }
 .turn-orbit::before {
-  background: rgba(231, 200, 134, 0.18);
+  background: rgba(255, 194, 46, 0.2);
 }
 .turn-orbit::after {
   background: conic-gradient(
-    rgba(208, 166, 80, 0) 0deg 170deg,
-    rgba(208, 166, 80, 0.7) 270deg,
-    #e7c886 330deg,
-    #fffdf7 356deg,
-    rgba(255, 253, 247, 0) 360deg
+    rgba(255, 194, 46, 0) 0deg 170deg,
+    rgba(255, 194, 46, 0.75) 270deg,
+    #ffdd7a 330deg,
+    #fffdf2 356deg,
+    rgba(255, 253, 242, 0) 360deg
   );
   animation: slow-spin 2.4s linear infinite;
 }
@@ -274,9 +302,6 @@ body {
 }
 .anim-toss {
   animation: toss 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-.anim-track {
-  animation: track-flow 1.4s linear infinite;
 }
 .anim-toast {
   animation: toast-in 200ms ease-out both;
@@ -326,7 +351,7 @@ body {
     display: none;
   }
   .turn-orbit::before {
-    background: rgba(231, 200, 134, 0.7);
+    background: rgba(255, 194, 46, 0.7);
   }
   /* no cards fly, so there is nothing to wait for */
   .anim-tally-in {
@@ -337,7 +362,7 @@ body {
 /* thin scrollbars for the feed and the roulette tray */
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgba(242, 232, 218, 0.2) transparent;
+  scrollbar-color: rgba(238, 240, 255, 0.18) transparent;
 }
 /* the hand still scrolls sideways by swipe, trackpad or keyboard, without a bar under the fan */
 .scroll-none {

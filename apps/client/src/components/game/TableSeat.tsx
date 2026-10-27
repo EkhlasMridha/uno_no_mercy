@@ -5,7 +5,7 @@ import { cardName } from '../../lib/cards';
 import { seatPosition } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
 import type { AvatarTraits } from '../../lib/avatar';
-import { PlayerAvatar } from '../PlayerAvatar';
+import { avatarGlow, PlayerAvatar } from '../PlayerAvatar';
 import { LastPlayedCard } from './LastPlayedCard';
 
 export type SeatScale = 'lg' | 'md' | 'sm';
@@ -24,13 +24,14 @@ interface TableSeatProps {
 
 const SCALE: Record<SeatScale, { avatar: string; name: string; fan: number; fanGap: number }> = {
   lg: {
-    avatar: 'h-12 w-12 sm:h-14 sm:w-14',
+    avatar:
+      'h-12 w-12 sm:h-[4.5rem] sm:w-[4.5rem] short:h-12 short:w-12 shortest:h-10 shortest:w-10',
     name: 'text-sm max-w-[7.5rem]',
     fan: 5,
-    fanGap: 64,
+    fanGap: 74,
   },
   md: {
-    avatar: 'h-10 w-10 sm:h-11 sm:w-11',
+    avatar: 'h-10 w-10 sm:h-12 sm:w-12 short:h-10 short:w-10 shortest:h-9 shortest:w-9',
     name: 'text-xs max-w-[5.5rem]',
     fan: 3,
     fanGap: 52,
@@ -65,7 +66,7 @@ export function TableSeat({
         <div
           aria-hidden
           // Short screens pull the fan in so it stays clear of the cards in the middle.
-          className="pointer-events-none absolute left-1/2 top-1/2 [--fan-px:1px] max-sm:hidden short:[--fan-px:0.75px] shorter:[--fan-px:0.6px]"
+          className="pointer-events-none absolute left-1/2 top-1/2 [--fan-px:1px] max-sm:hidden short:[--fan-px:0.75px] shorter:[--fan-px:0.6px] shortest:[--fan-px:0.5px]"
           style={{
             transform: `translate(-50%, -50%) translate(calc(${-Math.cos(rad) * s.fanGap} * var(--fan-px)), calc(${-Math.sin(rad) * s.fanGap} * var(--fan-px))) rotate(${angle - 90}deg)`,
           }}
@@ -96,10 +97,12 @@ export function TableSeat({
         )}
         <div
           className={[
-            'relative shrink-0 rounded-full ring-2 shadow-seat',
+            'relative shrink-0 rounded-full',
             s.avatar,
-            isCurrent ? 'anim-turn ring-brass' : 'ring-walnut-light/70',
+            isCurrent ? 'anim-turn' : '',
           ].join(' ')}
+          // Each seat glows in its avatar's color; on the current turn the gold pulse replaces it.
+          style={isCurrent ? undefined : avatarGlow(avatar)}
         >
           {isCurrent && !out && <span aria-hidden className="turn-orbit" />}
           <PlayerAvatar traits={avatar} className="h-full w-full" />
@@ -108,12 +111,13 @@ export function TableSeat({
               key={lastPlayed.seq}
               play={lastPlayed}
               side={Math.cos(rad) < -0.3 ? 'left' : 'right'}
+              inwardOnPhone={Math.abs(Math.cos(rad)) > 0.3}
             />
           )}
           {out && (
             <span
               aria-hidden
-              className="absolute -left-1.5 -top-1 flex h-[1.15rem] w-[1.15rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-walnut"
+              className="absolute -left-1.5 -top-1 flex h-[1.15rem] w-[1.15rem] items-center justify-center rounded-full bg-chalk text-room ring-2 ring-felt-950"
             >
               <Skull size={11} strokeWidth={2.5} />
             </span>
@@ -121,8 +125,10 @@ export function TableSeat({
           <span
             key={player.handCount}
             className={[
-              'anim-bump absolute -bottom-1 -right-2 z-10 min-w-[1.4rem] rounded-full px-1 text-center font-sans text-[11px] font-bold leading-[1.15rem] tabular-nums ring-2 ring-walnut',
-              danger ? 'bg-rose-500 text-white' : 'bg-chalk text-room',
+              'anim-bump absolute -bottom-1 -right-2 z-10 min-w-[1.4rem] rounded-full px-1 text-center font-sans text-[11px] font-bold leading-[1.15rem] tabular-nums ring-2',
+              danger
+                ? 'bg-rose-500 text-white ring-rose-200'
+                : 'bg-felt-950 text-chalk ring-chalk/90',
             ].join(' ')}
           >
             {player.handCount}
@@ -130,9 +136,11 @@ export function TableSeat({
         </div>
         <span
           className={[
-            'relative -mt-1.5 flex items-center gap-1 rounded-sm px-1.5 py-px font-semibold leading-tight shadow ring-1 ring-walnut-light/40',
+            'relative -mt-1.5 flex items-center gap-1 rounded-full px-2.5 py-0.5 font-semibold leading-tight shadow-lg ring-1',
             s.name,
-            isCurrent ? 'bg-brass text-room' : 'bg-room/85 text-chalk',
+            isCurrent
+              ? 'bg-brass text-room ring-brass-soft'
+              : 'bg-felt-950/90 text-chalk ring-white/15',
           ].join(' ')}
         >
           {player.isHost && <Crown size={10} className="shrink-0" aria-label="Host" />}

@@ -3,11 +3,10 @@ import type { ReactNode } from 'react';
 import type { ValidActions } from '@nomercy/shared';
 
 interface ActionBarProps {
-  /** Your name tag, card count and warnings, shown with the status. */
+  /** Your avatar, name tag, card count and warnings. */
   seat: ReactNode;
   actions: ValidActions;
   statusText: string;
-  emphasize: boolean;
   pendingTotal: number | null;
   unoArmed: boolean;
   onDraw: () => void;
@@ -19,7 +18,6 @@ export function ActionBar({
   seat,
   actions,
   statusText,
-  emphasize,
   pendingTotal,
   unoArmed,
   onDraw,
@@ -29,23 +27,15 @@ export function ActionBar({
   const unoActive = actions.canCallUno || actions.canDeclareWithPlay;
   const unoLabel = actions.canCallUno ? 'UNO!' : unoArmed ? 'UNO armed' : 'UNO';
 
-  // Your place at the near edge of the table: who you are and what's happening on the left, Draw (or
-  // Take) dead centre under your hand, UNO to its right. Draw keeps that spot however long the status
-  // is and whether or not it's your move. The status always has room for two lines, so a longer one
-  // never changes the strip's height and nudges the buttons or your hand. On a phone the seat and
-  // status stack above the buttons, and Draw and UNO sit side by side at one fixed width each.
+  // Your place at the near edge of the table: who you are on the left, Draw (or Take) dead centre
+  // under your hand, UNO to its right. On a phone the seat sits above the buttons, and Draw and UNO
+  // sit side by side at one fixed width each. The turn status is read out to screen readers only.
   return (
     <div className="flex flex-col items-center gap-3 px-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-x-6">
-      <div className="flex w-full flex-col items-center gap-0.5 text-center sm:col-start-1 sm:row-start-1 sm:min-h-[4.75rem] sm:items-end sm:justify-center sm:text-right">
-        {seat}
-        <p
-          role="status"
-          aria-live="polite"
-          className={`flex min-h-10 items-center text-sm drop-shadow sm:min-h-0 sm:text-base ${emphasize ? 'font-semibold text-brass-soft' : 'text-chalk/70'}`}
-        >
-          {statusText}
-        </p>
-      </div>
+      <div className="flex justify-center sm:col-start-1 sm:row-start-1 sm:justify-end">{seat}</div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {statusText}
+      </p>
       <div className="flex items-center gap-2 sm:contents">
         {/* Like UNO, Draw is always here and dims while you wait, so its spot never empties. A
             penalty swaps it for Take; the two are never offered together. */}
@@ -53,19 +43,19 @@ export function ActionBar({
           {actions.canAcceptPenalty ? (
             <button
               type="button"
-              className="btn min-w-[9.5rem] whitespace-nowrap bg-rose-600 text-white hover:brightness-110"
+              className="btn-danger min-w-[8.5rem] whitespace-nowrap py-2 font-display text-lg tracking-wide sm:min-w-[9.5rem] sm:py-2.5 sm:text-xl short:py-2 shortest:min-w-[7.5rem] shortest:text-lg"
               onClick={onAccept}
             >
-              <Download size={18} /> Take +{pendingTotal ?? 0}
+              <Download size={20} /> Take +{pendingTotal ?? 0}
             </button>
           ) : (
             <button
               type="button"
-              className="btn-primary min-w-[9.5rem]"
+              className="btn-primary min-w-[8.5rem] py-2 font-display text-lg tracking-wide sm:min-w-[9.5rem] sm:py-2.5 sm:text-xl short:py-2 shortest:min-w-[7.5rem] shortest:text-lg"
               disabled={!actions.canDraw}
               onClick={onDraw}
             >
-              <Download size={18} /> Draw
+              <Download size={20} /> Draw
             </button>
           )}
         </div>
@@ -81,12 +71,12 @@ export function ActionBar({
           }
           className={[
             // Fixed width on a phone, where it sits beside Draw, so "UNO armed" can't shift the pair.
-            'btn min-w-[9.5rem] whitespace-nowrap font-display text-lg tracking-wide sm:col-start-3 sm:row-start-1 sm:min-w-0 sm:justify-self-start',
+            'btn min-w-[8.5rem] whitespace-nowrap py-2 font-display text-lg tracking-wide sm:col-start-3 sm:row-start-1 sm:min-w-[7.5rem] sm:justify-self-start sm:py-2.5 sm:text-xl short:py-2 shortest:min-w-[6.5rem] shortest:text-lg',
             actions.canCallUno
               ? 'anim-turn bg-brass text-room'
               : unoArmed
                 ? 'bg-brass text-room'
-                : 'bg-chalk/10 text-chalk ring-1 ring-chalk/15',
+                : 'bg-felt-900/90 text-chalk ring-1 ring-white/15',
           ].join(' ')}
         >
           <Megaphone size={18} /> {unoLabel}

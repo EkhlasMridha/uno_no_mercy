@@ -107,7 +107,7 @@ function Toggle({
       />
       <span
         aria-hidden="true"
-        className="h-6 w-11 rounded-full bg-walnut-dark ring-1 ring-walnut-light/60 transition-colors peer-checked:bg-brass peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white motion-reduce:transition-none"
+        className="h-6 w-11 rounded-full bg-felt-700 ring-1 ring-white/15 transition-colors peer-checked:bg-brass peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white motion-reduce:transition-none"
       />
       <span
         aria-hidden="true"
@@ -118,7 +118,14 @@ function Toggle({
 }
 
 /** Top-bar button that opens the sound panel: mute all, plus a toggle and a preview for each sound. */
-export function SoundSettings({ className }: { className: string }) {
+export function SoundSettings({
+  className,
+  labelClassName = 'hidden sm:inline',
+}: {
+  className: string;
+  /** When the "Sound" label shows beside the icon. */
+  labelClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const prefs = useAppState((s) => s.sound);
   const Icon = !prefs.muted && SOUNDS.some(({ kind }) => prefs[kind]) ? Volume2 : VolumeX;
@@ -131,7 +138,7 @@ export function SoundSettings({ className }: { className: string }) {
         onClick={() => setOpen(true)}
         aria-label="Sound settings"
       >
-        <Icon size={16} /> <span className="hidden sm:inline">Sound</span>
+        <Icon size={17} /> <span className={labelClassName}>Sound</span>
       </button>
       {open && (
         <Modal title="Sound" onClose={() => setOpen(false)}>

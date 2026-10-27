@@ -1,4 +1,4 @@
-import type { GameEvent, GameLogEntry, PublicPlayerView } from '@nomercy/shared';
+import { type GameEvent, type GameLogEntry, type PublicPlayerView } from '@nomercy/shared';
 import { cardName, COLOR_LABEL } from './cards';
 
 export type NameLookup = (playerId: string) => string;
@@ -76,6 +76,26 @@ export function describeEvent(event: GameEvent, name: NameLookup): string {
       return event.reason === 'emptyHand'
         ? `${name(event.playerId)} played their last card and won!`
         : `${name(event.playerId)} is the last one standing and won!`;
+  }
+}
+
+/** The player a log line is about, whose face it shows. Null for table-wide events. */
+export function actorOf(event: GameEvent): string | null {
+  switch (event.type) {
+    case 'gameStarted':
+      return event.dealerId;
+    case 'rouletteColorNamed':
+    case 'rouletteCardRevealed':
+    case 'rouletteResolved':
+      return event.victimId;
+    case 'unoCaught':
+      return event.catcherId;
+    case 'directionReversed':
+    case 'handsPassed':
+    case 'drawPileReshuffled':
+      return null;
+    default:
+      return event.playerId;
   }
 }
 

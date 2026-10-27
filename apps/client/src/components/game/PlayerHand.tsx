@@ -11,6 +11,8 @@ interface PlayerHandProps {
   onCardClick: (card: Card) => void;
   /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
   nudge: IdleNudge;
+  /** Privacy mode: cards show their backs until you hover one (screens with a mouse only). */
+  concealed: boolean;
 }
 
 interface HandLayout {
@@ -22,8 +24,10 @@ interface HandLayout {
   gap: number;
 }
 
-// Room left for the scroller's padding and the tilted outer corners of the fan.
-const EDGE_ROOM = 48;
+// Room left for the scroller's padding (px-4) and each row's (px-6), which holds the tilted corners.
+const EDGE_ROOM = 80;
+// A short phone, or one held sideways, has no height for a second tier: one row that scrolls is better.
+const NO_TIERS_QUERY = '(max-height: 500px), (max-width: 639px) and (max-height: 720px)';
 
 function startsColor(row: readonly Card[], i: number): boolean {
   const prev = row[i - 1];
@@ -44,7 +48,12 @@ function splitTiers(cards: Card[]): Card[][] {
 }
 
 /** Spaces the hand to fit the width, so every card's corner index stays in view without scrolling. */
-function layoutHand(cards: Card[], width: number, cardWidth: number): HandLayout {
+function layoutHand(
+  cards: Card[],
+  width: number,
+  cardWidth: number,
+  allowTiers: boolean,
+): HandLayout {
   const avail = width - EDGE_ROOM;
   const roomy = cardWidth - 14;
   const readable = Math.max(26, cardWidth * 0.4);
@@ -54,7 +63,7 @@ function layoutHand(cards: Card[], width: number, cardWidth: number): HandLayout
     const starts = row.filter((_, i) => startsColor(row, i)).length;
     return (avail - cardWidth - starts * gap) / (row.length - 1);
   };
-  const tiers = cards.length >= 8 ? splitTiers(cards) : null;
+  const tiers = allowTiers && cards.length >= 8 ? splitTiers(cards) : null;
   const options: [Card[][] | null, number, number][] = [
     [[cards], groupGap, readable],
     [[cards], 4, readable],
@@ -71,7 +80,14 @@ function layoutHand(cards: Card[], width: number, cardWidth: number): HandLayout
 }
 
 /** Your cards held in a fan over the table edge, grouped by color and sized to the screen. */
-export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: PlayerHandProps) {
+export function PlayerHand({
+  hand,
+  playableIds,
+  isMyTurn,
+  onCardClick,
+  nudge,
+  concealed,
+}: PlayerHandProps) {
   const sorted = useMemo(() => sortHand(hand), [hand]);
   const previous = useRef<Set<string> | null>(null);
   const prevIds = previous.current;
@@ -82,16 +98,29 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   // Card size follows the breakpoints in PlayingCard, so it's measured rather than repeated here.
   const scroller = useRef<HTMLDivElement>(null);
   const hasCards = sorted.length > 0;
-  const [room, setRoom] = useState<{ width: number; cardWidth: number } | null>(null);
+  const [room, setRoom] = useState<{
+    width: number;
+    cardWidth: number;
+    allowTiers: boolean;
+  } | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const measure = () => {
       const card = el.querySelector('li');
       if (!card) return;
-      const next = { width: el.clientWidth, cardWidth: card.offsetWidth };
+      const next = {
+        width: el.clientWidth,
+        cardWidth: card.offsetWidth,
+        allowTiers: !window.matchMedia(NO_TIERS_QUERY).matches,
+      };
       setRoom((prev) =>
-        prev && prev.width === next.width && prev.cardWidth === next.cardWidth ? prev : next,
+        prev &&
+        prev.width === next.width &&
+        prev.cardWidth === next.cardWidth &&
+        prev.allowTiers === next.allowTiers
+          ? prev
+          : next,
       );
     };
     measure();
@@ -105,7 +134,7 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   }
 
   const layout = room
-    ? layoutHand(sorted, room.width, room.cardWidth)
+    ? layoutHand(sorted, room.width, room.cardWidth, room.allowTiers)
     : { rows: [sorted], step: 40, gap: 8 };
   const cardWidth = room?.cardWidth ?? 72;
   const tiered = layout.rows.length > 1;
@@ -114,7 +143,7 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
   return (
     <div
       ref={scroller}
-      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4"
+      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4 shortest:pb-1 shortest:pt-3"
     >
       <div
         role="group"
@@ -180,6 +209,7 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
                         dimmed={isMyTurn && !playable}
                         onClick={() => onCardClick(card)}
                         animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
+                        concealed={concealed}
                       />
                     </div>
                   </li>

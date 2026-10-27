@@ -21,6 +21,8 @@ export interface AppState {
   notices: Notice[];
   /** Which game sounds are on. Saved per browser. */
   sound: SoundPrefs;
+  /** Privacy mode: your hand shows card backs until you hover a card. Kept for this page only. */
+  privateHand: boolean;
 }
 
 /** Client-side view cache. The server stays authoritative; this only mirrors what it sent. */
@@ -32,6 +34,7 @@ let state: AppState = {
   restoring: false,
   notices: [],
   sound: loadSoundPrefs(),
+  privateHand: false,
 };
 const listeners = new Set<() => void>();
 
@@ -72,4 +75,8 @@ export function clearNotices(): void {
 export function setSoundPref(key: keyof SoundPrefs, value: boolean): void {
   setState((s) => ({ sound: { ...s.sound, [key]: value } }));
   saveSoundPrefs(state.sound);
+}
+
+export function togglePrivateHand(): void {
+  setState((s) => ({ privateHand: !s.privateHand }));
 }
