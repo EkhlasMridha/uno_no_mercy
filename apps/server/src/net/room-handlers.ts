@@ -73,7 +73,12 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     if (current && current.roomCode !== code) {
       throw new RoomError('ALREADY_IN_ROOM', 'Leave your current room first');
     }
-    const { room, player, previousSocketId } = manager.reconnect(code, token, socket.id);
+    const { room, player, previousSocketId } = manager.reconnect(
+      code,
+      token,
+      socket.id,
+      current?.playerId ?? null,
+    );
     if (previousSocketId) {
       // Same seat opened in another tab/device: the newest connection wins, no duplicate player.
       const previous = io.sockets.sockets.get(previousSocketId);

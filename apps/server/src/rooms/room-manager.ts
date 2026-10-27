@@ -162,16 +162,25 @@ export class RoomManager {
     return { room, player };
   }
 
-  /** Restores a seat from a room-scoped token. Returns the previous socket id so it can be closed. */
+  /**
+   * Restores a seat from a room-scoped token. Returns the previous socket id so it can be closed.
+   * `boundPlayerId` is the seat this socket already holds, if any: it may only reconnect that seat.
+   */
   reconnect(
     code: string,
     token: string,
     socketId: string,
+    boundPlayerId: string | null = null,
   ): JoinResult & { previousSocketId: string | null } {
     const room = this.rooms.get(code);
     const player = room?.players.find((p) => !p.departed && tokensMatch(p.reconnectToken, token));
     if (!room || !player) {
       throw new RoomError('INVALID_TOKEN', 'Your session has expired or the room no longer exists');
+    }
+    // Moving a socket to another seat would leave its old seat pointing at it forever: that seat
+    // would never time out, and the room could never close.
+    if (boundPlayerId && boundPlayerId !== player.id) {
+      throw new RoomError('ALREADY_IN_ROOM', 'Leave your current seat first');
     }
     const previousSocketId = player.socketId !== socketId ? player.socketId : null;
     this.clearExpiry(player);

@@ -222,6 +222,16 @@ describe('multiplayer over Socket.IO', () => {
     expect(restored.ok).toBe(true);
     await until(() => b.room!.players.find((p) => p.name === 'Alpha')?.connected === true);
     expect(b.room!.players).toHaveLength(2);
+
+    // A socket holding one seat can't take another: its old seat would point at it forever.
+    const hop = await emit(b, 'room:reconnect', {
+      code: created.data.roomCode,
+      token: (restored as { data: SessionInfo }).data.reconnectToken,
+    });
+    expect(hop).toMatchObject({ ok: false, error: { code: 'ALREADY_IN_ROOM' } });
+    b.socket.disconnect();
+    await until(() => again.room!.players.find((p) => p.name === 'Beta')?.connected === false);
+    expect(again.room!.players.find((p) => p.name === 'Alpha')?.connected).toBe(true);
   });
 
   it('lets a dropped player rejoin by code once the next player agrees to wait', async () => {
@@ -416,6 +426,59 @@ describe('multiplayer over Socket.IO', () => {
     expect((await emit(host, 'game:start', { fillWithComputers: true })).ok).toBe(true);
     await until(() => host.room?.status === 'inGame');
     expect(host.room!.players.filter((p) => p.isComputer)).toHaveLength(2);
+  });
+});
+
+describe('connection churn', () => {
+  it('frees every room, seat and connection once everyone is gone', async () => {
+    const server = createServer(createHttpApp(null));
+    const { io, manager } = createSocketServer(server, {
+      rng: seededRng(7),
+      reconnectGraceMs: 50,
+      checkInvariants: true,
+      computerMoveDelayMs: 5,
+      turnHoldMs: 0,
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const churnUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const open = async () => {
+      const socket: ClientSocket = connect(churnUrl, { transports: ['websocket'], forceNew: true });
+      await new Promise<void>((resolve) => socket.on('connect', () => resolve()));
+      return socket;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const send = (socket: ClientSocket, event: string, payload: unknown): Promise<any> =>
+      (socket.timeout(3000).emitWithAck as unknown as AnyEmit)(event, payload);
+
+    try {
+      for (let round = 0; round < 6; round++) {
+        const host = await open();
+        const guest = await open();
+        const created = await send(host, 'room:create', {
+          name: `Host${round}`,
+          gender: 'male',
+          maxPlayers: 3,
+        });
+        const code = created.data.roomCode as string;
+        await send(guest, 'room:join', { code, name: 'Guest', gender: 'female' });
+        await send(guest, 'room:ready', { ready: true });
+        await send(host, 'game:start', { fillWithComputers: round % 2 === 0 });
+        // Leave, drop mid-game, refresh into the same seat, then drop again.
+        if (round % 3 === 0) await send(guest, 'room:leave', {});
+        guest.disconnect();
+        const back = await open();
+        await send(back, 'room:reconnect', { code, token: created.data.reconnectToken });
+        host.disconnect();
+        back.disconnect();
+      }
+      // Everyone's reconnect window runs out: nothing may be left behind.
+      await new Promise((r) => setTimeout(r, 400));
+      expect(manager.roomCount).toBe(0);
+      expect(io.engine.clientsCount).toBe(0);
+    } finally {
+      io.close();
+      server.close();
+    }
   });
 });
 
