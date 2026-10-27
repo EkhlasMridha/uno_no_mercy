@@ -21,7 +21,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
   players" starts as is (only with 2 or more people). A host on their own can start this way.
 - With computers at the table, the round ends with no winner once every person is knocked out.
   Computers leave on Back to lobby, freeing their seats for people.
-- Joining is only possible in the lobby. During a game, only reconnecting with a valid token is accepted.
+- Joining is only possible in the lobby. During a game, a refresh reconnects with the tab's token. A
+  player who drops out is held for the next player to decide: on Wait, they can rejoin from any
+  device with the room code and the same name; on Don't wait, they forfeit (docs/RULES.md §5.16).
 - Players who leave or time out during a game are marked _departed_ and removed when the next round starts
   or the room returns to the lobby.
 
@@ -65,6 +67,8 @@ For `playCard`:
 7. Finalize: UNO sync, last-standing check, version++, log.
 
 For draw, penalty and roulette commands, the Mercy Rule is checked after **every** card enters a hand.
+The one exception is a draw you chose to make that brings you to 25 with a playable card: the phase
+becomes `drawing` with `lastChance`, and playing that card is the only legal move (docs/RULES.md §5.13).
 
 ## Validation scenarios covered
 

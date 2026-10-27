@@ -8,6 +8,7 @@ import {
   getValidActions,
   seededRng,
 } from '../src/engine/index.js';
+import { phaseView } from '../src/engine/game-selectors.js';
 import { matchesTop } from '../src/engine/game.validation.js';
 import {
   act,
@@ -102,7 +103,7 @@ describe('manual drawing', () => {
     const red3 = cardId(s, 0, 0);
     // Red 3 is playable, but the player chooses to draw instead: blue 1 is no match.
     s = run(s, 0, { type: 'draw' });
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null, lastChance: false });
     expect(s.currentIndex).toBe(0);
     expect(getValidActions(s, pid(0))).toMatchObject({ playableCardIds: [], canDraw: true });
     expect(reject(s, 0, { type: 'playCard', cardId: red3 })).toBe('INVALID_MOVE');
@@ -110,7 +111,7 @@ describe('manual drawing', () => {
     // Red 7 is playable, yet the player may still draw more.
     s = run(s, 0, { type: 'draw' });
     const red7 = handOf(s, 0).at(-1)!;
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id, lastChance: false });
     expect(getValidActions(s, pid(0))).toMatchObject({
       playableCardIds: [red7.id],
       drawnPlayableCardId: red7.id,
@@ -119,7 +120,7 @@ describe('manual drawing', () => {
 
     // Drawing past it locks red 7: only the newest card counts.
     s = run(s, 0, { type: 'draw' });
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null, lastChance: false });
     expect(reject(s, 0, { type: 'playCard', cardId: red7.id })).toBe('INVALID_MOVE');
     s = run(s, 0, { type: 'draw' });
     const red9 = handOf(s, 0).at(-1)!;
@@ -141,9 +142,54 @@ describe('manual drawing', () => {
     );
     const red7 = handOf(s, 0).at(-1)!;
     expect(s.currentIndex).toBe(0);
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id, lastChance: false });
     expect(getValidActions(s, pid(0)).canDraw).toBe(true);
     expect(handOf(run(s, 0, { type: 'draw' }), 0)).toHaveLength(3);
+  });
+
+  it('spares a manual draw to 25 when the drawn card is playable, as long as it is played', () => {
+    let s = run(
+      buildState({
+        hands: [filler(24), filler(3), filler(3)],
+        top: n('red', 5),
+        drawPile: [n('red', 8), ...deckFill()],
+      }),
+      0,
+      { type: 'draw' },
+    );
+    const red8 = handOf(s, 0).at(-1)!;
+    expect(s.players[0]?.status).toBe('active');
+    expect(handOf(s, 0)).toHaveLength(MERCY_HAND_LIMIT);
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red8.id, lastChance: true });
+    expect(phaseView(s)).toEqual({ type: 'drawing', playerId: pid(0), lastChance: true });
+
+    // Playing the drawn card is the only move: no drawing on, and nothing else in the hand.
+    const actions = getValidActions(s, pid(0));
+    expect(actions.canDraw).toBe(false);
+    expect(actions.playableCardIds).toEqual([red8.id]);
+    expect(reject(s, 0, { type: 'draw' })).toBe('INVALID_MOVE');
+    expect(reject(s, 0, { type: 'playCard', cardId: cardId(s, 0, 0) })).toBe('INVALID_MOVE');
+
+    s = run(s, 0, { type: 'playCard', cardId: red8.id });
+    expect(s.players[0]?.status).toBe('active');
+    expect(handOf(s, 0)).toHaveLength(MERCY_HAND_LIMIT - 1);
+    expect(s.currentIndex).toBe(1);
+    expect(s.phase).toEqual({ type: 'turn' });
+  });
+
+  it('still knocks out at 25 on a forced draw, even when the 25th card is playable', () => {
+    const s = run(
+      buildState({
+        hands: [filler(23), filler(3), filler(3)],
+        top: n('red', 5),
+        drawPile: [n('red', 7), n('red', 8), ...deckFill()],
+        pendingDraw: { total: 2, lastValue: 2 },
+      }),
+      0,
+      { type: 'acceptPenalty' },
+    );
+    expect(s.players[0]?.status).toBe('eliminated');
+    expect(s.players[0]?.eliminationReason).toBe('mercy');
   });
 
   it('knocks the player out when a manual draw reaches the Mercy limit', () => {

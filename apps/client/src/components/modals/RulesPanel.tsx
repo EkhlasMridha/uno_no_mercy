@@ -90,7 +90,11 @@ export function RulesPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div className="rounded-xl bg-white/5 p-3">
             <h3 className="mb-1 font-semibold text-white">Mercy Rule</h3>
-            <p>Reach 25 or more cards and you are knocked out immediately.</p>
+            <p>
+              Reach 25 or more cards and you are knocked out immediately. One last chance: if a draw
+              you chose to make is your 25th card and it can be played, play it straight away and
+              you stay in.
+            </p>
           </div>
           <div className="rounded-xl bg-white/5 p-3">
             <h3 className="mb-1 font-semibold text-white">UNO!</h3>

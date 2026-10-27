@@ -101,10 +101,15 @@ function useNewDraws(log: GameLogEntry[]): { flights: Flight[]; tallies: Record<
   const [flights, setFlights] = useState<Flight[]>([]);
   const [tallies, setTallies] = useState<Record<string, Tally>>({});
   const tallyTimers = useRef(new Map<string, number[]>());
+  const flightTimers = useRef(new Set<number>());
 
   useEffect(() => {
     const timers = tallyTimers.current;
-    return () => timers.forEach((ids) => ids.forEach((id) => window.clearTimeout(id)));
+    const flying = flightTimers.current;
+    return () => {
+      timers.forEach((ids) => ids.forEach((id) => window.clearTimeout(id)));
+      flying.forEach((id) => window.clearTimeout(id));
+    };
   }, []);
 
   useEffect(() => {
@@ -140,10 +145,14 @@ function useNewDraws(log: GameLogEntry[]): { flights: Flight[]; tallies: Record<
     setFlights((current) => [...current, ...fresh]);
     const longest = Math.max(...fresh.map((f) => Math.min(f.count, MAX_CARDS)));
     const done = new Set(fresh.map((f) => f.seq));
-    window.setTimeout(
-      () => setFlights((current) => current.filter((f) => !done.has(f.seq))),
+    const landed = window.setTimeout(
+      () => {
+        flightTimers.current.delete(landed);
+        setFlights((current) => current.filter((f) => !done.has(f.seq)));
+      },
       TRAVEL_MS + STAGGER_MS * longest + 100,
     );
+    flightTimers.current.add(landed);
 
     // Draws close together add up, so drawing until something plays reads +1, +2, +3.
     const added = new Map<string, Flight>();

@@ -22,3 +22,5 @@ export const MAX_COMPUTERS = 9;
  * so a player who reached one card can call it before anyone catches them (docs/RULES.md §5.9).
  */
 export const TURN_HOLD_MS = 2000;
+/** How long the table holds a dropped player's seat once the next player agrees to wait (§5.16). */
+export const WAIT_FOR_REJOIN_MS = 5 * 60_000;

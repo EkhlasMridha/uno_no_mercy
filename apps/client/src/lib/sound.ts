@@ -44,7 +44,17 @@ export function unlockAudio(): void {
   void ctx.resume();
 }
 
-/** One enveloped oscillator note, optionally gliding to `endHz`. */
+/**
+ * Disconnects a sound's nodes once its source has finished. A game night plays thousands of sounds,
+ * so each chain is let go explicitly instead of staying wired to the speakers.
+ */
+function releaseWhenDone(source: AudioScheduledSourceNode, ...nodes: AudioNode[]): void {
+  source.addEventListener('ended', () => nodes.forEach((node) => node.disconnect()), {
+    once: true,
+  });
+}
+
+/** One enveloped oscillator note, optionally gliding to `endHz`. Returns it, to await its end. */
 function tone(
   ac: AudioContext,
   out: AudioNode,
@@ -54,7 +64,7 @@ function tone(
   peak: number,
   hz: number,
   endHz = hz,
-): void {
+): OscillatorNode {
   const osc = ac.createOscillator();
   const amp = ac.createGain();
   osc.type = type;
@@ -66,6 +76,8 @@ function tone(
   osc.connect(amp).connect(out);
   osc.start(at);
   osc.stop(at + duration + 0.05);
+  releaseWhenDone(osc, osc, amp);
+  return osc;
 }
 
 /**
@@ -97,6 +109,7 @@ function noise(
   amp.gain.exponentialRampToValueAtTime(0.0001, at + duration);
   source.connect(band).connect(amp).connect(ac.destination);
   source.start(at);
+  releaseWhenDone(source, source, band, amp);
 }
 
 /**
@@ -137,10 +150,12 @@ function wah(
     lfo.connect(muteDepth).connect(mute.frequency);
     lfo.start(at);
     lfo.stop(at + duration + 0.05);
+    releaseWhenDone(lfo, lfo, pitchDepth, muteDepth);
   }
   osc.connect(mute).connect(amp).connect(ac.destination);
   osc.start(at);
   osc.stop(at + duration + 0.05);
+  releaseWhenDone(osc, osc, mute, amp);
 }
 
 // Voices whose names give them away, for the systems that ship them (Windows, macOS, iOS, Android,
@@ -277,7 +292,8 @@ const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: numbe
       tone(ac, klaxon, 'sawtooth', at + 0.18 + i * 0.42, 0.38, 0.12, 440, 880);
       tone(ac, klaxon, 'square', at + 0.18 + i * 0.42, 0.38, 0.04, 445, 890);
     }
-    tone(ac, klaxon, 'sawtooth', at + 0.18, 1.3, 0.07, 110, 55);
+    // The drone ends last, so the shared filter goes with it.
+    releaseWhenDone(tone(ac, klaxon, 'sawtooth', at + 0.18, 1.3, 0.07, 110, 55), klaxon);
   },
   // A brass fanfare up to a held C major chord, with a few sparkles on top.
   win(ac, at) {
@@ -288,9 +304,11 @@ const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: numbe
     [392, 523.25, 659.25, 783.99].forEach((hz, i) =>
       tone(ac, brass, 'sawtooth', at + i * 0.12, 0.18, 0.14, hz),
     );
-    for (const hz of [523.25, 659.25, 783.99, 1046.5]) {
-      tone(ac, brass, 'sawtooth', at + 0.5, 1.2, 0.1, hz);
-    }
+    const chord = [523.25, 659.25, 783.99, 1046.5].map((hz) =>
+      tone(ac, brass, 'sawtooth', at + 0.5, 1.2, 0.1, hz),
+    );
+    // The held chord ends last, so the shared filter goes with it.
+    if (chord[0]) releaseWhenDone(chord[0], brass);
     for (let i = 0; i < 6; i++) {
       tone(ac, ac.destination, 'sine', at + 0.6 + i * 0.13, 0.2, 0.05, 2000 + Math.random() * 2000);
     }

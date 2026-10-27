@@ -6,6 +6,7 @@ import {
   type ValidActions,
 } from '@nomercy/shared';
 import { getValidActions, toPublicGameView } from '../engine/index.js';
+import { waitDeciderId } from './rejoin.js';
 import type { Room } from './room.types.js';
 
 /** Public lobby projection: identical for every member, contains no secrets. */
@@ -23,6 +24,8 @@ export function toRoomView(room: Room): RoomView {
       ready: p.ready,
       connected: p.socketId !== null || p.isComputer,
       departed: p.departed,
+      waitDeciderId: waitDeciderId(room, p),
+      seatHeld: p.seatHeld,
       score: p.score,
     })),
     settings: { ...room.settings },

@@ -18,7 +18,7 @@ import {
   requireTurn,
   validatePlay,
 } from './game.validation.js';
-import { eliminatePlayer } from './mercy-rule.js';
+import { eliminatePlayer, enforceMercy, reachesMercyLimit } from './mercy-rule.js';
 import { canSupplyCard, drawCardsInto, topCard } from './pile.js';
 import type { Rng } from './rng.js';
 import { RULES_CONFIG } from './rules-config.js';
@@ -161,6 +161,9 @@ function handleDraw(ctx: EffectContext, index: number): void {
   if (state.pendingDraw) {
     fail('INVALID_MOVE', 'A penalty is pending: stack a Draw card or take the penalty');
   }
+  if (state.phase.type === 'drawing' && state.phase.lastChance) {
+    fail('INVALID_MOVE', 'You hold 25 cards: play the card you just drew to stay in the game');
+  }
   if (!RULES_CONFIG.allowVoluntaryDraw && playableCards(state, index).length > 0) {
     fail('INVALID_MOVE', 'You have a playable card, so you must play instead of drawing');
   }
@@ -169,25 +172,20 @@ function handleDraw(ctx: EffectContext, index: number): void {
   }
   closeCatchWindows(state, player.id);
 
-  const { drawn, eliminated, exhausted } = drawCardsInto(
-    state,
-    index,
-    1,
-    rng,
-    events,
-    'noPlayableCard',
-  );
+  const { drawn, exhausted } = drawCardsInto(state, index, 1, rng, events, 'noPlayableCard', true);
+  const card = drawn[0];
+  const playable = card ? matchesTop(card, topCard(state), state.currentColor) : false;
+  // Last chance (docs/RULES.md §5.13): a playable 25th card spares you, as long as you play it.
+  const lastChance =
+    RULES_CONFIG.lastChanceDraw && reachesMercyLimit(player.hand.length) && playable;
+  const eliminated = !lastChance && enforceMercy(state, index, events);
   // Mercy knockout, or no card exists to draw (docs/RULES.md §6): the turn passes.
-  if (eliminated || exhausted || !drawn[0]) {
+  if (eliminated || exhausted || !card) {
     state.phase = { type: 'turn' };
     advanceTurn(state, index);
     return;
   }
-  const card = drawn[0];
-  state.phase = {
-    type: 'drawing',
-    playableCardId: matchesTop(card, topCard(state), state.currentColor) ? card.id : null,
-  };
+  state.phase = { type: 'drawing', playableCardId: playable ? card.id : null, lastChance };
 }
 
 function handleAcceptPenalty(ctx: EffectContext, index: number): void {

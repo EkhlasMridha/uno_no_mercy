@@ -9,17 +9,18 @@ interface ColorPickerModalProps {
   onCancel?: () => void;
 }
 
+/** A color choice that must be made, shown above your hand so you can see what you hold. */
 export function ColorPickerModal({ title, description, onPick, onCancel }: ColorPickerModalProps) {
   return (
-    <Modal title={title} onClose={onCancel} dismissible={Boolean(onCancel)}>
-      <p className="mb-4 text-sm text-white/70">{description}</p>
-      <div className="grid grid-cols-2 gap-3">
+    <Modal title={title} onClose={onCancel} dismissible={Boolean(onCancel)} overHand>
+      <p className="mb-4 text-sm text-white/70 short:mb-3">{description}</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {CARD_COLORS.map((color) => (
           <button
             key={color}
             type="button"
             onClick={() => onPick(color)}
-            className={`${COLOR_BG[color]} flex h-24 items-center justify-center rounded-2xl border-4 border-white/90 font-display text-2xl shadow-card transition hover:scale-[1.03] focus-visible:outline focus-visible:outline-4 focus-visible:outline-white ${
+            className={`${COLOR_BG[color]} flex h-16 items-center sm:h-20 short:h-14 justify-center rounded-2xl border-4 border-white/90 font-display text-2xl shadow-card transition hover:scale-[1.03] focus-visible:outline focus-visible:outline-4 focus-visible:outline-white ${
               color === 'yellow' ? 'text-felt-950' : 'text-white'
             }`}
           >
