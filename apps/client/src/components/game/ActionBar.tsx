@@ -1,4 +1,4 @@
-import { Download, Megaphone } from 'lucide-react';
+import { Download, Megaphone, MessageCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { ValidActions } from '@nomercy/shared';
 
@@ -41,8 +41,13 @@ export function ActionBar({
         <p
           role="status"
           aria-live="polite"
-          className={`flex min-h-10 items-center text-sm drop-shadow sm:min-h-0 sm:text-base ${emphasize ? 'font-semibold text-brass-soft' : 'text-chalk/70'}`}
+          className={`mt-1 flex min-h-10 items-center gap-2.5 rounded-2xl bg-felt-950/75 px-3.5 py-1.5 text-left text-sm ring-1 backdrop-blur-sm sm:text-base ${
+            emphasize
+              ? 'font-semibold text-brass-soft ring-brass/40'
+              : 'text-chalk/75 ring-white/10'
+          }`}
         >
+          <MessageCircle size={17} aria-hidden className="shrink-0 opacity-80" />
           {statusText}
         </p>
       </div>
@@ -53,19 +58,19 @@ export function ActionBar({
           {actions.canAcceptPenalty ? (
             <button
               type="button"
-              className="btn min-w-[9.5rem] whitespace-nowrap bg-rose-600 text-white hover:brightness-110"
+              className="btn-danger min-w-[9.5rem] whitespace-nowrap font-display text-xl tracking-wide sm:min-w-[11rem] sm:py-3 sm:text-2xl"
               onClick={onAccept}
             >
-              <Download size={18} /> Take +{pendingTotal ?? 0}
+              <Download size={22} /> Take +{pendingTotal ?? 0}
             </button>
           ) : (
             <button
               type="button"
-              className="btn-primary min-w-[9.5rem]"
+              className="btn-primary min-w-[9.5rem] font-display text-xl tracking-wide sm:min-w-[11rem] sm:py-3 sm:text-2xl"
               disabled={!actions.canDraw}
               onClick={onDraw}
             >
-              <Download size={18} /> Draw
+              <Download size={22} /> Draw
             </button>
           )}
         </div>
@@ -81,12 +86,12 @@ export function ActionBar({
           }
           className={[
             // Fixed width on a phone, where it sits beside Draw, so "UNO armed" can't shift the pair.
-            'btn min-w-[9.5rem] whitespace-nowrap font-display text-lg tracking-wide sm:col-start-3 sm:row-start-1 sm:min-w-0 sm:justify-self-start',
+            'btn min-w-[9.5rem] whitespace-nowrap font-display text-xl tracking-wide sm:col-start-3 sm:row-start-1 sm:min-w-[8.5rem] sm:justify-self-start sm:py-3',
             actions.canCallUno
               ? 'anim-turn bg-brass text-room'
               : unoArmed
                 ? 'bg-brass text-room'
-                : 'bg-chalk/10 text-chalk ring-1 ring-chalk/15',
+                : 'bg-felt-900/90 text-chalk ring-1 ring-white/15',
           ].join(' ')}
         >
           <Megaphone size={18} /> {unoLabel}

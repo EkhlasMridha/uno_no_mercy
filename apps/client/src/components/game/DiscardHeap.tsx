@@ -8,6 +8,14 @@ import { PlayingCard } from '../card/PlayingCard';
 /** How many of the most recent plays stay visible on the felt. */
 export const HEAP_SIZE = 10;
 
+// The top card burns in the color play continues in, so a wild shows the color it was given.
+const TOP_GLOW: Record<CardColor, string> = {
+  red: '!shadow-[0_0_0_3px_rgba(255,138,122,0.9),0_0_30px_6px_rgba(229,56,59,0.7)]',
+  yellow: '!shadow-[0_0_0_3px_rgba(255,229,138,0.9),0_0_30px_6px_rgba(244,194,13,0.65)]',
+  green: '!shadow-[0_0_0_3px_rgba(127,232,156,0.9),0_0_30px_6px_rgba(34,165,89,0.7)]',
+  blue: '!shadow-[0_0_0_3px_rgba(140,184,255,0.9),0_0_30px_6px_rgba(47,111,224,0.7)]',
+};
+
 interface DiscardHeapProps {
   view: PublicGameView;
   name: NameLookup;
@@ -111,7 +119,7 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
               card={p.entry.card}
               size="lg"
               activeColor={p.entry.chosenColor}
-              className={p.toss ? 'shadow-lifted' : ''}
+              className={p.toss ? TOP_GLOW[view.currentColor] : ''}
             />
           </div>
         </div>

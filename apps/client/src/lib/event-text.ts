@@ -1,4 +1,10 @@
-import type { GameEvent, GameLogEntry, PublicPlayerView } from '@nomercy/shared';
+import {
+  colorOf,
+  type CardColor,
+  type GameEvent,
+  type GameLogEntry,
+  type PublicPlayerView,
+} from '@nomercy/shared';
 import { cardName, COLOR_LABEL } from './cards';
 
 export type NameLookup = (playerId: string) => string;
@@ -76,6 +82,46 @@ export function describeEvent(event: GameEvent, name: NameLookup): string {
       return event.reason === 'emptyHand'
         ? `${name(event.playerId)} played their last card and won!`
         : `${name(event.playerId)} is the last one standing and won!`;
+  }
+}
+
+/** The player a log line is about, whose face it shows. Null for table-wide events. */
+export function actorOf(event: GameEvent): string | null {
+  switch (event.type) {
+    case 'gameStarted':
+      return event.dealerId;
+    case 'rouletteColorNamed':
+    case 'rouletteCardRevealed':
+    case 'rouletteResolved':
+      return event.victimId;
+    case 'unoCaught':
+      return event.catcherId;
+    case 'directionReversed':
+    case 'handsPassed':
+    case 'drawPileReshuffled':
+      return null;
+    default:
+      return event.playerId;
+  }
+}
+
+/** The dot beside a log line: the card color it was about, red for penalties, or plain. */
+export function eventTone(event: GameEvent): CardColor | 'penalty' | 'plain' {
+  switch (event.type) {
+    case 'cardPlayed':
+      return event.chosenColor ?? colorOf(event.card) ?? 'plain';
+    case 'discardedAll':
+    case 'rouletteColorNamed':
+      return event.color;
+    case 'drawStackGrew':
+    case 'penaltyAccepted':
+    case 'unoCaught':
+    case 'playerEliminated':
+      return 'penalty';
+    case 'cardsDrawn':
+      return event.reason === 'noPlayableCard' ? 'plain' : 'penalty';
+    default:
+      return 'plain';
   }
 }
 

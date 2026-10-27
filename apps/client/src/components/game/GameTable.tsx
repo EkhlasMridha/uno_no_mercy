@@ -1,5 +1,5 @@
-import { useRef, type RefObject } from 'react';
-import { ChevronRight, RotateCcw, RotateCw } from 'lucide-react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { RotateCcw, RotateCw } from 'lucide-react';
 import type { PublicGameView } from '@nomercy/shared';
 import { COLOR_BG, COLOR_LABEL } from '../../lib/cards';
 import type { TableAvatars } from '../../lib/avatar';
@@ -70,7 +70,14 @@ export function GameTable({
       <div className="table-rail absolute inset-x-[5%] inset-y-[9%] rounded-[50%] p-[clamp(12px,2.2vmin,22px)]">
         {/* felt */}
         <div className="table-felt relative h-full w-full overflow-hidden rounded-[50%]">
-          <DirectionTrack color={COLOR_STROKE[view.currentColor]} clockwise={clockwise} />
+          {/* the house mark pressed into the felt */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex -rotate-6 select-none items-center justify-center whitespace-nowrap font-display text-[clamp(3rem,11vmin,8.5rem)] text-white/[0.035]"
+          >
+            No Mercy
+          </span>
+          <DirectionTrack clockwise={clockwise} />
           <RouletteReveal view={view} meId={meId} name={name} canDraw={canDraw} onDraw={onDraw} />
 
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[13%] max-sm:scale-[0.82] short:gap-1.5 short:pb-10">
@@ -89,15 +96,17 @@ export function GameTable({
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-chalk/80">
-              <span className="flex items-center gap-1.5">
+            <div className="pill flex-wrap justify-center gap-x-3 gap-y-0.5 px-4 py-1.5 text-sm text-chalk/90">
+              <span className="flex items-center gap-2">
                 <span
-                  className={`h-3 w-3 rounded-full ring-2 ring-chalk/80 ${COLOR_BG[view.currentColor]}`}
+                  className={`h-3.5 w-3.5 rounded-full ring-2 ring-white/70 ${COLOR_BG[view.currentColor]}`}
+                  style={{ boxShadow: `0 0 10px 1px ${COLOR_STROKE[view.currentColor]}` }}
                 />
                 {COLOR_LABEL[view.currentColor]}
               </span>
+              <span aria-hidden className="h-4 w-px bg-white/15" />
               <span className="flex items-center gap-1.5">
-                <DirectionIcon size={14} />
+                <DirectionIcon size={15} />
                 {clockwise ? 'Clockwise' : 'Counterclockwise'}
               </span>
               {view.setAsideCount > 0 && (
@@ -108,7 +117,7 @@ export function GameTable({
             {view.pendingDraw && (
               <div
                 role="status"
-                className="anim-toast flex items-center gap-3 rounded-md bg-rose-700 px-3 py-1.5 shadow-lifted ring-2 ring-brass"
+                className="anim-toast flex items-center gap-3 rounded-xl bg-rose-700 px-3 py-1.5 shadow-[0_0_28px_-4px_rgba(229,56,59,0.8)] ring-2 ring-rose-300/80"
               >
                 <span className="font-display text-3xl leading-none text-chalk">
                   +{view.pendingDraw.total}
@@ -192,60 +201,88 @@ function DrawPile({
         ))}
         <CardBack size="lg" className={canDraw ? 'shadow-glow' : ''} />
       </button>
-      <span className="text-xs tabular-nums text-chalk/60">
+      <span className="pill px-2.5 py-0.5 text-xs tabular-nums text-chalk/80">
         {count === 0 ? 'Empty' : `${count} left`}
       </span>
     </div>
   );
 }
 
-/** A stitched line on the felt in the active color, flowing in the direction of play. */
-function DirectionTrack({ color, clockwise }: { color: string; clockwise: boolean }) {
-  const chevrons = [
-    { left: '50%', top: '7%', rotate: 0 },
-    { left: '94%', top: '50%', rotate: 90 },
-    { left: '50%', top: '93%', rotate: 180 },
-    { left: '6%', top: '50%', rotate: 270 },
-  ];
+// A violet a few shades up from the felt, so the arrows read as part of the cloth.
+const TRACK = '#b49cff';
+// One arrow per corner of the felt, centered on the diagonals (screen angles, y pointing down).
+const ARROW_CENTERS = [-135, -45, 45, 135];
+const ARROW_SPAN = 18;
+
+/** Four curved arrows round the felt, pointing the way play goes. */
+function DirectionTrack({ clockwise }: { clockwise: boolean }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+
+  // Drawn in real pixels, not a stretched viewBox, so the heads keep their shape on any felt.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+
+  const arrows = (() => {
+    if (!size || size.w === 0) return [];
+    const { w, h } = size;
+    const cx = w / 2;
+    const cy = h / 2;
+    const rx = w * 0.45;
+    const ry = h * 0.44;
+    const head = Math.max(6, Math.min(12, w / 80));
+    const at = (deg: number) => {
+      const t = (deg * Math.PI) / 180;
+      return { x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t), t };
+    };
+    return ARROW_CENTERS.map((center) => {
+      const from = at(center - (clockwise ? ARROW_SPAN : -ARROW_SPAN));
+      const to = at(center + (clockwise ? ARROW_SPAN : -ARROW_SPAN));
+      // Tangent at the tip, in the direction of travel.
+      const sign = clockwise ? 1 : -1;
+      const dx = -rx * Math.sin(to.t) * sign;
+      const dy = ry * Math.cos(to.t) * sign;
+      const len = Math.hypot(dx, dy);
+      const back = Math.atan2(-dy / len, -dx / len);
+      const wing = (a: number) =>
+        `${to.x + head * Math.cos(back + a)} ${to.y + head * Math.sin(back + a)}`;
+      return {
+        key: center,
+        arc: `M${from.x} ${from.y}A${rx} ${ry} 0 0 ${clockwise ? 1 : 0} ${to.x} ${to.y}`,
+        tip: `M${wing(0.5)}L${to.x} ${to.y}L${wing(-0.5)}`,
+      };
+    });
+  })();
+
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        className="absolute inset-0 h-full w-full"
-      >
-        <ellipse
-          cx="50"
-          cy="50"
-          rx="44"
-          ry="43"
+    <div ref={boxRef} aria-hidden className="pointer-events-none absolute inset-0">
+      {size && (
+        <svg
+          width={size.w}
+          height={size.h}
+          className="absolute inset-0 drop-shadow-[0_0_5px_rgba(150,110,255,0.65)]"
           fill="none"
-          stroke={color}
-          strokeOpacity="0.55"
-          strokeWidth="2.5"
+          stroke={TRACK}
+          strokeOpacity="0.7"
+          strokeWidth={Math.max(1.5, Math.min(3, size.w / 400))}
           strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-          pathLength={100}
-          strokeDasharray="0.6 1.4"
-          className="anim-track transition-[stroke] duration-500"
-          style={clockwise ? undefined : { animationDirection: 'reverse' }}
-        />
-      </svg>
-      {chevrons.map((c) => (
-        <ChevronRight
-          key={c.rotate}
-          size={18}
-          strokeWidth={3}
-          className="absolute -translate-x-1/2 -translate-y-1/2 transition-colors duration-500"
-          style={{
-            left: c.left,
-            top: c.top,
-            color,
-            opacity: 0.7,
-            transform: `translate(-50%, -50%) rotate(${c.rotate + (clockwise ? 0 : 180)}deg)`,
-          }}
-        />
-      ))}
+          strokeLinejoin="round"
+        >
+          {arrows.map((a) => (
+            <g key={a.key}>
+              <path d={a.arc} />
+              <path d={a.tip} />
+            </g>
+          ))}
+        </svg>
+      )}
     </div>
   );
 }

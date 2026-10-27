@@ -208,12 +208,19 @@ definition of done below.
 
 ## Table design system
 
-The game is drawn as a physical card table seen from above. Keep new UI inside that metaphor.
+The game is drawn as a physical card table seen from above, in a games room at night lit by neon. Keep
+new UI inside that metaphor.
 
-- **Palette** (`tailwind.config.js`): `room` #17100d (the dark room), `walnut` (the rail), `baize` (plum
-  felt), `brass` (highlights, the current turn, primary buttons), `chalk` #f2e8da (text), `oxblood` (card
-  backs). Card colors are `card-red/yellow/green/blue`. Don't introduce new accent colors. Brass is the
-  only highlight.
+- **Palette** (`tailwind.config.js`): `room` #0a0c1a (the dark navy room, with a warm lamp glow in
+  `index.css`), `felt-*` (navy panel darks), `walnut` (the lit rail), `baize` (violet felt), `brass`
+  #ffc22e (neon gold: highlights, the current turn, primary buttons; the token keeps its old name),
+  `chalk` #eef0ff (text), `oxblood` (card backs). Card colors are `card-red/yellow/green/blue`. Don't
+  introduce new accent colors. Gold is the only highlight. The only other glows are each seat's ring
+  in its avatar's disc color (`avatarGlow`) and the top discard in the color in play.
+- **Chrome:** shared classes in `index.css`: `.btn-primary` (gold, with a lip), `.btn-danger` (Leave,
+  Take), `.btn-tile` (top-bar icon over label), `.pill` (small facts on the felt and the status line),
+  `.panel`. The sidebar (`SidePanel.tsx`) holds the game log and the player list as tabs; below `lg` it
+  opens as a sheet from the Log tile.
 - **Type:** _Lilita One_ (`font-display`) for card faces and big moments. _Bricolage Grotesque_
   (`font-sans`) for everything else. Use sentence case and no all-caps labels.
 - **Layout:** the oval table fills the stage. Seats are placed on the rail by `seatAngle` and

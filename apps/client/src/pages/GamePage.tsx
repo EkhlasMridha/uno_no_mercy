@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, DoorOpen, Layers, ScrollText, Skull, Wifi } from 'lucide-react';
+import { BookOpen, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
 import {
   colorOf,
   isWildCard,
@@ -11,12 +11,12 @@ import {
 } from '@nomercy/shared';
 import { ActionBar } from '../components/game/ActionBar';
 import { EventBanner } from '../components/game/EventBanner';
-import { EventFeed } from '../components/game/EventFeed';
 import { GameTable } from '../components/game/GameTable';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { MercyGauge } from '../components/game/MercyGauge';
 import { PlayerHand } from '../components/game/PlayerHand';
-import { PlayerAvatar } from '../components/PlayerAvatar';
+import { SidePanel, type SideTab } from '../components/game/SidePanel';
+import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
 import { SoundSettings } from '../components/SoundSettings';
 import { ColorPickerModal } from '../components/modals/ColorPickerModal';
 import { DiscardChoiceModal } from '../components/modals/DiscardChoiceModal';
@@ -64,7 +64,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [pending, setPending] = useState<PendingChoice | null>(null);
   const [unoArmed, setUnoArmed] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  const [showFeed, setShowFeed] = useState(false);
+  const [sideTab, setSideTab] = useState<SideTab>('log');
+  // Below the lg breakpoint there is no sidebar: the log and player list open in a sheet.
+  const [showSheet, setShowSheet] = useState(false);
   const [showPlayed, setShowPlayed] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [shake, setShake] = useState(0);
@@ -195,48 +197,76 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const swapTargets = view.players.filter((p) => actions.swapTargetIds.includes(p.id));
   const connectedCount = view.players.filter((p) => p.connected && p.status === 'active').length;
 
+  const openSide = (tab: SideTab) => {
+    setSideTab(tab);
+    if (!window.matchMedia('(min-width: 1024px)').matches) setShowSheet(true);
+  };
+
   return (
-    <div className="flex h-[100dvh] flex-col">
+    <div className="lounge-room flex h-[100dvh] flex-col">
       {/* top bar */}
-      <header className="relative z-30 flex items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-3 text-sm">
-          <span className="font-display text-lg tracking-widest">{room.code}</span>
-          <span className="hidden text-white/50 sm:inline">Round {room.roundNumber}</span>
-          <span className="flex items-center gap-1 text-emerald-300" title="Connected players">
-            <Wifi size={14} /> {connectedCount}
+      <header className="relative z-30 flex items-center justify-between gap-2 border-b border-white/[0.06] bg-felt-950/55 px-3 py-2 backdrop-blur sm:px-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span
+            aria-hidden
+            className="hidden -rotate-6 font-display text-[1.75rem] leading-none text-brass drop-shadow-[0_3px_0_rgba(229,56,59,0.85)] md:block"
+          >
+            No Mercy
           </span>
+          <span aria-hidden className="hidden h-9 w-px bg-white/10 md:block" />
+          <div className="min-w-0 leading-tight">
+            <p className="whitespace-nowrap font-semibold sm:text-lg">Round {room.roundNumber}</p>
+            <p className="truncate text-xs text-chalk/60 sm:text-sm">
+              Room <span className="font-display tracking-widest text-chalk/85">{room.code}</span>
+              {room.settings.scoringEnabled && `, first to ${room.matchTarget} points`}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        {/* On a phone the player list sits behind the Log tile's tabs, and the discard heap opens
+            the played cards, so those two tiles step aside for room. */}
+        <nav aria-label="Game menu" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <button
             type="button"
-            className="btn-ghost px-2.5 py-1.5 text-sm lg:hidden"
-            onClick={() => setShowFeed(true)}
+            className="btn-tile max-sm:hidden"
+            aria-label={`Players, ${connectedCount} online`}
+            onClick={() => openSide('players')}
           >
-            <ScrollText size={16} /> Log
+            <Users size={17} /> <span className="hidden sm:inline">{connectedCount} online</span>
           </button>
           <button
             type="button"
-            className="btn-ghost px-2.5 py-1.5 text-sm"
+            className="btn-tile lg:hidden"
+            aria-label="Game log"
+            onClick={() => openSide('log')}
+          >
+            <ScrollText size={17} /> <span className="hidden sm:inline">Log</span>
+          </button>
+          <button
+            type="button"
+            className="btn-tile max-sm:hidden"
+            aria-label="Played cards"
             onClick={() => setShowPlayed(true)}
           >
-            <Layers size={16} /> <span className="hidden sm:inline">Played</span>
+            <Layers size={17} /> <span className="hidden sm:inline">Played</span>
           </button>
-          <SoundSettings className="btn-ghost px-2.5 py-1.5 text-sm" />
+          <SoundSettings className="btn-tile" />
           <button
             type="button"
-            className="btn-ghost px-2.5 py-1.5 text-sm"
+            className="btn-tile"
+            aria-label="Rules"
             onClick={() => setShowRules(true)}
           >
-            <BookOpen size={16} /> <span className="hidden sm:inline">Rules</span>
+            <BookOpen size={17} /> <span className="hidden sm:inline">Rules</span>
           </button>
           <button
             type="button"
-            className="btn-ghost px-2.5 py-1.5 text-sm"
+            className="btn-danger ml-1 px-3 py-2 text-sm sm:px-4 sm:py-2.5"
+            aria-label="Leave game"
             onClick={() => setConfirmLeave(true)}
           >
-            <DoorOpen size={16} /> <span className="hidden sm:inline">Leave</span>
+            <LogOut size={17} /> <span className="hidden sm:inline">Leave game</span>
           </button>
-        </div>
+        </nav>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -265,10 +295,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             aria-label="Your hand"
             className="relative z-20 -mt-20 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:-mt-28 short:-mt-16"
           >
-            {/* brass light pools behind the hand while it's your move */}
+            {/* gold light pools behind the hand while it's your move */}
             <div
               aria-hidden
-              className={`pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[150%] bg-[radial-gradient(ellipse_60%_70%_at_50%_100%,rgba(231,200,134,0.32),rgba(208,166,80,0.1)_45%,transparent_75%)] transition-opacity duration-500 ${
+              className={`pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[150%] bg-[radial-gradient(ellipse_60%_70%_at_50%_100%,rgba(255,194,46,0.26),rgba(255,194,46,0.08)_45%,transparent_75%)] transition-opacity duration-500 ${
                 myMove ? 'opacity-100' : 'opacity-0'
               }`}
             />
@@ -285,9 +315,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               seat={
                 <div className="flex items-center gap-3">
                   <span
-                    className={`relative h-9 w-9 shrink-0 rounded-full shadow-seat ring-2 ${
-                      myMove ? 'anim-turn ring-brass' : 'ring-walnut-light/70'
-                    }`}
+                    className={`relative h-11 w-11 shrink-0 rounded-full ${myMove ? 'anim-turn' : ''}`}
+                    style={myMove ? undefined : avatarGlow(avatarOf(meId))}
                   >
                     {myMove && <span aria-hidden className="turn-orbit" />}
                     <PlayerAvatar traits={avatarOf(meId)} className="h-full w-full" />
@@ -295,10 +324,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                   </span>
                   <div className="flex flex-col items-start gap-1.5">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      {/* Your turn lights the tag with the brass ring the seats use, leaving Draw the
-                          only solid brass in the row. */}
+                      {/* Your turn lights the tag with the gold ring the seats use, leaving Draw the
+                          only solid gold in the row. */}
                       <span
-                        className={`rounded-sm bg-room/85 px-2 py-0.5 font-semibold shadow ${
+                        className={`rounded-full bg-felt-950/90 px-2.5 py-0.5 font-semibold shadow ring-1 ring-white/15 ${
                           myMove ? 'anim-turn text-brass-soft' : 'text-chalk'
                         }`}
                       >
@@ -340,13 +369,15 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           </section>
         </div>
 
-        <aside className="panel m-3 hidden w-72 flex-col p-3 lg:flex">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/70">
-            <ScrollText size={16} /> Action log
-          </h2>
-          <div className="min-h-0 flex-1">
-            <EventFeed log={view.log} name={name} />
-          </div>
+        <aside className="panel my-3 mr-3 hidden w-80 flex-col p-3 lg:flex">
+          <SidePanel
+            tab={sideTab}
+            onTab={setSideTab}
+            view={view}
+            meId={meId}
+            name={name}
+            avatarOf={avatarOf}
+          />
         </aside>
       </div>
 
@@ -382,10 +413,17 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           onPick={(color) => void chooseRouletteColor(color)}
         />
       )}
-      {showFeed && (
-        <Modal title="Action log" onClose={() => setShowFeed(false)}>
-          <div className="max-h-[60vh]">
-            <EventFeed log={view.log} name={name} />
+      {showSheet && (
+        <Modal title="At the table" onClose={() => setShowSheet(false)}>
+          <div className="h-[60vh]">
+            <SidePanel
+              tab={sideTab}
+              onTab={setSideTab}
+              view={view}
+              meId={meId}
+              name={name}
+              avatarOf={avatarOf}
+            />
           </div>
         </Modal>
       )}
@@ -405,11 +443,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               : 'Leaving forfeits this game: you will be removed from play and cannot rejoin this round.'}
           </p>
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn bg-rose-600 flex-1 text-white"
-              onClick={() => void leaveRoom()}
-            >
+            <button type="button" className="btn-danger flex-1" onClick={() => void leaveRoom()}>
               Leave
             </button>
             <button
