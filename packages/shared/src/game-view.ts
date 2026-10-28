@@ -120,8 +120,13 @@ export interface PublicGameView {
   pendingDraw: PendingDrawView | null;
   phase: GamePhaseView;
   log: GameLogEntry[];
-  /** Every card played this round, oldest first. Unaffected by reshuffles. */
+  /**
+   * The plays still on the discard pile, oldest first. After a reshuffle only the top card is left:
+   * the earlier plays are face down in the deck and no longer sent to anyone.
+   */
   playHistory: PlayedCardEntry[];
+  /** How many plays this round were shuffled back into the deck: the round position of `playHistory[0]`. */
+  playHistoryStart: number;
 }
 
 /** Actions the requesting player may take right now, computed by the server engine. */

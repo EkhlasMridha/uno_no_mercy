@@ -1,3 +1,4 @@
+import { Layers } from 'lucide-react';
 import { CARD_COLORS, type CardColor } from '@nomercy/shared';
 import { COLOR_BG, COLOR_LABEL } from '../../lib/cards';
 import { Modal } from '../ui/Modal';
@@ -7,10 +8,21 @@ interface ColorPickerModalProps {
   description: string;
   onPick: (color: CardColor) => void;
   onCancel?: () => void;
+  /** Opens the cards on the discard pile over this picker, to check them before choosing. */
+  onShowPlayed?: () => void;
+  /** How many cards that list holds, shown on its button. */
+  playedCount?: number;
 }
 
 /** A color choice that must be made, shown above your hand so you can see what you hold. */
-export function ColorPickerModal({ title, description, onPick, onCancel }: ColorPickerModalProps) {
+export function ColorPickerModal({
+  title,
+  description,
+  onPick,
+  onCancel,
+  onShowPlayed,
+  playedCount,
+}: ColorPickerModalProps) {
   return (
     <Modal title={title} onClose={onCancel} dismissible={Boolean(onCancel)} overHand>
       <p className="mb-4 text-sm text-white/70 short:mb-3">{description}</p>
@@ -28,6 +40,16 @@ export function ColorPickerModal({ title, description, onPick, onCancel }: Color
           </button>
         ))}
       </div>
+      {onShowPlayed && (
+        <button
+          type="button"
+          className="btn-secondary mt-4 w-full short:mt-3"
+          onClick={onShowPlayed}
+        >
+          <Layers size={18} /> See played cards
+          {playedCount !== undefined && ` (${playedCount})`}
+        </button>
+      )}
     </Modal>
   );
 }

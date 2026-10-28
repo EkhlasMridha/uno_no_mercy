@@ -3,10 +3,10 @@ import { avatarsForTable, type AvatarTraits } from '../../lib/avatar';
 import { PlayerAvatar } from '../PlayerAvatar';
 import { Modal } from '../ui/Modal';
 
-const LABEL: Record<Gender, string> = { male: 'Male', female: 'Female' };
+export const GENDER_LABEL: Record<Gender, string> = { male: 'Male', female: 'Female' };
 
 // Three sample faces per choice, dealt like a small table so they all differ.
-const SAMPLES = Object.fromEntries(
+export const GENDER_SAMPLES = Object.fromEntries(
   GENDERS.map((gender) => {
     const seats = [0, 1, 2].map((seat) => ({
       id: `sample-${gender}-${seat}`,
@@ -40,7 +40,7 @@ export function GenderPickerModal({ onPick, onCancel }: GenderPickerModalProps) 
             className="group flex flex-col items-center gap-3 rounded-2xl bg-chalk/5 px-3 pb-4 pt-5 ring-1 ring-chalk/15 transition hover:bg-chalk/10 hover:ring-brass focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
           >
             <span className="flex items-end -space-x-3" aria-hidden>
-              {SAMPLES[gender].map((traits, i) => (
+              {GENDER_SAMPLES[gender].map((traits, i) => (
                 <PlayerAvatar
                   key={i}
                   traits={traits}
@@ -51,7 +51,7 @@ export function GenderPickerModal({ onPick, onCancel }: GenderPickerModalProps) 
                 />
               ))}
             </span>
-            <span className="font-display text-2xl text-chalk">{LABEL[gender]}</span>
+            <span className="font-display text-2xl text-chalk">{GENDER_LABEL[gender]}</span>
           </button>
         ))}
       </div>

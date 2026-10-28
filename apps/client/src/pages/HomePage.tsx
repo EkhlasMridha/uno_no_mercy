@@ -8,7 +8,7 @@ import {
   ROOM_CODE_LENGTH,
   type Gender,
 } from '@nomercy/shared';
-import { createRoom, joinRoom } from '../net/actions';
+import { createRoom, joinFromInvite, joinRoom } from '../net/actions';
 import { takeInviteCode } from '../lib/invite';
 import { loadName, saveName } from '../net/session-storage';
 import { useAppState } from '../state/store';
@@ -114,13 +114,17 @@ export function HomePage() {
 
   const online = connection === 'connected';
 
-  // An invite link joins straight away once connected, if this browser already knows your name.
-  // Without one, the code is filled in and you add your name, then Join.
+  // An invite link joins straight away once connected: under the name this browser last played
+  // with, or a random one. The avatar set starts as male; both can be changed in the lobby.
   useEffect(() => {
     if (!pendingInvite || !online) return;
     setPendingInvite(null);
-    if (playerNameSchema.safeParse(name).success) setAskGender('join');
-  }, [pendingInvite, online, name]);
+    const saved = playerNameSchema.safeParse(loadName());
+    setBusy(true);
+    void joinFromInvite(pendingInvite, saved.success ? saved.data : null).finally(() =>
+      setBusy(false),
+    );
+  }, [pendingInvite, online]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-8 px-4 py-10">
@@ -159,10 +163,16 @@ export function HomePage() {
 
       <section className="panel w-full max-w-md space-y-5 p-5">
         {invitedCode && code === invitedCode && (
-          <p className="rounded-xl bg-brass/10 px-3 py-2 text-sm text-brass-soft ring-1 ring-brass/30">
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-xl bg-brass/10 px-3 py-2 text-sm text-brass-soft ring-1 ring-brass/30"
+          >
             You&apos;re invited to room{' '}
-            <span className="font-display tracking-widest">{invitedCode}</span>. Enter your name,
-            then press Join.
+            <span className="font-display tracking-widest">{invitedCode}</span>.{' '}
+            {pendingInvite || busy
+              ? 'Taking you to the lobby…'
+              : "Couldn't join automatically. Enter your name, then press Join."}
           </p>
         )}
         <label className="block">

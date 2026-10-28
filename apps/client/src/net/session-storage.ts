@@ -57,6 +57,7 @@ const DEFAULT_SOUND: SoundPrefs = {
   cardPlay: true,
   discardAll: true,
   cardDraw: true,
+  reshuffle: true,
   rouletteHit: true,
   unoCall: true,
   yourTurn: true,

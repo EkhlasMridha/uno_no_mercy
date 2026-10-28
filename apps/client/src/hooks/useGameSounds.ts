@@ -32,7 +32,7 @@ export interface IdleNudge {
 }
 
 /**
- * Plays the card play, Discard All, card draw, roulette hit, UNO call, your turn, turn reminder, hand exchange, penalty, knockout and win sounds the player has
+ * Plays the card play, Discard All, card draw, reshuffle, roulette hit, UNO call, your turn, turn reminder, hand exchange, penalty, knockout and win sounds the player has
  * switched on, and returns the idle nudge so the hand can shake with the reminder. Purely
  * presentational: every trigger is state the server already sent.
  */
@@ -85,7 +85,11 @@ export function useGameSounds(
       }
       return n;
     }, 0);
-    for (let i = 0; i < Math.min(draws, 3); i++) playIfOn('cardDraw', i * 0.12);
+    // The pile ran out: the discards are gathered and riffled before the next card comes off it.
+    const reshuffled = fresh.some((e) => e.event.type === 'drawPileReshuffled');
+    if (reshuffled) playIfOn('reshuffle', played ? 0.25 : 0);
+    const drawFrom = reshuffled ? (played ? 1.35 : 1.1) : 0;
+    for (let i = 0; i < Math.min(draws, 3); i++) playIfOn('cardDraw', drawFrom + i * 0.12);
     // The reveal that turns up the named color: ding once its card has slid in.
     const rouletteHit = fresh.some((e) => e.event.type === 'rouletteResolved' && e.event.matched);
     if (rouletteHit) playIfOn('rouletteHit', 0.2);

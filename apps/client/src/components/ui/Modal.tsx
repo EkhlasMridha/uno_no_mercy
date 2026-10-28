@@ -23,8 +23,15 @@ export function Modal({
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Focus once on open; refocusing on every render would pull focus out of inputs inside.
-  useEffect(() => dialogRef.current?.focus(), []);
+  // Focus once on open; refocusing on every render would pull focus out of inputs inside. On close,
+  // focus goes back to what opened it, such as a button in a picker still open underneath.
+  useEffect(() => {
+    const opener = document.activeElement;
+    dialogRef.current?.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (!dismissible || !onClose) return;

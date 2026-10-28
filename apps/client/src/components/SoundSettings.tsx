@@ -8,6 +8,7 @@ import {
   Layers3,
   Megaphone,
   Play,
+  Repeat,
   Shuffle,
   Siren,
   Sparkles,
@@ -39,6 +40,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     description:
       'A soft swish whenever anyone draws from the pile, including Color Roulette draws.',
     Icon: Download,
+  },
+  {
+    kind: 'reshuffle',
+    label: 'Reshuffle',
+    description: 'The discards swept up and riffled when the draw pile runs out.',
+    Icon: Repeat,
   },
   {
     kind: 'rouletteHit',

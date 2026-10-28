@@ -8,6 +8,7 @@ export type SoundKind =
   | 'cardPlay'
   | 'discardAll'
   | 'cardDraw'
+  | 'reshuffle'
   | 'rouletteHit'
   | 'unoCall'
   | 'yourTurn'
@@ -237,6 +238,23 @@ const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: numbe
     const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
     noise(ac, at, 0.16, vary(0.32), vary(3400), vary(1300), 0.3);
     noise(ac, at + 0.14, 0.025, vary(0.16), vary(2400), vary(1900), 0.1);
+  },
+  // The discards gathered into a new deck: a broad sweep across the felt, two riffles (a burst of
+  // flicks that speeds up as the halves interleave), and a double tap as the deck is squared up.
+  reshuffle(ac, at) {
+    const out = ac.destination;
+    const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
+    noise(ac, at, 0.3, vary(0.28), vary(900), vary(2600), 0.4);
+    for (const start of [at + 0.3, at + 0.62]) {
+      for (let i = 0; i < 12; i++) {
+        noise(ac, start + i * (0.026 - i * 0.0011), 0.02, vary(0.2), vary(3000), vary(4400), 0.1);
+      }
+      noise(ac, start + 0.2, 0.06, vary(0.3), vary(1600), vary(900), 0.05);
+    }
+    for (const tap of [at + 0.92, at + 1.0]) {
+      noise(ac, tap, 0.03, vary(0.4), vary(2200), vary(1400), 0.02);
+      tone(ac, out, 'sine', tap, 0.06, 0.2, vary(160), 90);
+    }
   },
   // Color Roulette found its color: a quick bright "ding-ding" a fifth apart, C6 then G6, in
   // triangle so it sounds like a bell rather than the softer sine chime of your turn.

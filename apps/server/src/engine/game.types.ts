@@ -59,8 +59,13 @@ export interface GameState {
   pendingDraw: PendingDraw | null;
   log: GameLogEntry[];
   logSeq: number;
-  /** Every card played this round, oldest first (public; kept across reshuffles). */
+  /**
+   * The plays still lying on the discard pile, oldest first (public). A reshuffle gathers all but the
+   * top card into the deck, so only the top card's entry survives it.
+   */
   playHistory: PlayedCardEntry[];
+  /** How many plays this round went back into the deck: the round position of `playHistory[0]`. */
+  playHistoryStart: number;
   /** When all of these players are out, the round ends with no winner. Empty: play to the end. */
   endWhenOut: string[];
 }

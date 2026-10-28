@@ -303,6 +303,33 @@ body {
 .anim-toss {
   animation: toss 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
+/* the gathered discards land as a new deck and are riffled: split, bent, squared up */
+@keyframes riffle {
+  from {
+    transform: translateY(-14px) scale(0.92);
+    opacity: 0;
+  }
+  25% {
+    transform: none;
+    opacity: 1;
+  }
+  40% {
+    transform: rotate(-7deg) translateX(-5px);
+  }
+  55% {
+    transform: rotate(6deg) translateX(5px);
+  }
+  70% {
+    transform: rotate(-3deg) translateX(-2px);
+  }
+  85%,
+  to {
+    transform: none;
+  }
+}
+.anim-riffle {
+  animation: riffle 900ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
 .anim-toast {
   animation: toast-in 200ms ease-out both;
 }

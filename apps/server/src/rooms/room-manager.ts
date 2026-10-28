@@ -228,6 +228,74 @@ export class RoomManager {
     this.removePlayer(room, player);
   }
 
+  /** A lobby player renames themselves or switches avatar set. Names stay unique in the room. */
+  updateProfile(
+    code: string,
+    playerId: string,
+    profile: { name?: string | undefined; gender?: Gender | undefined },
+  ): Room {
+    const room = this.requireRoom(code);
+    const player = this.requireMember(room, playerId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only change your name in the lobby');
+    }
+    const { name, gender } = profile;
+    if (
+      name !== undefined &&
+      room.players.some(
+        (p) =>
+          p.id !== player.id &&
+          !p.departed &&
+          p.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      )
+    ) {
+      throw new RoomError('NAME_TAKEN', 'Someone in this room already uses that name');
+    }
+    if (name !== undefined) player.name = name;
+    if (gender !== undefined) player.gender = gender;
+    return room;
+  }
+
+  /** The host removes another player from the lobby. Returns the socket that player was using. */
+  kickPlayer(
+    code: string,
+    hostId: string,
+    targetId: string,
+  ): { room: Room; kickedSocketId: string | null } {
+    const room = this.requireHost(code, hostId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only remove players in the lobby');
+    }
+    if (targetId === hostId) {
+      throw new RoomError('INVALID_TARGET', 'Use Leave to leave the room yourself');
+    }
+    const target = room.players.find((p) => p.id === targetId && !p.departed);
+    if (!target) throw new RoomError('INVALID_TARGET', 'That player has already left');
+    const kickedSocketId = target.socketId;
+    this.removePlayer(room, target);
+    return { room, kickedSocketId };
+  }
+
+  /** The host hands the room to another connected player in the lobby and becomes a guest. */
+  transferHost(code: string, hostId: string, targetId: string): Room {
+    const room = this.requireHost(code, hostId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only hand over the room in the lobby');
+    }
+    if (targetId === hostId) throw new RoomError('INVALID_TARGET', 'You are already the host');
+    const target = room.players.find((p) => p.id === targetId && !p.departed);
+    if (!target || target.isComputer) {
+      throw new RoomError('INVALID_TARGET', 'That player has already left');
+    }
+    if (!target.socketId) {
+      throw new RoomError('INVALID_TARGET', `${target.name} is disconnected. Wait for them first.`);
+    }
+    room.hostId = target.id;
+    // The host is always ready; the old host stays ready rather than holding up the start.
+    target.ready = true;
+    return room;
+  }
+
   setReady(code: string, playerId: string, ready: boolean): Room {
     const room = this.requireRoom(code);
     const player = this.requireMember(room, playerId);

@@ -87,7 +87,9 @@ export function GameTable({
                 <ColorInPlay color={view.currentColor} clockwise={clockwise} />
                 <DrawPile
                   pileRef={pileRef}
+                  log={view.log}
                   count={view.drawCount}
+                  refillable={view.discardCount > 1 || view.setAsideCount > 0}
                   setAside={view.setAsideCount}
                   canDraw={canDraw}
                   onDraw={onDraw}
@@ -153,15 +155,30 @@ export function GameTable({
   );
 }
 
+/**
+ * The seq of a reshuffle that happened while this table was open, or null. One already in the log
+ * when the table mounts (a reload or reconnect) doesn't count, so it isn't replayed.
+ */
+function useFreshReshuffle(log: PublicGameView['log']): number | null {
+  const latest = [...log].reverse().find((e) => e.event.type === 'drawPileReshuffled')?.seq ?? null;
+  const [onMount] = useState(latest);
+  return latest !== null && latest !== onMount ? latest : null;
+}
+
 function DrawPile({
   pileRef,
+  log,
   count,
+  refillable,
   setAside,
   canDraw,
   onDraw,
 }: {
   pileRef: RefObject<HTMLButtonElement>;
+  log: PublicGameView['log'];
   count: number;
+  /** Whether a reshuffle would find cards: discards under the top card, or set-aside hands. */
+  refillable: boolean;
   /** Cards out of play for the rest of the round, mentioned beside the pile's count. */
   setAside: number;
   canDraw: boolean;
@@ -169,6 +186,8 @@ function DrawPile({
 }) {
   // A thicker deck looks thicker: up to four offset backs underneath.
   const depth = Math.min(4, Math.ceil(count / 25));
+  const reshuffle = useFreshReshuffle(log);
+  const drawRefills = count === 0 && canDraw && refillable;
   return (
     <div className="flex flex-col items-center gap-3 shortest:gap-1">
       <button
@@ -176,23 +195,45 @@ function DrawPile({
         type="button"
         onClick={onDraw}
         disabled={!canDraw}
-        aria-label={canDraw ? `Draw a card, ${count} left` : `Draw pile, ${count} cards`}
+        aria-label={
+          count === 0
+            ? `Draw pile is empty${drawRefills ? '. Draw to reshuffle the discards into a new pile' : ''}`
+            : canDraw
+              ? `Draw a card, ${count} left`
+              : `Draw pile, ${count} cards`
+        }
         className={`relative rounded-2xl transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-chalk ${
           canDraw ? 'cursor-pointer hover:-translate-y-1' : 'cursor-default'
         }`}
       >
-        {Array.from({ length: depth }).map((_, i) => (
-          <CardBack
-            key={i}
-            size="lg"
-            className="absolute left-0 top-0"
-            style={{ transform: `translate(${(depth - i) * 1.5}px, ${(depth - i) * 2}px)` }}
-          />
-        ))}
-        <CardBack size="lg" className={canDraw ? 'shadow-glow' : ''} />
+        {count === 0 ? (
+          // The spot where the deck sat, until a draw gathers the discards into a new one.
+          <span className="relative block">
+            <CardBack size="lg" className="invisible" />
+            <span
+              aria-hidden
+              className={`absolute inset-0 rounded-2xl border-2 border-dashed short:rounded-xl ${
+                drawRefills ? 'border-brass/80 shadow-glow' : 'border-chalk/30'
+              }`}
+            />
+          </span>
+        ) : (
+          // Keyed by the reshuffle, so each new deck riffles once as it lands.
+          <span key={reshuffle ?? 'deck'} className={`block ${reshuffle ? 'anim-riffle' : ''}`}>
+            {Array.from({ length: depth }).map((_, i) => (
+              <CardBack
+                key={i}
+                size="lg"
+                className="absolute left-0 top-0"
+                style={{ transform: `translate(${(depth - i) * 1.5}px, ${(depth - i) * 2}px)` }}
+              />
+            ))}
+            <CardBack size="lg" className={canDraw ? 'shadow-glow' : ''} />
+          </span>
+        )}
       </button>
       <span className="pill px-2.5 py-0.5 text-xs tabular-nums text-chalk/80">
-        {count === 0 ? 'Empty' : `${count} left`}
+        {count === 0 ? (drawRefills ? 'Empty: draw to reshuffle' : 'Empty') : `${count} left`}
         {setAside > 0 && `, ${setAside} set aside`}
       </span>
     </div>

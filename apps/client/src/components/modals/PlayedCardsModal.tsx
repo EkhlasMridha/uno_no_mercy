@@ -6,20 +6,28 @@ import { Modal } from '../ui/Modal';
 
 interface PlayedCardsModalProps {
   history: PlayedCardEntry[];
+  /** How many earlier plays were shuffled back into the deck. */
+  shuffledAway: number;
   name: NameLookup;
   onClose: () => void;
 }
 
-/** Every card played this round, newest first, with who played it. */
-export function PlayedCardsModal({ history, name, onClose }: PlayedCardsModalProps) {
+/** The cards on the discard pile, newest first, with who played them. */
+export function PlayedCardsModal({ history, shuffledAway, name, onClose }: PlayedCardsModalProps) {
   const newestFirst = history.slice().reverse();
   return (
     <Modal title={`Played cards (${history.length})`} onClose={onClose} wide>
+      {shuffledAway > 0 && (
+        <p className="mb-3 text-sm text-white/60">
+          The {shuffledAway} cards played before the last reshuffle went back into the draw pile
+          face down, so they can&apos;t be seen any more.
+        </p>
+      )}
       <ol className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-3">
         {newestFirst.map((entry, i) => (
           <li
             // A card can be played again after a reshuffle, so its id is not unique here.
-            key={history.length - i}
+            key={shuffledAway + history.length - i}
             className="flex flex-col items-center gap-1 text-center"
           >
             <PlayingCard
