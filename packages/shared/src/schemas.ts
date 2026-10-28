@@ -48,6 +48,15 @@ export const joinRoomSchema = z
 export const reconnectSchema = z
   .object({ code: roomCodeSchema, token: reconnectTokenSchema })
   .strict();
+/** A lobby player changing their own name or avatar set. */
+export const profileSchema = z
+  .object({ name: playerNameSchema.optional(), gender: genderSchema.optional() })
+  .strict()
+  .refine((p) => p.name !== undefined || p.gender !== undefined, 'Change your name or avatar');
+/** The host removing another player from the lobby. */
+export const kickSchema = z.object({ playerId: playerIdSchema }).strict();
+/** The host handing the room to another player. */
+export const transferHostSchema = z.object({ playerId: playerIdSchema }).strict();
 export const readySchema = z.object({ ready: z.boolean() }).strict();
 /** The decider's answer for a dropped player: hold their seat, or let them forfeit (§5.16). */
 export const waitForPlayerSchema = z
@@ -92,6 +101,9 @@ export const catchUnoSchema = z
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
 export type ReconnectPayload = z.input<typeof reconnectSchema>;
+export type ProfilePayload = z.input<typeof profileSchema>;
+export type KickPayload = z.input<typeof kickSchema>;
+export type TransferHostPayload = z.input<typeof transferHostSchema>;
 export type ReadyPayload = z.input<typeof readySchema>;
 export type WaitForPlayerPayload = z.input<typeof waitForPlayerSchema>;
 export type StartGamePayload = z.input<typeof startGameSchema>;

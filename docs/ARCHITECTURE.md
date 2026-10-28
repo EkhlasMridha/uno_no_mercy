@@ -127,6 +127,9 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:wait-for-player`       | `{ playerId, wait }`                                                 | the dropped player's decider only: `true` holds the seat, `false` makes them forfeit now                |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
+| `room:profile`               | `{ name?, gender? }`                                                 | lobby only; your own seat; at least one field; names stay unique                                        |
+| `room:kick`                  | `{ playerId }`                                                       | host, lobby only; the removed player gets `room:closed` and is unbound                                  |
+| `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
 | `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
 | `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
 | `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |

@@ -75,7 +75,10 @@ function place(
   };
 }
 
-/** The last few cards played, lying on the felt the way they landed. */
+/**
+ * The last few cards played, lying on the felt the way they landed. The server only sends plays
+ * still on the discard pile, so after a reshuffle this is just the top card.
+ */
 export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapProps) {
   const history: PlayedCardEntry[] =
     view.playHistory.length > 0
@@ -83,12 +86,13 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
       : [{ playerId: null, card: view.topCard, chosenColor: null }];
   const start = Math.max(0, history.length - HEAP_SIZE);
   const last = history.length - 1;
+  // Placed by round position, so the top card keeps its spot when a reshuffle clears the rest.
   const placements = history
     .slice(start)
     .map((entry, i) =>
       place(
         entry,
-        start + i,
+        view.playHistoryStart + start + i,
         i,
         start + i === last,
         entry.playerId ? angleOf(entry.playerId) : null,

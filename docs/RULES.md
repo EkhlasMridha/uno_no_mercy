@@ -61,7 +61,14 @@ its face or deck position.
 - **Mercy while drawing:** the draw that brings you to 25 cards knocks you out (§5.13), whether you drew
   because you had to or because you chose to.
 - **Reshuffle:** when the draw pile is empty, every discard except the top card, plus any set-aside hands
-  of knocked-out players, is shuffled into a new draw pile.
+  of knocked-out players, is shuffled into a new draw pile, as at a real table. It happens at the moment
+  a card is needed, so an empty pile can sit on the table until the next draw, and a draw of several
+  cards (a penalty, a Color Roulette reveal) carries on from the new pile. The top card stays face up and
+  the color in play does not change. A recycled wild goes back as a plain wild: the color it was given
+  only lasted while it was the top card. The recycled cards are face down in the deck, so nobody can
+  look back at them: the table and the played-cards list start again from the top card, and the
+  server stops sending the earlier plays to anyone. If the discards and set-aside hands are empty as well, see A5
+  in §6.
 
 ## 5. Card effects and special rules
 

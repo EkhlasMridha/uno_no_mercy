@@ -13,7 +13,8 @@ export function topCard(state: GameState): Card {
 
 /**
  * Rebuilds the draw pile from every discard except the active top card, plus any
- * set-aside hands of eliminated players. Returns the number of recycled cards.
+ * set-aside hands of eliminated players, and forgets the recycled plays. Returns the number of
+ * recycled cards.
  */
 export function reshuffleDiscardIntoDraw(state: GameState, rng: Rng, events: EventSink): number {
   const top = state.discardPile.pop();
@@ -21,6 +22,10 @@ export function reshuffleDiscardIntoDraw(state: GameState, rng: Rng, events: Eve
   state.discardPile = top ? [top] : [];
   state.setAside = [];
   state.drawPile = shuffle(pool, rng);
+  // The recycled plays are face down in the deck now, so nobody can look back at them any more.
+  const gathered = Math.max(0, state.playHistory.length - 1);
+  state.playHistory = state.playHistory.slice(gathered);
+  state.playHistoryStart += gathered;
   if (pool.length > 0) events.push({ type: 'drawPileReshuffled', cards: pool.length });
   return pool.length;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   BookOpen,
   Check,
@@ -9,13 +9,32 @@ import {
   Play,
   Trophy,
   Users,
+  UserX,
   WifiOff,
 } from 'lucide-react';
-import type { RoomView } from '@nomercy/shared';
+import {
+  GENDERS,
+  PLAYER_NAME_MAX_LENGTH,
+  playerNameSchema,
+  type LobbyPlayerView,
+  type RoomView,
+} from '@nomercy/shared';
 import { copyText, inviteText } from '../lib/invite';
-import { leaveRoom, setMaxPlayers, setReady, setScoring, startGame } from '../net/actions';
+import {
+  kickPlayer,
+  leaveRoom,
+  setMaxPlayers,
+  setReady,
+  setScoring,
+  startGame,
+  transferHost,
+  updateProfile,
+} from '../net/actions';
+import { saveName } from '../net/session-storage';
 import { pushNotice } from '../state/store';
 import { FillSeatsModal } from '../components/modals/FillSeatsModal';
+import { GENDER_LABEL, GENDER_SAMPLES } from '../components/modals/GenderPickerModal';
+import { PlayerAvatar } from '../components/PlayerAvatar';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { PlayerCountInput } from '../components/PlayerCountInput';
 import { SoundSettings } from '../components/SoundSettings';
@@ -24,6 +43,8 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
   const [copied, setCopied] = useState<'code' | 'invite' | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [showFill, setShowFill] = useState(false);
+  // A host action pressed on a player's row, waiting for the host to confirm it.
+  const [pending, setPending] = useState<{ id: string; action: 'host' | 'remove' } | null>(null);
   const me = room.players.find((p) => p.id === meId);
   const isHost = room.hostId === meId;
   const others = room.players.filter((p) => p.id !== room.hostId);
@@ -95,6 +116,8 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
         </p>
       </section>
 
+      {me && <ProfilePanel me={me} />}
+
       <section className="panel p-4">
         <h2 className="mb-3 flex items-center justify-between font-semibold">
           Players
@@ -128,6 +151,51 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
                   {p.ready ? 'Ready' : 'Not ready'}
                 </span>
               )}
+              {isHost &&
+                !p.isHost &&
+                (pending?.id === p.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className={`${pending.action === 'host' ? 'btn-primary' : 'btn-danger'} px-2.5 py-1 text-xs`}
+                      onClick={() => {
+                        setPending(null);
+                        void (pending.action === 'host' ? transferHost(p.id) : kickPlayer(p.id));
+                      }}
+                    >
+                      {pending.action === 'host' ? 'Make host' : 'Remove'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost px-2.5 py-1 text-xs"
+                      onClick={() => setPending(null)}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <button
+                      type="button"
+                      className="rounded-lg p-1.5 text-white/50 transition hover:bg-brass/15 hover:text-brass focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-30"
+                      aria-label={`Make ${p.name} the host`}
+                      title={p.connected ? 'Make host' : 'Disconnected players cannot be host'}
+                      disabled={!p.connected}
+                      onClick={() => setPending({ id: p.id, action: 'host' })}
+                    >
+                      <Crown size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg p-1.5 text-white/50 transition hover:bg-rose-500/15 hover:text-rose-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass"
+                      aria-label={`Remove ${p.name} from the room`}
+                      title="Remove from the room"
+                      onClick={() => setPending({ id: p.id, action: 'remove' })}
+                    >
+                      <UserX size={18} />
+                    </button>
+                  </span>
+                ))}
             </li>
           ))}
           {openSeats > 0 && (
@@ -202,5 +270,72 @@ export function LobbyPage({ room, meId }: { room: RoomView; meId: string }) {
       {showRules && <RulesPanel onClose={() => setShowRules(false)} />}
       {showFill && <FillSeatsModal room={room} meId={meId} onClose={() => setShowFill(false)} />}
     </main>
+  );
+}
+
+/** Your name and avatar set, both changeable until the game starts. */
+function ProfilePanel({ me }: { me: LobbyPlayerView }) {
+  const [draft, setDraft] = useState(me.name);
+  const [saving, setSaving] = useState(false);
+  const changed = draft.trim() !== me.name;
+
+  const onRename = async (e: FormEvent) => {
+    e.preventDefault();
+    const parsed = playerNameSchema.safeParse(draft);
+    if (!parsed.success) {
+      pushNotice('error', parsed.error.issues[0]?.message ?? 'Invalid name');
+      return;
+    }
+    setSaving(true);
+    const result = await updateProfile({ name: parsed.data });
+    setSaving(false);
+    // Remembered for the next room and the next invite link.
+    if (result.ok) {
+      saveName(parsed.data);
+      setDraft(parsed.data);
+    }
+  };
+
+  return (
+    <section className="panel space-y-3 p-4" aria-labelledby="profile-heading">
+      <h2 id="profile-heading" className="font-semibold">
+        You
+      </h2>
+      <form className="flex gap-2" onSubmit={(e) => void onRename(e)}>
+        <input
+          className="input"
+          value={draft}
+          maxLength={PLAYER_NAME_MAX_LENGTH}
+          autoComplete="nickname"
+          aria-label="Your name"
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button type="submit" className="btn-secondary px-5" disabled={!changed || saving}>
+          Rename
+        </button>
+      </form>
+      <div role="group" aria-label="Avatar set" className="grid grid-cols-2 gap-2">
+        {GENDERS.map((gender) => {
+          const picked = me.gender === gender;
+          return (
+            <button
+              key={gender}
+              type="button"
+              aria-pressed={picked}
+              disabled={saving}
+              onClick={() => !picked && void updateProfile({ gender })}
+              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 ring-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass ${
+                picked
+                  ? 'bg-brass/15 text-brass ring-brass'
+                  : 'bg-chalk/5 text-chalk/80 ring-chalk/15 hover:bg-chalk/10'
+              }`}
+            >
+              <PlayerAvatar traits={GENDER_SAMPLES[gender][1]!} className="h-8 w-8 rounded-full" />
+              {GENDER_LABEL[gender]}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }

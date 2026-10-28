@@ -141,6 +141,12 @@ export function bannerFor(event: GameEvent, name: NameLookup): BannerSpec | null
       return { title: 'Caught!', subtitle: `${name(event.playerId)} draws 2`, tone: 'danger' };
     case 'unoCalled':
       return { title: 'UNO!', subtitle: name(event.playerId), tone: 'success' };
+    case 'drawPileReshuffled':
+      return {
+        title: 'Reshuffle!',
+        subtitle: `${event.cards} cards shuffled into a new draw pile`,
+        tone: 'info',
+      };
     case 'discardedAll':
       return event.count > 0
         ? {

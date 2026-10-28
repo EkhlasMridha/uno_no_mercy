@@ -123,5 +123,6 @@ export function toPublicGameView(state: GameState, presence: SeatPresence): Publ
     phase: phaseView(state),
     log: state.log.slice(-40),
     playHistory: state.playHistory.slice(),
+    playHistoryStart: state.playHistoryStart,
   };
 }

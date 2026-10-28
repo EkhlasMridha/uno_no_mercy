@@ -1,10 +1,13 @@
 import {
   createRoomSchema,
   joinRoomSchema,
+  kickSchema,
+  profileSchema,
   readySchema,
   reconnectSchema,
   roomSettingsSchema,
   startGameSchema,
+  transferHostSchema,
   waitForPlayerSchema,
   type SessionInfo,
 } from '@nomercy/shared';
@@ -99,6 +102,31 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     socket.data.session = null;
     const room = manager.getRoom(session.roomCode);
     if (room) broadcaster.room(room);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:profile', profileSchema, (profile) => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.updateProfile(session.roomCode, session.playerId, profile));
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:kick', kickSchema, ({ playerId }) => {
+    const session = requireSession(socket);
+    const { room, kickedSocketId } = manager.kickPlayer(
+      session.roomCode,
+      session.playerId,
+      playerId,
+    );
+    if (kickedSocketId) broadcaster.removed(kickedSocketId, 'The host removed you from the room.');
+    console.info(`[room ${room.code}] host removed a player (${room.players.length} seated)`);
+    broadcaster.room(room);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:transfer-host', transferHostSchema, ({ playerId }) => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.transferHost(session.roomCode, session.playerId, playerId));
     return { ok: true, data: null };
   });
 

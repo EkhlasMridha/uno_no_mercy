@@ -27,6 +27,13 @@ export class Broadcaster {
     if (gameView) target.emit('game:state', gameView);
   }
 
+  /** Tells one socket it no longer has a seat, and unbinds it so it can join another room. */
+  removed(socketId: string, reason: string): void {
+    this.io.to(socketId).emit('room:closed', { reason });
+    const socket = this.io.sockets.sockets.get(socketId);
+    if (socket) socket.data.session = null;
+  }
+
   closed(room: Room, reason: string): void {
     for (const player of room.players) {
       if (!player.socketId) continue;

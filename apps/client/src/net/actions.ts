@@ -1,4 +1,5 @@
 import type { Ack, CardColor, CommandResult, Gender } from '@nomercy/shared';
+import { randomPlayerName } from '../lib/random-name';
 import { getState, pushNotice } from '../state/store';
 import { adoptSession, forgetSession, request } from './socket';
 
@@ -36,6 +37,32 @@ export async function joinRoom(code: string, name: string, gender: Gender) {
   if (result.ok) adoptSession(result.data);
   return report(result);
 }
+
+/**
+ * Joins from an invite link without asking anything: under `savedName` when there is one, otherwise
+ * (or when someone at the table already has it) under a random name the player can change in the lobby.
+ */
+export async function joinFromInvite(code: string, savedName: string | null) {
+  const join = (name: string) => request('room:join', { code, name, gender: 'male' });
+  let result = await join(savedName ?? randomPlayerName());
+  for (let retry = 0; retry < 3 && !result.ok && result.error.code === 'NAME_TAKEN'; retry++) {
+    result = await join(randomPlayerName());
+  }
+  if (result.ok) adoptSession(result.data);
+  return report(result);
+}
+
+/** Renames this player, or switches their avatar set, while in the lobby. */
+export const updateProfile = async (profile: { name?: string; gender?: Gender }) =>
+  report(await request('room:profile', profile));
+
+/** Host only: removes another player from the lobby. */
+export const kickPlayer = async (playerId: string) =>
+  report(await request('room:kick', { playerId }));
+
+/** Host only: hands the room to another player, who becomes the host instead. */
+export const transferHost = async (playerId: string) =>
+  report(await request('room:transfer-host', { playerId }));
 
 export async function leaveRoom() {
   const result = await request('room:leave', {});

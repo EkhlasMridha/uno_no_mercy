@@ -354,6 +354,146 @@ describe('multiplayer over Socket.IO', () => {
     expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
   });
 
+  it('lets lobby players change their own name and avatar set, but not mid-game', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Hana',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const joined = (await emit<SessionInfo>(guest, 'room:join', {
+      code,
+      name: 'Lucky Otter',
+      gender: 'male',
+    })) as { data: SessionInfo };
+    const guestId = joined.data.playerId;
+
+    const empty = await emit(guest, 'room:profile', {});
+    expect(empty).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const badName = await emit(guest, 'room:profile', { name: '<b>' });
+    expect(badName).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const extra = await emit(guest, 'room:profile', {
+      name: 'Gus',
+      playerId: created.data.playerId,
+    });
+    expect(extra).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const taken = await emit(guest, 'room:profile', { name: 'HANA' });
+    expect(taken).toMatchObject({ ok: false, error: { code: 'NAME_TAKEN' } });
+
+    expect((await emit(guest, 'room:profile', { name: '  Gus ' })).ok).toBe(true);
+    expect((await emit(guest, 'room:profile', { gender: 'female' })).ok).toBe(true);
+    await until(() => {
+      const me = host.room?.players.find((p) => p.id === guestId);
+      return me?.name === 'Gus' && me.gender === 'female';
+    });
+    // Keeping your own name in another case is not a clash with yourself.
+    expect((await emit(guest, 'room:profile', { name: 'GUS' })).ok).toBe(true);
+
+    await emit(guest, 'room:ready', { ready: true });
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(guest, 'room:profile', { name: 'Late Change' });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+    await until(() => guest.game !== null);
+    expect(guest.game!.public.players.some((p) => p.name === 'GUS')).toBe(true);
+  });
+
+  it('lets the host remove a player from the lobby, and nobody else', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const other = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Hosta',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const guestId = (
+      (await emit<SessionInfo>(guest, 'room:join', { code, name: 'Kicky', gender: 'male' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+    const otherId = (
+      (await emit<SessionInfo>(other, 'room:join', { code, name: 'Stays', gender: 'female' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+    let closedReason: string | null = null;
+    guest.socket.on('room:closed', ({ reason }) => (closedReason = reason));
+
+    const notHost = await emit(other, 'room:kick', { playerId: guestId });
+    expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+    const self = await emit(host, 'room:kick', { playerId: created.data.playerId });
+    expect(self).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+    const bad = await emit(host, 'room:kick', { playerId: 'nobody' });
+    expect(bad).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+
+    expect((await emit(host, 'room:kick', { playerId: guestId })).ok).toBe(true);
+    await until(() => closedReason !== null && host.room?.players.length === 2);
+    expect(host.room!.players.some((p) => p.id === guestId)).toBe(false);
+    // The removed player is unbound: their seat commands fail and they may join a room again.
+    const ready = await emit(guest, 'room:ready', { ready: true });
+    expect(ready).toMatchObject({ ok: false, error: { code: 'NOT_IN_ROOM' } });
+    const again = await emit(host, 'room:kick', { playerId: guestId });
+    expect(again).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+
+    await emit(other, 'room:ready', { ready: true });
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(host, 'room:kick', { playerId: otherId });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+  });
+
+  it('lets the host hand the room to another player and lose host powers', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Owner',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const hostId = created.data.playerId;
+    const guestId = (
+      (await emit<SessionInfo>(guest, 'room:join', { code, name: 'Heir', gender: 'female' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+
+    const notHost = await emit(guest, 'room:transfer-host', { playerId: guestId });
+    expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+    const self = await emit(host, 'room:transfer-host', { playerId: hostId });
+    expect(self).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+    const extra = await emit(host, 'room:transfer-host', { playerId: guestId, force: true });
+    expect(extra).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+
+    expect((await emit(host, 'room:transfer-host', { playerId: guestId })).ok).toBe(true);
+    await until(() => host.room?.hostId === guestId && guest.room?.hostId === guestId);
+    expect(guest.room!.players.find((p) => p.id === guestId)).toMatchObject({
+      isHost: true,
+      ready: true,
+    });
+
+    // The old host is now a guest: host-only actions are refused.
+    for (const [event, payload] of [
+      ['game:start', {}],
+      ['room:settings', { maxPlayers: 3 }],
+      ['room:kick', { playerId: guestId }],
+      ['room:transfer-host', { playerId: guestId }],
+    ] as const) {
+      expect(await emit(host, event, payload)).toMatchObject({
+        ok: false,
+        error: { code: 'NOT_HOST' },
+      });
+    }
+    expect((await emit(guest, 'room:transfer-host', { playerId: hostId })).ok).toBe(true);
+    await until(() => host.room?.hostId === hostId);
+
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(host, 'room:transfer-host', { playerId: guestId });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+  });
+
   it('deals a solo player in against named computer players who take their turns', async () => {
     const solo = await newClient();
     const tooMany = await emit(solo, 'room:create', {

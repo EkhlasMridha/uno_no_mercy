@@ -424,6 +424,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           title="Color Roulette!"
           description="Name a color. Then draw cards one at a time, face up for everyone to see, until that color shows up. You keep every card you draw. Wild cards don't count."
           onPick={(color) => void chooseRouletteColor(color)}
+          // Rendered after this picker, the list opens on top of it; closing it returns here.
+          onShowPlayed={() => setShowPlayed(true)}
+          playedCount={view.playHistory.length}
         />
       )}
       {showSheet && (
@@ -444,6 +447,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       {showPlayed && (
         <PlayedCardsModal
           history={view.playHistory}
+          shuffledAway={view.playHistoryStart}
           name={name}
           onClose={() => setShowPlayed(false)}
         />

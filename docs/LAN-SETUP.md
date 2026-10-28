@@ -106,8 +106,9 @@ is still refused, the server log says which host or origin it rejected and why.
 3. Enter a name and the 5-character room code shown in the host's lobby.
 
 Or skip steps 2 and 3: in the lobby, **Copy invite link** copies a link (`http://<host-LAN-IP>:3000/?join=CODE`)
-with the room code on its own line. Opening the link fills in the code, and if that browser already
-knows the player's name it goes straight to the avatar choice and joins.
+with the room code on its own line. Opening the link goes straight into the lobby under the name that
+browser last played with, or a random name if it has none. Players can change their name and avatar in
+the lobby.
 
 ## 4. Windows Firewall
 

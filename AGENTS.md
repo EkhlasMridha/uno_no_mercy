@@ -124,7 +124,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
   animation starts.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files): every
   card play (a Discard All has its own: a handful of cards hitting the pile), every card drawn from the pile (a Draw or a Color Roulette reveal, so the table hears
-  someone drawing), the ding when a roulette reveal finds the named color, a voice shouting "UNO!" when anyone calls it (the browser's own speech voices, a man or a woman to match the caller's avatar), the chime when your turn
+  someone drawing), the sweep and riffle when the discards are reshuffled into a new draw pile, the ding when a roulette reveal finds the named color, a voice shouting "UNO!" when anyone calls it (the browser's own speech voices, a man or a woman to match the caller's avatar), the chime when your turn
   starts, the turn reminder, 0/7 hand exchanges, the
   mocking trombone everyone hears when a player takes penalty cards, the danger alarm when the Mercy Rule knocks a player out at 25 cards, and the
   win. `useGameSounds` plays them only from
@@ -231,7 +231,9 @@ new UI inside that metaphor.
   Under it, your seat shows your card count and, from 20 cards, how many are left before the
   25-card knockout. The card a player just played sits on their avatar, on the side away from the
   felt (`LastPlayedCard.tsx`, `useLastPlay`), until the player whose turn came next finishes their move.
-  The last 10 plays stay visible on the felt (`DiscardHeap.tsx`). The color in play is a chip left
+  The last 10 plays stay visible on the felt (`DiscardHeap.tsx`), but only while they are really on the
+  discard pile: a reshuffle drops the recycled plays from `playHistory` on the server, so the heap and
+  the played-cards list restart from the top card, and an empty draw pile is an empty outlined spot. The color in play is a chip left
   of the draw pile (`ColorInPlay` in `GameTable.tsx`), and the direction shows only as the arrows on
   the felt. A pending penalty floats under the piles, so it never pushes them into the seats. Cards keep
   their scatter between renders because placement is seeded from history position (`scatter`).
@@ -248,7 +250,7 @@ new UI inside that metaphor.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
   drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
   popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events; a Discard All raises the same tag in green (`ink-green`) as `−N cards` with the Discard All
-  mark, counting the card itself), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
+  mark, counting the card itself), the new deck riffling once after a reshuffle (`anim-riffle`), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
   `handsPassed.passes` pairs the server sends), the turn pulse, and your cards hopping in a ripple
   with the knock after 10 s idle on your move (`anim-nudge`, not `anim-shake`, which means "can't play
   that"). No decorative entrance animations.
