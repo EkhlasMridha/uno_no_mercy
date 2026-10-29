@@ -16,7 +16,10 @@ interface PlayerHandProps {
 }
 
 interface HandLayout {
-  /** One row, or two tiers when one row would hide the corner indices: the back tier first. */
+  /**
+   * One row, or two tiers when one row would hide the corner indices: the back tier first.
+   * A phone always gets one row, which scrolls sideways when it doesn't fit.
+   */
   rows: Card[][];
   /** Distance from one card's left edge to the next, in px. */
   step: number;
@@ -26,8 +29,8 @@ interface HandLayout {
 
 // Room left for the scroller's padding (px-4) and each row's (px-6), which holds the tilted corners.
 const EDGE_ROOM = 80;
-// A short phone, or one held sideways, has no height for a second tier: one row that scrolls is better.
-const NO_TIERS_QUERY = '(max-height: 500px), (max-width: 639px) and (max-height: 720px)';
+// A phone, upright or sideways, has no room for a second tier: one row you swipe through is better.
+const PHONE_QUERY = '(max-width: 639px), (max-height: 500px)';
 
 function startsColor(row: readonly Card[], i: number): boolean {
   const prev = row[i - 1];
@@ -47,23 +50,21 @@ function splitTiers(cards: Card[]): Card[][] {
   return [cards.slice(0, cut), cards.slice(cut)];
 }
 
-/** Spaces the hand to fit the width, so every card's corner index stays in view without scrolling. */
-function layoutHand(
-  cards: Card[],
-  width: number,
-  cardWidth: number,
-  allowTiers: boolean,
-): HandLayout {
+/**
+ * Spaces the hand to fit the width, so every card's corner index stays in view without scrolling.
+ * On a phone each card keeps at least half its width to tap, and a hand too big for that scrolls.
+ */
+function layoutHand(cards: Card[], width: number, cardWidth: number, phone: boolean): HandLayout {
   const avail = width - EDGE_ROOM;
   const roomy = cardWidth - 14;
-  const readable = Math.max(26, cardWidth * 0.4);
+  const readable = phone ? cardWidth * 0.5 : Math.max(26, cardWidth * 0.4);
   const groupGap = Math.round(cardWidth * 0.2);
   const stepFor = (row: Card[], gap: number) => {
     if (row.length < 2) return roomy;
     const starts = row.filter((_, i) => startsColor(row, i)).length;
     return (avail - cardWidth - starts * gap) / (row.length - 1);
   };
-  const tiers = allowTiers && cards.length >= 8 ? splitTiers(cards) : null;
+  const tiers = !phone && cards.length >= 8 ? splitTiers(cards) : null;
   const options: [Card[][] | null, number, number][] = [
     [[cards], groupGap, readable],
     [[cards], 4, readable],
@@ -75,8 +76,8 @@ function layoutHand(
     const step = Math.min(...rows.map((row) => stepFor(row, gap)));
     if (step >= min) return { rows, step: Math.min(step, roomy), gap };
   }
-  // Even two tight tiers don't fit: keep the corners readable and let the hand scroll.
-  return { rows: tiers ?? [cards], step: 22, gap: 4 };
+  // Even two tight tiers, or a phone's one row, don't fit: keep the corners readable and let it scroll.
+  return { rows: tiers ?? [cards], step: tiers ? 22 : readable, gap: tiers ? 4 : groupGap };
 }
 
 /** Your cards held in a fan over the table edge, grouped by color and sized to the screen. */
@@ -103,7 +104,7 @@ export function PlayerHand({
   const [room, setRoom] = useState<{
     width: number;
     cardWidth: number;
-    allowTiers: boolean;
+    phone: boolean;
   } | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -114,13 +115,13 @@ export function PlayerHand({
       const next = {
         width: el.clientWidth,
         cardWidth: card.offsetWidth,
-        allowTiers: !window.matchMedia(NO_TIERS_QUERY).matches,
+        phone: window.matchMedia(PHONE_QUERY).matches,
       };
       setRoom((prev) =>
         prev &&
         prev.width === next.width &&
         prev.cardWidth === next.cardWidth &&
-        prev.allowTiers === next.allowTiers
+        prev.phone === next.phone
           ? prev
           : next,
       );
@@ -131,12 +132,27 @@ export function PlayerHand({
     return () => observer.disconnect();
   }, [hasCards]);
 
+  // When your turn starts, bring a playable card into view if every one is scrolled off screen.
+  // scrollTo, not scrollIntoView, which would also scroll the page's clipped ancestors.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!isMyTurn || !el) return;
+    const box = el.getBoundingClientRect();
+    const cards = [...el.querySelectorAll<HTMLElement>('li[data-playable]')];
+    // A card counts as on screen while its left corner index is: the rest sits under the next card.
+    const onScreen = (c: DOMRect) => c.left >= box.left && c.left + c.width / 2 <= box.right;
+    const first = cards[0];
+    if (!first || cards.some((card) => onScreen(card.getBoundingClientRect()))) return;
+    const c = first.getBoundingClientRect();
+    el.scrollTo({ left: el.scrollLeft + c.left - box.left - (box.width - c.width) / 2 });
+  }, [isMyTurn]);
+
   if (!hasCards) {
     return <p className="py-8 text-center text-chalk/50">No cards in hand</p>;
   }
 
   const layout = room
-    ? layoutHand(sorted, room.width, room.cardWidth, room.allowTiers)
+    ? layoutHand(sorted, room.width, room.cardWidth, room.phone)
     : { rows: [sorted], step: 40, gap: 8 };
   const cardWidth = room?.cardWidth ?? 72;
   const tiered = layout.rows.length > 1;
@@ -145,7 +161,13 @@ export function PlayerHand({
   return (
     <div
       ref={scroller}
-      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4 shortest:pb-1 shortest:pt-3"
+      className="scroll-none overflow-x-auto overflow-y-hidden motion-safe:scroll-smooth px-4 pb-3 pt-6 short:pb-2 short:pt-4 shortest:pb-1 shortest:pt-3"
+      // A plain mouse wheel only scrolls up and down, which the hand can't: turn it sideways.
+      onWheel={(e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.currentTarget.scrollBy({ left: e.deltaY, behavior: 'instant' });
+        }
+      }}
     >
       <div
         role="group"
@@ -192,6 +214,7 @@ export function PlayerHand({
                     key={card.id}
                     // Hovering or focusing a card brings it to the front so you can read all of it.
                     className="hover:!z-[300] focus-within:!z-[300]"
+                    data-playable={playable || undefined}
                     onPointerEnter={() => setRevealed(true)}
                     style={{
                       marginLeft,
