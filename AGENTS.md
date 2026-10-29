@@ -35,7 +35,7 @@ apps/server
   src/rooms       Room lifecycle, sessions, reconnects, per-player projections, scoring
   src/net         Socket.IO handlers: validate, route, broadcast
   test/           Vitest: engine.test.ts, simulation.test.ts, multiplayer.test.ts,
-                  turn-hold.test.ts
+                  turn-hold.test.ts, three-player-uno.test.ts
 apps/client       React + Vite + Tailwind. Presentation only
 docs              RULES.md, ARCHITECTURE.md, GAME-FLOW.md, LAN-SETUP.md
 ```

@@ -107,6 +107,9 @@ Automated (`npm test`):
 - Socket.IO integration: create, join, ready, start. Each player sees only their own cards and token. Late
   joins are rejected. `NOT_YOUR_TURN` and `STALE_STATE` work. A repeated command id runs once. Reconnecting
   restores the seat without duplicating the player, and a bad token is rejected.
+- A 3-player game over Socket.IO, played to a winner: UNO armed with the second-to-last card, pressed on
+  the last card (then uncatchable), and forgotten (caught for +2), each seen by all three players. The
+  `3-player UNO game` workflow runs it on every pull request into `main` or `develop`.
 
 Manual (browser, production build over the LAN address): created a room on `localhost`, joined from a second
 tab through the machine's LAN IP, readied up and started. Played a Wild +6 with the color dialog. The target
