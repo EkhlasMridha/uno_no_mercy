@@ -222,6 +222,98 @@ describe('multiplayer over Socket.IO', () => {
     expect(restored.ok).toBe(true);
     await until(() => b.room!.players.find((p) => p.name === 'Alpha')?.connected === true);
     expect(b.room!.players).toHaveLength(2);
+
+    // A socket holding one seat can't take another: its old seat would point at it forever.
+    const hop = await emit(b, 'room:reconnect', {
+      code: created.data.roomCode,
+      token: (restored as { data: SessionInfo }).data.reconnectToken,
+    });
+    expect(hop).toMatchObject({ ok: false, error: { code: 'ALREADY_IN_ROOM' } });
+    b.socket.disconnect();
+    await until(() => again.room!.players.find((p) => p.name === 'Beta')?.connected === false);
+    expect(again.room!.players.find((p) => p.name === 'Alpha')?.connected).toBe(true);
+  });
+
+  it('lets a dropped player rejoin by code once the next player agrees to wait', async () => {
+    const [alpha, bravo, charlie] = [await newClient(), await newClient(), await newClient()];
+    const created = (await emit<SessionInfo>(alpha, 'room:create', {
+      name: 'Alpha',
+      gender: 'male',
+      maxPlayers: 3,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    await emit(bravo, 'room:join', { code, name: 'Bravo', gender: 'female' });
+    await emit(charlie, 'room:join', { code, name: 'Charlie', gender: 'male' });
+    await emit(bravo, 'room:ready', { ready: true });
+    await emit(charlie, 'room:ready', { ready: true });
+    expect((await emit(alpha, 'game:start', {})).ok).toBe(true);
+    await until(() => alpha.game !== null && bravo.game !== null && charlie.game !== null);
+    const alphaHand = alpha.game!.me.hand.map((c) => c.id).sort();
+    const alphaId = created.data.playerId;
+
+    alpha.socket.disconnect();
+    const seatOf = (client: TestClient) => client.room!.players.find((p) => p.id === alphaId)!;
+    await until(() => seatOf(bravo).connected === false && seatOf(bravo).waitDeciderId !== null);
+    const deciderId = seatOf(bravo).waitDeciderId!;
+    const [decider, other] =
+      bravo.room!.players.find((p) => p.id === deciderId)!.name === 'Bravo'
+        ? [bravo, charlie]
+        : [charlie, bravo];
+    expect(seatOf(other).waitDeciderId).toBe(deciderId);
+
+    // Only the decider answers, and nobody gets the seat back before they agree.
+    const notYours = await emit(other, 'room:wait-for-player', { playerId: alphaId, wait: true });
+    expect(notYours).toMatchObject({ ok: false, error: { code: 'NOT_YOUR_TURN' } });
+    const returning = await newClient();
+    const early = await emit(returning, 'room:join', { code, name: 'Alpha', gender: 'male' });
+    expect(early).toMatchObject({ ok: false, error: { code: 'GAME_IN_PROGRESS' } });
+
+    expect(
+      (await emit(decider, 'room:wait-for-player', { playerId: alphaId, wait: true })).ok,
+    ).toBe(true);
+    await until(() => seatOf(other).seatHeld);
+
+    // A held seat goes only to its own name.
+    const stranger = await newClient();
+    const stolen = await emit(stranger, 'room:join', { code, name: 'Mallory', gender: 'male' });
+    expect(stolen).toMatchObject({ ok: false, error: { code: 'GAME_IN_PROGRESS' } });
+
+    const rejoined = await emit<SessionInfo>(returning, 'room:join', {
+      code,
+      name: 'alpha',
+      gender: 'male',
+    });
+    expect(rejoined.ok).toBe(true);
+    const fresh = (rejoined as { data: SessionInfo }).data;
+    expect(fresh.playerId).toBe(alphaId);
+    expect(fresh.reconnectToken).not.toBe(created.data.reconnectToken);
+    await until(() => returning.game !== null);
+    expect(returning.game!.me.hand.map((c) => c.id).sort()).toEqual(alphaHand);
+    await until(() => seatOf(other).connected && !seatOf(other).seatHeld);
+    expect(other.room!.players).toHaveLength(3);
+
+    // The lost session's token can no longer take the seat.
+    const oldTab = await newClient();
+    const stale = await emit(oldTab, 'room:reconnect', {
+      code,
+      token: created.data.reconnectToken,
+    });
+    expect(stale).toMatchObject({ ok: false, error: { code: 'INVALID_TOKEN' } });
+
+    // Not waiting makes the dropped player forfeit at once.
+    const otherId = other.room!.players.find((p) => p.id !== alphaId && p.id !== deciderId)!.id;
+    other.socket.disconnect();
+    const otherSeat = () => returning.room!.players.find((p) => p.id === otherId)!;
+    await until(() => otherSeat().waitDeciderId !== null);
+    const nextDecider = otherSeat().waitDeciderId === alphaId ? returning : decider;
+    expect([alphaId, deciderId]).toContain(otherSeat().waitDeciderId);
+    expect(
+      (await emit(nextDecider, 'room:wait-for-player', { playerId: otherId, wait: false })).ok,
+    ).toBe(true);
+    await until(() => otherSeat().departed);
+    await until(
+      () => returning.game!.public.players.find((p) => p.id === otherId)?.status === 'eliminated',
+    );
   });
 
   it('lets the host choose how many players the room seats', async () => {
@@ -260,6 +352,146 @@ describe('multiplayer over Socket.IO', () => {
     expect(shrink).toMatchObject({ ok: false, error: { code: 'ROOM_FULL' } });
     const notHost = await emit(second, 'room:settings', { maxPlayers: 6 });
     expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+  });
+
+  it('lets lobby players change their own name and avatar set, but not mid-game', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Hana',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const joined = (await emit<SessionInfo>(guest, 'room:join', {
+      code,
+      name: 'Lucky Otter',
+      gender: 'male',
+    })) as { data: SessionInfo };
+    const guestId = joined.data.playerId;
+
+    const empty = await emit(guest, 'room:profile', {});
+    expect(empty).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const badName = await emit(guest, 'room:profile', { name: '<b>' });
+    expect(badName).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const extra = await emit(guest, 'room:profile', {
+      name: 'Gus',
+      playerId: created.data.playerId,
+    });
+    expect(extra).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    const taken = await emit(guest, 'room:profile', { name: 'HANA' });
+    expect(taken).toMatchObject({ ok: false, error: { code: 'NAME_TAKEN' } });
+
+    expect((await emit(guest, 'room:profile', { name: '  Gus ' })).ok).toBe(true);
+    expect((await emit(guest, 'room:profile', { gender: 'female' })).ok).toBe(true);
+    await until(() => {
+      const me = host.room?.players.find((p) => p.id === guestId);
+      return me?.name === 'Gus' && me.gender === 'female';
+    });
+    // Keeping your own name in another case is not a clash with yourself.
+    expect((await emit(guest, 'room:profile', { name: 'GUS' })).ok).toBe(true);
+
+    await emit(guest, 'room:ready', { ready: true });
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(guest, 'room:profile', { name: 'Late Change' });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+    await until(() => guest.game !== null);
+    expect(guest.game!.public.players.some((p) => p.name === 'GUS')).toBe(true);
+  });
+
+  it('lets the host remove a player from the lobby, and nobody else', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const other = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Hosta',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const guestId = (
+      (await emit<SessionInfo>(guest, 'room:join', { code, name: 'Kicky', gender: 'male' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+    const otherId = (
+      (await emit<SessionInfo>(other, 'room:join', { code, name: 'Stays', gender: 'female' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+    let closedReason: string | null = null;
+    guest.socket.on('room:closed', ({ reason }) => (closedReason = reason));
+
+    const notHost = await emit(other, 'room:kick', { playerId: guestId });
+    expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+    const self = await emit(host, 'room:kick', { playerId: created.data.playerId });
+    expect(self).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+    const bad = await emit(host, 'room:kick', { playerId: 'nobody' });
+    expect(bad).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+
+    expect((await emit(host, 'room:kick', { playerId: guestId })).ok).toBe(true);
+    await until(() => closedReason !== null && host.room?.players.length === 2);
+    expect(host.room!.players.some((p) => p.id === guestId)).toBe(false);
+    // The removed player is unbound: their seat commands fail and they may join a room again.
+    const ready = await emit(guest, 'room:ready', { ready: true });
+    expect(ready).toMatchObject({ ok: false, error: { code: 'NOT_IN_ROOM' } });
+    const again = await emit(host, 'room:kick', { playerId: guestId });
+    expect(again).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+
+    await emit(other, 'room:ready', { ready: true });
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(host, 'room:kick', { playerId: otherId });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+  });
+
+  it('lets the host hand the room to another player and lose host powers', async () => {
+    const host = await newClient();
+    const guest = await newClient();
+    const created = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'Owner',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    const code = created.data.roomCode;
+    const hostId = created.data.playerId;
+    const guestId = (
+      (await emit<SessionInfo>(guest, 'room:join', { code, name: 'Heir', gender: 'female' })) as {
+        data: SessionInfo;
+      }
+    ).data.playerId;
+
+    const notHost = await emit(guest, 'room:transfer-host', { playerId: guestId });
+    expect(notHost).toMatchObject({ ok: false, error: { code: 'NOT_HOST' } });
+    const self = await emit(host, 'room:transfer-host', { playerId: hostId });
+    expect(self).toMatchObject({ ok: false, error: { code: 'INVALID_TARGET' } });
+    const extra = await emit(host, 'room:transfer-host', { playerId: guestId, force: true });
+    expect(extra).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+
+    expect((await emit(host, 'room:transfer-host', { playerId: guestId })).ok).toBe(true);
+    await until(() => host.room?.hostId === guestId && guest.room?.hostId === guestId);
+    expect(guest.room!.players.find((p) => p.id === guestId)).toMatchObject({
+      isHost: true,
+      ready: true,
+    });
+
+    // The old host is now a guest: host-only actions are refused.
+    for (const [event, payload] of [
+      ['game:start', {}],
+      ['room:settings', { maxPlayers: 3 }],
+      ['room:kick', { playerId: guestId }],
+      ['room:transfer-host', { playerId: guestId }],
+    ] as const) {
+      expect(await emit(host, event, payload)).toMatchObject({
+        ok: false,
+        error: { code: 'NOT_HOST' },
+      });
+    }
+    expect((await emit(guest, 'room:transfer-host', { playerId: hostId })).ok).toBe(true);
+    await until(() => host.room?.hostId === hostId);
+
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    const midGame = await emit(host, 'room:transfer-host', { playerId: guestId });
+    expect(midGame).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
   });
 
   it('deals a solo player in against named computer players who take their turns', async () => {
@@ -334,6 +566,59 @@ describe('multiplayer over Socket.IO', () => {
     expect((await emit(host, 'game:start', { fillWithComputers: true })).ok).toBe(true);
     await until(() => host.room?.status === 'inGame');
     expect(host.room!.players.filter((p) => p.isComputer)).toHaveLength(2);
+  });
+});
+
+describe('connection churn', () => {
+  it('frees every room, seat and connection once everyone is gone', async () => {
+    const server = createServer(createHttpApp(null));
+    const { io, manager } = createSocketServer(server, {
+      rng: seededRng(7),
+      reconnectGraceMs: 50,
+      checkInvariants: true,
+      computerMoveDelayMs: 5,
+      turnHoldMs: 0,
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const churnUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const open = async () => {
+      const socket: ClientSocket = connect(churnUrl, { transports: ['websocket'], forceNew: true });
+      await new Promise<void>((resolve) => socket.on('connect', () => resolve()));
+      return socket;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const send = (socket: ClientSocket, event: string, payload: unknown): Promise<any> =>
+      (socket.timeout(3000).emitWithAck as unknown as AnyEmit)(event, payload);
+
+    try {
+      for (let round = 0; round < 6; round++) {
+        const host = await open();
+        const guest = await open();
+        const created = await send(host, 'room:create', {
+          name: `Host${round}`,
+          gender: 'male',
+          maxPlayers: 3,
+        });
+        const code = created.data.roomCode as string;
+        await send(guest, 'room:join', { code, name: 'Guest', gender: 'female' });
+        await send(guest, 'room:ready', { ready: true });
+        await send(host, 'game:start', { fillWithComputers: round % 2 === 0 });
+        // Leave, drop mid-game, refresh into the same seat, then drop again.
+        if (round % 3 === 0) await send(guest, 'room:leave', {});
+        guest.disconnect();
+        const back = await open();
+        await send(back, 'room:reconnect', { code, token: created.data.reconnectToken });
+        host.disconnect();
+        back.disconnect();
+      }
+      // Everyone's reconnect window runs out: nothing may be left behind.
+      await new Promise((r) => setTimeout(r, 400));
+      expect(manager.roomCount).toBe(0);
+      expect(io.engine.clientsCount).toBe(0);
+    } finally {
+      io.close();
+      server.close();
+    }
   });
 });
 

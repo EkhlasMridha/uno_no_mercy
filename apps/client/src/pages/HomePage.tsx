@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Bot, BookOpen, LogIn, Play, Plus, Users, Wifi, WifiOff } from 'lucide-react';
 import {
   MAX_COMPUTERS,
@@ -8,7 +8,8 @@ import {
   ROOM_CODE_LENGTH,
   type Gender,
 } from '@nomercy/shared';
-import { createRoom, joinRoom } from '../net/actions';
+import { createRoom, joinFromInvite, joinRoom } from '../net/actions';
+import { takeInviteCode } from '../lib/invite';
 import { loadName, saveName } from '../net/session-storage';
 import { useAppState } from '../state/store';
 import { GenderPickerModal } from '../components/modals/GenderPickerModal';
@@ -18,10 +19,15 @@ import { PlayerCountInput } from '../components/PlayerCountInput';
 import { Modal } from '../components/ui/Modal';
 import { TablePreview } from '../components/TablePreview';
 
+// Read once when the app loads, so a page opened from an invite link joins that room.
+const invitedCode = takeInviteCode();
+
 export function HomePage() {
   const connection = useAppState((s) => s.connection);
   const [name, setName] = useState(loadName);
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(invitedCode ?? '');
+  // An invite waiting for the connection before it opens the avatar picker.
+  const [pendingInvite, setPendingInvite] = useState(invitedCode);
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +114,18 @@ export function HomePage() {
 
   const online = connection === 'connected';
 
+  // An invite link joins straight away once connected: under the name this browser last played
+  // with, or a random one. The avatar set starts as male; both can be changed in the lobby.
+  useEffect(() => {
+    if (!pendingInvite || !online) return;
+    setPendingInvite(null);
+    const saved = playerNameSchema.safeParse(loadName());
+    setBusy(true);
+    void joinFromInvite(pendingInvite, saved.success ? saved.data : null).finally(() =>
+      setBusy(false),
+    );
+  }, [pendingInvite, online]);
+
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-8 px-4 py-10">
       <header className="flex flex-col items-center gap-4 text-center">
@@ -144,6 +162,19 @@ export function HomePage() {
       </header>
 
       <section className="panel w-full max-w-md space-y-5 p-5">
+        {invitedCode && code === invitedCode && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-xl bg-brass/10 px-3 py-2 text-sm text-brass-soft ring-1 ring-brass/30"
+          >
+            You&apos;re invited to room{' '}
+            <span className="font-display tracking-widest">{invitedCode}</span>.{' '}
+            {pendingInvite || busy
+              ? 'Taking you to the lobby…'
+              : "Couldn't join automatically. Enter your name, then press Join."}
+          </p>
+        )}
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-white/80">Your name</span>
           <input

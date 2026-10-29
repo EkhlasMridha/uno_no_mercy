@@ -19,6 +19,8 @@ export interface RoomPlayer {
   isComputer: boolean;
   commandCache: CommandCache<Ack<unknown>>;
   expiryTimer: ReturnType<typeof setTimeout> | null;
+  /** Dropped out mid-game and the table agreed to wait: they may rejoin with the room code. */
+  seatHeld: boolean;
 }
 
 export interface Room {

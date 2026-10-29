@@ -6,11 +6,19 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   TURN_HOLD_MS,
+  WAIT_FOR_REJOIN_MS,
   type ErrorCode,
+  type GameEvent,
   type Gender,
   type RoomSettingsPayload,
 } from '@nomercy/shared';
-import { applyCommand, createGame, type GameCommand, type Rng } from '../engine/index.js';
+import {
+  applyCommand,
+  createGame,
+  type GameCommand,
+  type GameState,
+  type Rng,
+} from '../engine/index.js';
 import { CommandCache } from '../net/command-cache.js';
 import {
   chooseComputerMove,
@@ -19,6 +27,7 @@ import {
   fallbackComputerMove,
 } from './computer-player.js';
 import { scoreRound } from './match-scoring.js';
+import { waitDeciderId } from './rejoin.js';
 import type { Room, RoomPlayer } from './room.types.js';
 import { generatePlayerId, generateReconnectToken, tokensMatch } from './session.js';
 
@@ -30,6 +39,18 @@ const HELD_COMMANDS: ReadonlySet<GameCommand['type']> = new Set([
   'chooseRouletteColor',
   'catchUno',
 ]);
+
+/**
+ * Whether a command starts the UNO breather (docs/RULES.md §5.9): the turn passed to someone else, or
+ * a card was played. A play that hands the turn straight back to its player (Skip Everyone, or a Skip
+ * or Reverse with two players) goes on at once, unless it left someone open to an UNO catch: they
+ * still get the 2 seconds to call it.
+ */
+function needsTurnHold(game: GameState, turnBefore: number, events: GameEvent[]): boolean {
+  if (game.currentIndex !== turnBefore) return true;
+  if (!events.some((e) => e.type === 'cardPlayed')) return false;
+  return game.players.some((p) => p.uno === 'vulnerable');
+}
 
 export class RoomError extends Error {
   constructor(
@@ -52,6 +73,8 @@ export interface RoomManagerOptions {
   computerMoveDelayMs?: number;
   /** Length of the UNO breather after each play or turn change. Defaults to `TURN_HOLD_MS`. */
   turnHoldMs?: number;
+  /** How long a seat stays held once the table agrees to wait. Defaults to `WAIT_FOR_REJOIN_MS`. */
+  waitForRejoinMs?: number;
   /** Called when a room changes outside a client request (e.g. a reconnect window expired). */
   onRoomUpdated: (room: Room) => void;
   onRoomClosed: (room: Room, reason: string) => void;
@@ -127,9 +150,7 @@ export class RoomManager {
 
   joinRoom(code: string, name: string, gender: Gender, socketId: string): JoinResult {
     const room = this.requireRoom(code);
-    if (room.status !== 'lobby') {
-      throw new RoomError('GAME_IN_PROGRESS', 'This game has already started. Wait for the lobby.');
-    }
+    if (room.status !== 'lobby') return this.rejoinHeldSeat(room, name, socketId);
     const members = room.players.filter((p) => !p.departed);
     if (members.length >= room.settings.maxPlayers)
       throw new RoomError('ROOM_FULL', 'This room is full');
@@ -141,28 +162,138 @@ export class RoomManager {
     return { room, player };
   }
 
-  /** Restores a seat from a room-scoped token. Returns the previous socket id so it can be closed. */
+  /**
+   * Restores a seat from a room-scoped token. Returns the previous socket id so it can be closed.
+   * `boundPlayerId` is the seat this socket already holds, if any: it may only reconnect that seat.
+   */
   reconnect(
     code: string,
     token: string,
     socketId: string,
+    boundPlayerId: string | null = null,
   ): JoinResult & { previousSocketId: string | null } {
     const room = this.rooms.get(code);
     const player = room?.players.find((p) => !p.departed && tokensMatch(p.reconnectToken, token));
     if (!room || !player) {
       throw new RoomError('INVALID_TOKEN', 'Your session has expired or the room no longer exists');
     }
+    // Moving a socket to another seat would leave its old seat pointing at it forever: that seat
+    // would never time out, and the room could never close.
+    if (boundPlayerId && boundPlayerId !== player.id) {
+      throw new RoomError('ALREADY_IN_ROOM', 'Leave your current seat first');
+    }
     const previousSocketId = player.socketId !== socketId ? player.socketId : null;
     this.clearExpiry(player);
     player.socketId = socketId;
     player.disconnectedAt = null;
+    player.seatHeld = false;
     return { room, player, previousSocketId };
+  }
+
+  /**
+   * The decider's answer for a dropped player (docs/RULES.md §5.16). Waiting holds the seat so they
+   * can rejoin with the room code; not waiting, or no longer waiting, makes them forfeit now.
+   */
+  waitForPlayer(code: string, deciderId: string, playerId: string, wait: boolean): Room {
+    const room = this.requireRoom(code);
+    this.requireMember(room, deciderId);
+    const player = room.players.find((p) => p.id === playerId && !p.departed);
+    const decider = player ? waitDeciderId(room, player) : null;
+    if (!player || !decider) {
+      throw new RoomError('INVALID_TARGET', 'That player is back or no longer in the game');
+    }
+    if (decider !== deciderId) {
+      const name = room.players.find((p) => p.id === decider)?.name ?? 'the next player';
+      throw new RoomError('NOT_YOUR_TURN', `${name} decides whether to wait for ${player.name}`);
+    }
+    if (!wait) {
+      this.removePlayer(room, player);
+      return room;
+    }
+    if (!player.seatHeld) {
+      player.seatHeld = true;
+      this.clearExpiry(player);
+      player.expiryTimer = setTimeout(
+        () => this.expireSeat(room, player),
+        this.options.waitForRejoinMs ?? WAIT_FOR_REJOIN_MS,
+      );
+      player.expiryTimer.unref?.();
+    }
+    return room;
   }
 
   leaveRoom(code: string, playerId: string): void {
     const room = this.requireRoom(code);
     const player = this.requireMember(room, playerId);
     this.removePlayer(room, player);
+  }
+
+  /** A lobby player renames themselves or switches avatar set. Names stay unique in the room. */
+  updateProfile(
+    code: string,
+    playerId: string,
+    profile: { name?: string | undefined; gender?: Gender | undefined },
+  ): Room {
+    const room = this.requireRoom(code);
+    const player = this.requireMember(room, playerId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only change your name in the lobby');
+    }
+    const { name, gender } = profile;
+    if (
+      name !== undefined &&
+      room.players.some(
+        (p) =>
+          p.id !== player.id &&
+          !p.departed &&
+          p.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      )
+    ) {
+      throw new RoomError('NAME_TAKEN', 'Someone in this room already uses that name');
+    }
+    if (name !== undefined) player.name = name;
+    if (gender !== undefined) player.gender = gender;
+    return room;
+  }
+
+  /** The host removes another player from the lobby. Returns the socket that player was using. */
+  kickPlayer(
+    code: string,
+    hostId: string,
+    targetId: string,
+  ): { room: Room; kickedSocketId: string | null } {
+    const room = this.requireHost(code, hostId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only remove players in the lobby');
+    }
+    if (targetId === hostId) {
+      throw new RoomError('INVALID_TARGET', 'Use Leave to leave the room yourself');
+    }
+    const target = room.players.find((p) => p.id === targetId && !p.departed);
+    if (!target) throw new RoomError('INVALID_TARGET', 'That player has already left');
+    const kickedSocketId = target.socketId;
+    this.removePlayer(room, target);
+    return { room, kickedSocketId };
+  }
+
+  /** The host hands the room to another connected player in the lobby and becomes a guest. */
+  transferHost(code: string, hostId: string, targetId: string): Room {
+    const room = this.requireHost(code, hostId);
+    if (room.status !== 'lobby') {
+      throw new RoomError('INVALID_PHASE', 'You can only hand over the room in the lobby');
+    }
+    if (targetId === hostId) throw new RoomError('INVALID_TARGET', 'You are already the host');
+    const target = room.players.find((p) => p.id === targetId && !p.departed);
+    if (!target || target.isComputer) {
+      throw new RoomError('INVALID_TARGET', 'That player has already left');
+    }
+    if (!target.socketId) {
+      throw new RoomError('INVALID_TARGET', `${target.name} is disconnected. Wait for them first.`);
+    }
+    room.hostId = target.id;
+    // The host is always ready; the old host stays ready rather than holding up the start.
+    target.ready = true;
+    return room;
   }
 
   setReady(code: string, playerId: string, ready: boolean): Room {
@@ -283,12 +414,7 @@ export class RoomManager {
     if (!outcome.ok) throw new RoomError(outcome.error.code, outcome.error.message);
     room.game = outcome.state;
     if (room.game.phase.type === 'finished') this.finishRound(room);
-    else if (
-      room.game.currentIndex !== turnBefore ||
-      outcome.events.some((e) => e.type === 'cardPlayed')
-    ) {
-      this.startTurnHold(room);
-    }
+    else if (needsTurnHold(room.game, turnBefore, outcome.events)) this.startTurnHold(room);
     this.scheduleComputers(room);
     return { room, version: room.game.version };
   }
@@ -299,6 +425,7 @@ export class RoomManager {
     if (!room || !player || player.socketId !== socketId) return null;
     player.socketId = null;
     player.disconnectedAt = this.now();
+    player.seatHeld = false;
     this.clearExpiry(player);
     player.expiryTimer = setTimeout(
       () => this.expireSeat(room, player),
@@ -315,6 +442,35 @@ export class RoomManager {
   }
 
   // ---- internals ----
+
+  /**
+   * Joining a running game by code: only a seat the table agreed to hold (docs/RULES.md §5.16), taken
+   * back under the same name. The lost session's token is replaced so it can't reclaim the seat.
+   */
+  private rejoinHeldSeat(room: Room, name: string, socketId: string): JoinResult {
+    const seat = room.players.find(
+      (p) =>
+        !p.departed && !p.isComputer && p.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    );
+    if (!seat || seat.socketId) {
+      throw new RoomError('GAME_IN_PROGRESS', 'This game has already started. Wait for the lobby.');
+    }
+    if (!seat.seatHeld) {
+      const decider = room.players.find((p) => p.id === waitDeciderId(room, seat));
+      throw new RoomError(
+        'GAME_IN_PROGRESS',
+        decider
+          ? `${decider.name} needs to agree to wait for you first. Ask them to press Wait.`
+          : "Nobody has agreed to wait for you, so you can't rejoin this game.",
+      );
+    }
+    this.clearExpiry(seat);
+    seat.socketId = socketId;
+    seat.disconnectedAt = null;
+    seat.seatHeld = false;
+    seat.reconnectToken = generateReconnectToken();
+    return { room, player: seat };
+  }
 
   private beginRound(room: Room): void {
     const members = room.players.filter((p) => !p.departed);
@@ -449,6 +605,7 @@ export class RoomManager {
   private removePlayer(room: Room, player: RoomPlayer): void {
     this.clearExpiry(player);
     player.socketId = null;
+    player.seatHeld = false;
     player.reconnectToken = '';
     if (room.status === 'lobby') {
       room.players = room.players.filter((p) => p.id !== player.id);
@@ -525,6 +682,7 @@ export class RoomManager {
       isComputer: false,
       commandCache: new CommandCache(),
       expiryTimer: null,
+      seatHeld: false,
     };
   }
 

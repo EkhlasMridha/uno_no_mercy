@@ -61,7 +61,14 @@ its face or deck position.
 - **Mercy while drawing:** the draw that brings you to 25 cards knocks you out (§5.13), whether you drew
   because you had to or because you chose to.
 - **Reshuffle:** when the draw pile is empty, every discard except the top card, plus any set-aside hands
-  of knocked-out players, is shuffled into a new draw pile.
+  of knocked-out players, is shuffled into a new draw pile, as at a real table. It happens at the moment
+  a card is needed, so an empty pile can sit on the table until the next draw, and a draw of several
+  cards (a penalty, a Color Roulette reveal) carries on from the new pile. The top card stays face up and
+  the color in play does not change. A recycled wild goes back as a plain wild: the color it was given
+  only lasted while it was the top card. The recycled cards are face down in the deck, so nobody can
+  look back at them: the table and the played-cards list start again from the top card, and the
+  server stops sending the earlier plays to anyone. If the discards and set-aside hands are empty as well, see A5
+  in §6.
 
 ## 5. Card effects and special rules
 
@@ -132,7 +139,10 @@ and **before the next player begins their turn**, you draw 2 (official).
   player, the table pauses for **2 seconds** (`TURN_HOLD_MS`). During the pause only **calling UNO** (and
   leaving) is open: nobody may play, draw, take a penalty, name a roulette color or catch. So a player who
   just reached one card always has 2 seconds to press UNO before anyone can catch them, and the next
-  player cannot close the window early either. Drawing again within your own turn does not start a pause.
+  player cannot close the window early either. Drawing again within your own turn does not start a pause,
+  and neither does a play that hands the turn straight back to you (Skip Everyone, or a Skip or Reverse
+  with two players): you play on at once, unless that play left someone open to a catch (usually you, on
+  one card), in which case the 2 seconds still apply so they can call UNO.
   The pause always ends on its own (the server re-sends the table when it does), so it cannot stall a
   game.
 
@@ -177,7 +187,12 @@ single card enters a hand: penalties, mandatory draws, roulette reveals and UNO 
 - **Knocked out while taking a stack:** drawing stops at the 25th card. The rest of the penalty is void, the
   stack is cleared, and play passes to the next active player after them. It is not passed on to anyone
   else.
-- **Knocked out while drawing manually:** the draw that reaches 25 cards knocks you out and play passes on.
+- **Reaching 25 by drawing manually (house rule, last chance):** when a draw you chose to make brings you
+  to 25 cards, look at the card you drew. If it can't be played, you are knocked out and play passes on.
+  If it can, you are spared for one move: you must play that card, which brings you back to 24. Drawing
+  again is not allowed, so the turn always ends with that play. This applies only to draws you choose
+  to make. Penalty draws, UNO penalties and Color Roulette reveals still knock you out at 25.
+  Switch: `RULES_CONFIG.lastChanceDraw` (§6, A13).
 
 ### 5.14 Winning
 
@@ -196,6 +211,27 @@ worth their face value, colored action cards 20 points, and wild action cards 50
 carry over from round to round, and the first to **1,000** wins the match. This lives in
 `apps/server/src/rooms/match-scoring.ts`, separate from the engine.
 
+### 5.16 Dropping out and rejoining (house rule)
+
+A person who loses their connection mid-game keeps their seat and hand for the reconnect window
+(`RECONNECT_GRACE_SECONDS`, 120 s by default). A refresh in the same tab gets the seat straight back.
+
+1. **Who decides:** the next connected person after them in the current direction of play (computers
+   are skipped). They are asked, on the table, whether to wait. Everyone else sees who is deciding.
+2. **Wait:** the seat is held for up to `WAIT_FOR_REJOIN_MS` (5 minutes) from the moment they agree.
+   While it is held, the dropped player may **rejoin from any device**: open the game, enter the room
+   code and the **same name**, and they get their seat and hand back. If it is their turn, play waits.
+3. **Don't wait, or Stop waiting:** the dropped player forfeits at once (§6, A11) and play moves on. The
+   decider can stop waiting at any time while the seat is held.
+4. **No answer:** the normal reconnect window applies; when it runs out, the player forfeits.
+5. **Refused rejoins:** joining a running game by code works only for a seat the table agreed to hold. A
+   name matching a seat nobody agreed to hold is refused with who has to agree. Any other name is
+   refused as before: the game has started.
+6. **Edge cases:** if the decider drops out too, the question passes to the next connected person. A
+   player already knocked out is not asked about. Rejoining replaces the lost session's token, so the old
+   tab can no longer reclaim the seat. The wait always ends: on rejoin, on a refusal, or when the hold
+   runs out.
+
 ## 6. Ambiguities and chosen policies
 
 | #   | Situation                                                                                | Chosen behavior                                                                                                                                                                                    | Where                                                   |
@@ -210,5 +246,6 @@ carry over from round to round, and the first to **1,000** wins the match. This 
 | A8  | One card left after a swap or pass                                                       | Must call UNO, same catch window                                                                                                                                                                   | `uno-manager.ts`                                        |
 | A9  | Last card is a 7, 0, Draw or Discard All                                                 | The win is checked first, so no effect resolves                                                                                                                                                    | `game.reducer.ts`                                       |
 | A10 | Ignored opening action cards                                                             | Stay in the discard pile underneath the starting card                                                                                                                                              | `game.factory.ts`                                       |
-| A11 | Player leaves or their reconnect window expires mid-game                                 | Forfeit: eliminated with reason `forfeit` and cards set aside. If it was their turn, any pending penalty against them is void and play moves on. Forfeits do not earn the 250 knockout bonus       | `handleForfeit`, `RULES_CONFIG.forfeitCountsAsKnockout` |
+| A11 | Player leaves, the table won't wait for them, or their reconnect window expires mid-game | Forfeit: eliminated with reason `forfeit` and cards set aside. If it was their turn, any pending penalty against them is void and play moves on. Forfeits do not earn the 250 knockout bonus       | `handleForfeit`, `RULES_CONFIG.forfeitCountsAsKnockout` |
 | A12 | Knocked-out players catching UNO                                                         | Not allowed                                                                                                                                                                                        | `uno-manager.ts`                                        |
+| A13 | A draw you chose to make brings you to 25 cards (house rule)                             | If the drawn card is playable you must play it, back to 24, and stay in; drawing again is refused. If it isn't playable you are knocked out. Forced draws still knock out at 25                    | `handleDraw`, `RULES_CONFIG.lastChanceDraw`             |

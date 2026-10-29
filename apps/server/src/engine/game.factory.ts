@@ -74,6 +74,7 @@ export function createGame(options: CreateGameOptions): { state: GameState; even
     log: [],
     logSeq: 0,
     playHistory: [{ playerId: null, card: first, chosenColor: null }],
+    playHistoryStart: 0,
     endWhenOut: options.endWhenOut ?? [],
   };
   const events: EventSink = [

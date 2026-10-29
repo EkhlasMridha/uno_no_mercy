@@ -25,6 +25,13 @@ export interface LobbyPlayerView {
   connected: boolean;
   /** Player left or timed out during a running game; kept until the room returns to the lobby. */
   departed: boolean;
+  /**
+   * Dropped out mid-game: who decides whether the table waits for them, and may stop waiting
+   * (docs/RULES.md §5.16). Null when there is nothing to decide.
+   */
+  waitDeciderId: string | null;
+  /** The table agreed to hold this dropped player's seat, so they may rejoin with the room code. */
+  seatHeld: boolean;
   score: number;
 }
 

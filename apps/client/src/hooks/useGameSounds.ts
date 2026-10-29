@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PublicGameView } from '@nomercy/shared';
+import type { Gender, PublicGameView } from '@nomercy/shared';
+import type { TableAvatars } from '../lib/avatar';
 import { playSound, type SoundKind } from '../lib/sound';
 import { getState } from '../state/store';
 
@@ -14,6 +15,13 @@ function playIfOn(kind: SoundKind, delay = 0): void {
   if (isOn(kind)) playSound(kind, delay);
 }
 
+/** The voice that calls a player's UNO: their own, or a fixed one per computer, which has no gender. */
+function voiceOf(avatarOf: TableAvatars, playerId: string): Gender {
+  const face = avatarOf(playerId);
+  if (face.kind === 'person') return face.gender;
+  return [...playerId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 2 === 0 ? 'male' : 'female';
+}
+
 /**
  * The idle turn reminder's nudge for the hand. `count` only grows, one per reminder, so each one can
  * replay the hop; `active` stays true until anything happens at the table.
@@ -24,7 +32,7 @@ export interface IdleNudge {
 }
 
 /**
- * Plays the card play, your turn, turn reminder, hand exchange, penalty, knockout and win sounds the player has
+ * Plays the card play, Discard All, card draw, reshuffle, roulette hit, UNO call, your turn, turn reminder, hand exchange, penalty, knockout and win sounds the player has
  * switched on, and returns the idle nudge so the hand can shake with the reminder. Purely
  * presentational: every trigger is state the server already sent.
  */
@@ -33,6 +41,8 @@ export function useGameSounds(
   meId: string,
   mustAct: boolean,
   version: number,
+  /** Each player's face, whose gender picks the voice that calls their UNO. */
+  avatarOf: TableAvatars,
 ): IdleNudge {
   const [tick, setTick] = useState({ count: 0, version: -1 });
   // `version` changes on every move, so anything happening at the table restarts the countdown.
@@ -57,14 +67,42 @@ export function useGameSounds(
     lastSeq.current = newest;
     const fresh = view.log.filter((e) => e.seq > since);
     // Every card played gets its own slap, a beat apart when several arrive in one update.
-    const plays = fresh.filter((e) => e.event.type === 'cardPlayed').length;
-    for (let i = 0; i < Math.min(plays, 3); i++) playIfOn('cardPlay', i * 0.12);
-    const played = plays > 0;
+    // A Discard All has its own sound: a handful of cards hitting the pile.
+    const plays = fresh.flatMap((e): SoundKind[] =>
+      e.event.type === 'cardPlayed'
+        ? [e.event.card.kind === 'discardAll' ? 'discardAll' : 'cardPlay']
+        : [],
+    );
+    plays.slice(0, 3).forEach((kind, i) => playIfOn(kind, i * 0.12));
+    const played = plays.length > 0;
+    // Drawing from the pile, so everyone can tell the player is drawing: one swish per card drawn
+    // on their own (one per Draw), and one per Color Roulette reveal. Penalty draws have the
+    // trombone instead, and the roulette's closing `cardsDrawn` only totals the reveals.
+    const draws = fresh.reduce((n, e) => {
+      if (e.event.type === 'rouletteCardRevealed') return n + 1;
+      if (e.event.type === 'cardsDrawn' && e.event.reason === 'noPlayableCard') {
+        return n + e.event.count;
+      }
+      return n;
+    }, 0);
+    // The pile ran out: the discards are gathered and riffled before the next card comes off it.
+    const reshuffled = fresh.some((e) => e.event.type === 'drawPileReshuffled');
+    if (reshuffled) playIfOn('reshuffle', played ? 0.25 : 0);
+    const drawFrom = reshuffled ? (played ? 1.35 : 1.1) : 0;
+    for (let i = 0; i < Math.min(draws, 3); i++) playIfOn('cardDraw', drawFrom + i * 0.12);
+    // The reveal that turns up the named color: ding once its card has slid in.
+    const rouletteHit = fresh.some((e) => e.event.type === 'rouletteResolved' && e.event.matched);
+    if (rouletteHit) playIfOn('rouletteHit', 0.2);
     // A 0 or 7 is played and passed in one update: let the card land before the hands move.
     const exchanged = fresh.some(
       (e) => e.event.type === 'handsSwapped' || e.event.type === 'handsPassed',
     );
     if (exchanged) playIfOn('handExchange', played ? 0.25 : 0);
+    // Everyone hears the UNO call in the caller's voice, after their card lands when it came with one.
+    const caller = fresh.find((e) => e.event.type === 'unoCalled');
+    if (caller?.event.type === 'unoCalled' && isOn('unoCall')) {
+      playSound('unoCall', played ? 0.25 : 0, voiceOf(avatarOf, caller.event.playerId));
+    }
     // Everyone hears it when someone takes a stacked penalty or is caught without calling UNO.
     const penalized = fresh.some(
       (e) =>
@@ -84,11 +122,11 @@ export function useGameSounds(
       (e) => e.event.type === 'cardPlayed' && e.event.playerId !== meId,
     );
     if (mustAct && (!actingBefore.current || othersPlayed)) {
-      // Chime once the card has landed and any hands have finished passing.
-      playIfOn('yourTurn', exchanged ? 0.8 : played ? 0.3 : 0);
+      // Chime once the card has landed and any hands or the roulette ding have finished.
+      playIfOn('yourTurn', exchanged || rouletteHit ? 0.8 : played ? 0.3 : 0);
     }
     actingBefore.current = mustAct;
-  }, [view.log, mustAct, meId]);
+  }, [view.log, mustAct, meId, avatarOf]);
 
   // Only the moment of winning cheers, after the final card lands; reloading into a finished game
   // stays quiet.

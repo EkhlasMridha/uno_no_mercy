@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Card } from '@nomercy/shared';
+import { colorOf, type Card } from '@nomercy/shared';
 import type { IdleNudge } from '../../hooks/useGameSounds';
 import { sortHand } from '../../lib/cards';
 import { PlayingCard } from '../card/PlayingCard';
@@ -11,10 +11,83 @@ interface PlayerHandProps {
   onCardClick: (card: Card) => void;
   /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
   nudge: IdleNudge;
+  /** Privacy mode: cards show their backs until you point at one (screens with a mouse only). */
+  concealed: boolean;
 }
 
-/** Your cards held in a fan over the table edge. */
-export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: PlayerHandProps) {
+interface HandLayout {
+  /** One row, or two tiers when one row would hide the corner indices: the back tier first. */
+  rows: Card[][];
+  /** Distance from one card's left edge to the next, in px. */
+  step: number;
+  /** Extra space where a new color starts, in px. */
+  gap: number;
+}
+
+// Room left for the scroller's padding (px-4) and each row's (px-6), which holds the tilted corners.
+const EDGE_ROOM = 80;
+// A short phone, or one held sideways, has no height for a second tier: one row that scrolls is better.
+const NO_TIERS_QUERY = '(max-height: 500px), (max-width: 639px) and (max-height: 720px)';
+
+function startsColor(row: readonly Card[], i: number): boolean {
+  const prev = row[i - 1];
+  const card = row[i];
+  return prev !== undefined && card !== undefined && colorOf(prev) !== colorOf(card);
+}
+
+/** Splits the hand in two tiers, at the color change nearest the middle when one is close. */
+function splitTiers(cards: Card[]): Card[][] {
+  const half = Math.ceil(cards.length / 2);
+  let cut = half;
+  for (let i = 1; i < cards.length; i++) {
+    if (startsColor(cards, i) && Math.abs(i - half) < Math.abs(cut - half)) cut = i;
+  }
+  // A lopsided color split reads worse than one color carried over to the second tier.
+  if (Math.abs(cut - half) > cards.length / 5) cut = half;
+  return [cards.slice(0, cut), cards.slice(cut)];
+}
+
+/** Spaces the hand to fit the width, so every card's corner index stays in view without scrolling. */
+function layoutHand(
+  cards: Card[],
+  width: number,
+  cardWidth: number,
+  allowTiers: boolean,
+): HandLayout {
+  const avail = width - EDGE_ROOM;
+  const roomy = cardWidth - 14;
+  const readable = Math.max(26, cardWidth * 0.4);
+  const groupGap = Math.round(cardWidth * 0.2);
+  const stepFor = (row: Card[], gap: number) => {
+    if (row.length < 2) return roomy;
+    const starts = row.filter((_, i) => startsColor(row, i)).length;
+    return (avail - cardWidth - starts * gap) / (row.length - 1);
+  };
+  const tiers = allowTiers && cards.length >= 8 ? splitTiers(cards) : null;
+  const options: [Card[][] | null, number, number][] = [
+    [[cards], groupGap, readable],
+    [[cards], 4, readable],
+    [tiers, groupGap, readable],
+    [tiers, 4, 22],
+  ];
+  for (const [rows, gap, min] of options) {
+    if (!rows) continue;
+    const step = Math.min(...rows.map((row) => stepFor(row, gap)));
+    if (step >= min) return { rows, step: Math.min(step, roomy), gap };
+  }
+  // Even two tight tiers don't fit: keep the corners readable and let the hand scroll.
+  return { rows: tiers ?? [cards], step: 22, gap: 4 };
+}
+
+/** Your cards held in a fan over the table edge, grouped by color and sized to the screen. */
+export function PlayerHand({
+  hand,
+  playableIds,
+  isMyTurn,
+  onCardClick,
+  nudge,
+  concealed,
+}: PlayerHandProps) {
   const sorted = useMemo(() => sortHand(hand), [hand]);
   const previous = useRef<Set<string> | null>(null);
   const prevIds = previous.current;
@@ -22,92 +95,138 @@ export function PlayerHand({ hand, playableIds, isMyTurn, onCardClick, nudge }: 
     previous.current = new Set(hand.map((c) => c.id));
   }, [hand]);
 
-  // The felt's width and one card's, measured so the fan can open to fill the space it has.
+  // Card size follows the breakpoints in PlayingCard, so it's measured rather than repeated here.
   const scroller = useRef<HTMLDivElement>(null);
-  const [room, setRoom] = useState({ width: 0, card: 0 });
-  const empty = sorted.length === 0;
+  const hasCards = sorted.length > 0;
+  // In privacy mode, pointing at or focusing any card shows the whole hand until you leave it.
+  const [revealed, setRevealed] = useState(false);
+  const [room, setRoom] = useState<{
+    width: number;
+    cardWidth: number;
+    allowTiers: boolean;
+  } | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const measure = () =>
-      setRoom({
-        // Less the scroller's px-4 and the list's px-6, which hold the outer cards' tilted corners.
-        width: el.clientWidth - 80,
-        card: el.querySelector('li')?.offsetWidth ?? 0,
-      });
+    const measure = () => {
+      const card = el.querySelector('li');
+      if (!card) return;
+      const next = {
+        width: el.clientWidth,
+        cardWidth: card.offsetWidth,
+        allowTiers: !window.matchMedia(NO_TIERS_QUERY).matches,
+      };
+      setRoom((prev) =>
+        prev &&
+        prev.width === next.width &&
+        prev.cardWidth === next.cardWidth &&
+        prev.allowTiers === next.allowTiers
+          ? prev
+          : next,
+      );
+    };
     measure();
-    // Card size follows width and height breakpoints; both resize the scroller too.
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [empty]);
+  }, [hasCards]);
 
-  if (empty) {
+  if (!hasCards) {
     return <p className="py-8 text-center text-chalk/50">No cards in hand</p>;
   }
 
-  // Each card bares a strip under the next: as wide as the felt allows, up to three quarters of a
-  // card. A big hand may pack tighter, down to a strip that still shows the corner index, then scrolls.
-  const cardWidth = room.card;
-  const tightest = sorted.length > 16 ? 0.4 : sorted.length > 9 ? 0.55 : 0.75;
-  const fit = sorted.length > 1 ? (room.width - cardWidth) / (sorted.length - 1) : cardWidth;
-  const strip = Math.max(cardWidth * tightest, Math.min(cardWidth * 0.75, fit));
-
-  // The fan opens wider with more cards, up to a comfortable grip.
-  const spread = Math.min(sorted.length * 4, 44);
-  const step = sorted.length > 1 ? spread / (sorted.length - 1) : 0;
-  // The outermost cards sit lowest in the arc and tip a corner further down as they tilt on their
-  // foot. Room for that, plus the shadow, goes under the list so the scroller never clips a corner;
-  // the scroller gives it back with a negative margin so the seat below doesn't move.
-  const edge = spread / 2;
-  const overhang =
-    Math.ceil((edge * edge) / 28 + (cardWidth / 2) * Math.sin((edge * Math.PI) / 180)) + 8;
+  const layout = room
+    ? layoutHand(sorted, room.width, room.cardWidth, room.allowTiers)
+    : { rows: [sorted], step: 40, gap: 8 };
+  const cardWidth = room?.cardWidth ?? 72;
+  const tiered = layout.rows.length > 1;
+  let index = 0;
 
   return (
     <div
       ref={scroller}
-      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4"
-      style={{ marginBottom: -overhang }}
+      className="scroll-none overflow-x-auto overflow-y-hidden px-4 pb-3 pt-6 short:pb-2 short:pt-4 shortest:pb-1 shortest:pt-3"
     >
-      <ul
-        className="mx-auto flex w-max items-end px-6"
-        style={{ paddingBottom: overhang }}
+      <div
+        role="group"
         aria-label={`Your hand, ${sorted.length} cards`}
+        className="w-max min-w-full"
+        onPointerLeave={() => setRevealed(false)}
+        onFocus={() => setRevealed(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setRevealed(false);
+        }}
       >
-        {sorted.map((card, i) => {
-          const playable = isMyTurn && playableIds.has(card.id);
-          const tilt = sorted.length > 1 ? -spread / 2 + i * step : 0;
-          // Cards further from the middle sit lower, tracing the arc of the fan.
-          const drop = (tilt * tilt) / 28;
+        {layout.rows.map((row, r) => {
+          // A flatter arc for two tiers, so the back tier's corners stay above the front one.
+          const spread = Math.min(row.length * 3.5, tiered ? 18 : 32);
+          const tiltStep = row.length > 1 ? spread / (row.length - 1) : 0;
+          // The outermost cards sit lowest and tip a corner further down as they tilt on their foot.
+          // The front row keeps room for that, so no corner is clipped by the screen edge.
+          const edge = spread / 2;
+          const overhang =
+            r === layout.rows.length - 1
+              ? Math.ceil((edge * edge) / 28 + (cardWidth / 2) * Math.sin((edge * Math.PI) / 180))
+              : 0;
           return (
-            <li
-              key={card.id}
+            <ul
+              key={r}
+              className="mx-auto flex w-max items-end px-6"
               style={{
-                marginLeft: i > 0 ? strip - cardWidth : 0,
-                zIndex: i,
-                transform: `translateY(${drop}px) rotate(${tilt}deg)`,
-                transformOrigin: '50% 100%',
+                // The front tier covers the lower half of the back one, leaving its top corners and
+                // symbols showing, the way you'd hold a thick hand in two rows.
+                marginTop: r > 0 ? -cardWidth * 0.7 : undefined,
+                paddingBottom: overhang,
               }}
             >
-              {/* Re-keyed on each reminder so the hop replays, rippling across the fan. */}
-              <div
-                key={nudge.count}
-                className={nudge.active ? 'anim-nudge' : undefined}
-                style={nudge.active ? { animationDelay: `${Math.min(i * 18, 220)}ms` } : undefined}
-              >
-                <PlayingCard
-                  card={card}
-                  size="md"
-                  playable={playable}
-                  dimmed={isMyTurn && !playable}
-                  onClick={() => onCardClick(card)}
-                  animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
-                />
-              </div>
-            </li>
+              {row.map((card, i) => {
+                const order = index++;
+                const playable = isMyTurn && playableIds.has(card.id);
+                const tilt = row.length > 1 ? -spread / 2 + i * tiltStep : 0;
+                // Cards further from the middle sit lower, tracing the arc of the fan.
+                const drop = (tilt * tilt) / 28;
+                const marginLeft =
+                  i === 0 ? 0 : layout.step - cardWidth + (startsColor(row, i) ? layout.gap : 0);
+                return (
+                  <li
+                    key={card.id}
+                    // Hovering or focusing a card brings it to the front so you can read all of it.
+                    className="hover:!z-[300] focus-within:!z-[300]"
+                    onPointerEnter={() => setRevealed(true)}
+                    style={{
+                      marginLeft,
+                      zIndex: r * 100 + i,
+                      transform: `translateY(${drop}px) rotate(${tilt}deg)`,
+                      transformOrigin: '50% 100%',
+                    }}
+                  >
+                    {/* Re-keyed on each reminder so the hop replays, rippling across the fan. */}
+                    <div
+                      key={nudge.count}
+                      className={nudge.active ? 'anim-nudge' : undefined}
+                      style={
+                        nudge.active
+                          ? { animationDelay: `${Math.min(order * 18, 220)}ms` }
+                          : undefined
+                      }
+                    >
+                      <PlayingCard
+                        card={card}
+                        size="md"
+                        playable={playable}
+                        dimmed={isMyTurn && !playable}
+                        onClick={() => onCardClick(card)}
+                        animate={prevIds && !prevIds.has(card.id) ? 'draw' : null}
+                        concealed={concealed && !revealed}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           );
         })}
-      </ul>
+      </div>
     </div>
   );
 }

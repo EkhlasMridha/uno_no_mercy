@@ -5,6 +5,8 @@
 ```
 Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    │  guests toggle Ready; host may enable scoring
+                   │  anyone may rename or switch avatar set
+                   │  host may remove a player, or hand hosting to a connected player
                    │  host: Start (all others ready & connected; open seats? fill with computers)
                    ▼
                  inGame ──(win)──► roundOver
@@ -13,6 +15,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
+- **Invite links** (`?join=CODE`) join without asking: under the name this browser last used (kept in
+  `localStorage`), or a random one like "Lucky Otter" when there is none or it is taken, with the male
+  avatar set. The player can rename and switch avatar set in the lobby; a rename is remembered.
 - **Play with computer** skips the lobby: the player picks 1–9 computer opponents, the server seats
   them under generated names and deals the first round at once. Computers move by themselves after a
   short pause; the player is the host for Next round and Back to lobby. The room closes when they leave.
@@ -21,7 +26,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
   players" starts as is (only with 2 or more people). A host on their own can start this way.
 - With computers at the table, the round ends with no winner once every person is knocked out.
   Computers leave on Back to lobby, freeing their seats for people.
-- Joining is only possible in the lobby. During a game, only reconnecting with a valid token is accepted.
+- Joining is only possible in the lobby. During a game, a refresh reconnects with the tab's token. A
+  player who drops out is held for the next player to decide: on Wait, they can rejoin from any
+  device with the room code and the same name; on Don't wait, they forfeit (docs/RULES.md §5.16).
 - Players who leave or time out during a game are marked _departed_ and removed when the next round starts
   or the room returns to the lobby.
 
@@ -36,15 +43,22 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
 3. The server validates and applies the command, increments the version, and broadcasts new projections.
    Clients animate the change; animations never hold up or alter the state. A 7 or a 0 shows each hand
    sliding face down from its old owner's seat to its new one, with a caption naming who swapped.
+   The played card also sits on the player's avatar until the next player has finished their move, so
+   everyone can see who played what.
    For the next 2 seconds the table pauses (the UNO breather, RULES.md §5.9): only **UNO** can be pressed,
    so a player left on one card can call it before anyone catches them. Then the server re-sends the table
-   with the next player's actions open.
+   with the next player's actions open. A play that gives the turn straight back to you (Skip Everyone,
+   or a Skip or Reverse with two players) skips the pause, unless it left you on one card.
 4. The player may press **Draw** (or the draw pile) at any time on their turn, one card per press. From then
    on only the card drawn last is playable, if it matches. The player can play it or keep drawing; each new
-   draw locks the previous one.
+   draw locks the previous one. When the pile is empty it shows as an empty spot ("Empty: draw to
+   reshuffle"). The next draw gathers the discards under the top card into a new pile: the heap on the
+   felt shrinks to the top card, the new deck riffles, everyone sees a "Reshuffle!" banner and hears
+   the shuffle, and then the card comes off the new pile.
 5. With a penalty pending, only Draw cards of at least the last value are highlighted. **Take +N** accepts
    the stack.
-6. Roulette: the victim gets a color dialog that cannot be dismissed, then presses **Draw** once per card.
+6. Roulette: the victim gets a color dialog that cannot be dismissed (its **See played cards** button opens
+   the cards on the discard pile over it, to check before naming a color), then presses **Draw** once per card.
    Every revealed card is shown face up to the whole table. When the named color appears, the revealed
    cards join the victim's hand, the reveal clears, and play continues with the player after the victim.
 
@@ -62,6 +76,8 @@ For `playCard`:
 7. Finalize: UNO sync, last-standing check, version++, log.
 
 For draw, penalty and roulette commands, the Mercy Rule is checked after **every** card enters a hand.
+The one exception is a draw you chose to make that brings you to 25 with a playable card: the phase
+becomes `drawing` with `lastChance`, and playing that card is the only legal move (docs/RULES.md §5.13).
 
 ## Validation scenarios covered
 
@@ -70,7 +86,9 @@ Automated (`npm test`):
 - Deck has 168 unique cards with the exact composition. Setup deals 7 each and ignores opening action cards.
 - Matching by color, number and symbol. Wilds play on anything. After a wild only its chosen color matches.
 - Draw until playable, then must play that card. Drawing is refused when a playable card is held.
-- Reshuffle keeps the top card. The fallback when nothing is left to draw.
+- Reshuffle keeps the top card and the color in play, recycles exactly the cards under it (wilds come
+  back colorless), and a penalty that empties the pile carries on from the new one with every card
+  accounted for. The fallback when nothing is left to draw.
 - Skip and Reverse with three and with two players. Skip Everyone. Discard All placement.
 - +2, then +4, then accept, with the turn going to the right player. +10 only answered by +10. Unrelated
   cards and drawing are blocked while a stack is pending.

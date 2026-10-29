@@ -13,7 +13,8 @@ export function topCard(state: GameState): Card {
 
 /**
  * Rebuilds the draw pile from every discard except the active top card, plus any
- * set-aside hands of eliminated players. Returns the number of recycled cards.
+ * set-aside hands of eliminated players, and forgets the recycled plays. Returns the number of
+ * recycled cards.
  */
 export function reshuffleDiscardIntoDraw(state: GameState, rng: Rng, events: EventSink): number {
   const top = state.discardPile.pop();
@@ -21,6 +22,10 @@ export function reshuffleDiscardIntoDraw(state: GameState, rng: Rng, events: Eve
   state.discardPile = top ? [top] : [];
   state.setAside = [];
   state.drawPile = shuffle(pool, rng);
+  // The recycled plays are face down in the deck now, so nobody can look back at them any more.
+  const gathered = Math.max(0, state.playHistory.length - 1);
+  state.playHistory = state.playHistory.slice(gathered);
+  state.playHistoryStart += gathered;
   if (pool.length > 0) events.push({ type: 'drawPileReshuffled', cards: pool.length });
   return pool.length;
 }
@@ -47,6 +52,7 @@ export interface DrawOutcome {
 /**
  * Draws up to `count` cards into a player's hand one at a time. Stops immediately when the
  * player reaches the Mercy limit (they are eliminated) or when no card can be supplied.
+ * `deferMercy` leaves the knockout to the caller, for the last-chance draw (docs/RULES.md §5.13).
  */
 export function drawCardsInto(
   state: GameState,
@@ -55,6 +61,7 @@ export function drawCardsInto(
   rng: Rng,
   events: EventSink,
   reason: DrawReason,
+  deferMercy = false,
 ): DrawOutcome {
   const player = playerAt(state, index);
   const drawn: Card[] = [];
@@ -73,6 +80,6 @@ export function drawCardsInto(
     events.push({ type: 'cardsDrawn', playerId: player.id, count: drawn.length, reason });
   }
   if (exhausted) events.push({ type: 'drawPileExhausted', playerId: player.id });
-  const eliminated = enforceMercy(state, index, events);
+  const eliminated = !deferMercy && enforceMercy(state, index, events);
   return { drawn, eliminated, exhausted };
 }

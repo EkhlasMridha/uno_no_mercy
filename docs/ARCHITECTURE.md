@@ -113,7 +113,8 @@ Opponents' card ids are never sent. The integration test checks this byte for by
 refuses play, draw, take-penalty, roulette-color and catch commands with `TURN_HOLD`; `callUno` and leaving
 still go through. `toGameView` sends `turnHoldMs` and strips every action except `canCallUno` from
 `validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
-Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+A play that hands the turn straight back to its player skips the hold unless a player is left
+vulnerable to a catch (`needsTurnHold`). Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
 
 ## Network protocol
 
@@ -122,9 +123,13 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | Event                        | Payload                                                              | Notes                                                                                                   |
 | ---------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `room:create`                | `{ name, gender, maxPlayers, computers? }`                           | returns `SessionInfo`; `computers` (1–9) deals at once; `gender` (`male`/`female`) picks the avatar set |
-| `room:join`                  | `{ code, name, gender }`                                             | lobby only; max 6; unique names                                                                         |
+| `room:join`                  | `{ code, name, gender }`                                             | lobby: up to `maxPlayers`, unique names. In a game: only takes back a held seat under its name (§5.16)  |
+| `room:wait-for-player`       | `{ playerId, wait }`                                                 | the dropped player's decider only: `true` holds the seat, `false` makes them forfeit now                |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
+| `room:profile`               | `{ name?, gender? }`                                                 | lobby only; your own seat; at least one field; names stay unique                                        |
+| `room:kick`                  | `{ playerId }`                                                       | host, lobby only; the removed player gets `room:closed` and is unbound                                  |
+| `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
 | `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
 | `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
 | `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
@@ -194,6 +199,11 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   connection.
 - When a player disconnects, their seat and hand are kept for `RECONNECT_GRACE_SECONDS` (default 120s) and
   other players see a disconnected icon. If the host disconnects, host rights move to a connected player.
+- **Waiting for a dropped player** (docs/RULES.md §5.16): during a game, `waitDeciderId` in
+  `rooms/rejoin.ts` names the next connected person in the direction of play, and the room view
+  carries it with `seatHeld`. If they wait, the expiry timer is reset to `WAIT_FOR_REJOIN_MS` and
+  `room:join` with the room code and the same name takes the seat back, with a new token. If they
+  don't, the player forfeits at once.
 - **When the reconnect window expires:** in the lobby the seat is freed. During a game the player forfeits
   (eliminated, cards set aside, play continues), is marked _departed_, and their token becomes invalid. When
   no human members remain, the room is deleted.

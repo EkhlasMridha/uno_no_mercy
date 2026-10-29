@@ -1,10 +1,14 @@
 import {
   createRoomSchema,
   joinRoomSchema,
+  kickSchema,
+  profileSchema,
   readySchema,
   reconnectSchema,
   roomSettingsSchema,
   startGameSchema,
+  transferHostSchema,
+  waitForPlayerSchema,
   type SessionInfo,
 } from '@nomercy/shared';
 import { z } from 'zod';
@@ -58,7 +62,11 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     requireUnbound();
     const { room, player } = manager.joinRoom(code, name, gender, socket.id);
     socket.data.session = { roomCode: room.code, playerId: player.id };
-    console.info(`[room ${room.code}] player joined (${room.players.length} seated)`);
+    console.info(
+      room.status === 'lobby'
+        ? `[room ${room.code}] player joined (${room.players.length} seated)`
+        : `[room ${room.code}] player rejoined a held seat`,
+    );
     broadcaster.room(room);
     return { ok: true, data: sessionInfo(room, player) };
   });
@@ -68,7 +76,12 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     if (current && current.roomCode !== code) {
       throw new RoomError('ALREADY_IN_ROOM', 'Leave your current room first');
     }
-    const { room, player, previousSocketId } = manager.reconnect(code, token, socket.id);
+    const { room, player, previousSocketId } = manager.reconnect(
+      code,
+      token,
+      socket.id,
+      current?.playerId ?? null,
+    );
     if (previousSocketId) {
       // Same seat opened in another tab/device: the newest connection wins, no duplicate player.
       const previous = io.sockets.sockets.get(previousSocketId);
@@ -89,6 +102,31 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     socket.data.session = null;
     const room = manager.getRoom(session.roomCode);
     if (room) broadcaster.room(room);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:profile', profileSchema, (profile) => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.updateProfile(session.roomCode, session.playerId, profile));
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:kick', kickSchema, ({ playerId }) => {
+    const session = requireSession(socket);
+    const { room, kickedSocketId } = manager.kickPlayer(
+      session.roomCode,
+      session.playerId,
+      playerId,
+    );
+    if (kickedSocketId) broadcaster.removed(kickedSocketId, 'The host removed you from the room.');
+    console.info(`[room ${room.code}] host removed a player (${room.players.length} seated)`);
+    broadcaster.room(room);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:transfer-host', transferHostSchema, ({ playerId }) => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.transferHost(session.roomCode, session.playerId, playerId));
     return { ok: true, data: null };
   });
 
@@ -123,6 +161,19 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
   registerHandler(socket, limiter, 'room:return-lobby', emptySchema, () => {
     const session = requireSession(socket);
     broadcaster.room(manager.returnToLobby(session.roomCode, session.playerId));
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'room:wait-for-player', waitForPlayerSchema, (answer) => {
+    const session = requireSession(socket);
+    const room = manager.waitForPlayer(
+      session.roomCode,
+      session.playerId,
+      answer.playerId,
+      answer.wait,
+    );
+    // Refusing to wait can end the room (nobody left), so only broadcast a room that still exists.
+    if (manager.getRoom(room.code)) broadcaster.room(room);
     return { ok: true, data: null };
   });
 

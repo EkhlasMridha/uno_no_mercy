@@ -1,6 +1,22 @@
-/** The game sounds. Each is synthesized with Web Audio, so the client ships no audio files. */
+import type { Gender } from '@nomercy/shared';
+
+/**
+ * The game sounds. Each is synthesized with Web Audio, or spoken by the browser's own speech voices
+ * for the UNO call, so the client ships no audio files.
+ */
 export type SoundKind =
-  'cardPlay' | 'yourTurn' | 'turnReminder' | 'handExchange' | 'penalty' | 'knockout' | 'win';
+  | 'cardPlay'
+  | 'discardAll'
+  | 'cardDraw'
+  | 'reshuffle'
+  | 'rouletteHit'
+  | 'unoCall'
+  | 'yourTurn'
+  | 'turnReminder'
+  | 'handExchange'
+  | 'penalty'
+  | 'knockout'
+  | 'win';
 
 /** Which sounds the player has switched on, and whether all of them are muted. */
 export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
@@ -29,7 +45,17 @@ export function unlockAudio(): void {
   void ctx.resume();
 }
 
-/** One enveloped oscillator note, optionally gliding to `endHz`. */
+/**
+ * Disconnects a sound's nodes once its source has finished. A game night plays thousands of sounds,
+ * so each chain is let go explicitly instead of staying wired to the speakers.
+ */
+function releaseWhenDone(source: AudioScheduledSourceNode, ...nodes: AudioNode[]): void {
+  source.addEventListener('ended', () => nodes.forEach((node) => node.disconnect()), {
+    once: true,
+  });
+}
+
+/** One enveloped oscillator note, optionally gliding to `endHz`. Returns it, to await its end. */
 function tone(
   ac: AudioContext,
   out: AudioNode,
@@ -39,7 +65,7 @@ function tone(
   peak: number,
   hz: number,
   endHz = hz,
-): void {
+): OscillatorNode {
   const osc = ac.createOscillator();
   const amp = ac.createGain();
   osc.type = type;
@@ -51,6 +77,8 @@ function tone(
   osc.connect(amp).connect(out);
   osc.start(at);
   osc.stop(at + duration + 0.05);
+  releaseWhenDone(osc, osc, amp);
+  return osc;
 }
 
 /**
@@ -82,6 +110,7 @@ function noise(
   amp.gain.exponentialRampToValueAtTime(0.0001, at + duration);
   source.connect(band).connect(amp).connect(ac.destination);
   source.start(at);
+  releaseWhenDone(source, source, band, amp);
 }
 
 /**
@@ -122,13 +151,51 @@ function wah(
     lfo.connect(muteDepth).connect(mute.frequency);
     lfo.start(at);
     lfo.stop(at + duration + 0.05);
+    releaseWhenDone(lfo, lfo, pitchDepth, muteDepth);
   }
   osc.connect(mute).connect(amp).connect(ac.destination);
   osc.start(at);
   osc.stop(at + duration + 0.05);
+  releaseWhenDone(osc, osc, mute, amp);
 }
 
-const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
+// Voices whose names give them away, for the systems that ship them (Windows, macOS, iOS, Android,
+// Chrome). "female" is tested first because it contains "male".
+const FEMALE_VOICE =
+  /female|woman|zira|aria|jenny|libby|sonia|hazel|susan|samantha|victoria|karen|moira|tessa|fiona|serena|google us english/i;
+const MALE_VOICE =
+  /\bmale\b|\bman\b|david|mark|guy|ryan|george|james|daniel|alex|fred|oliver|rishi|thomas/i;
+
+const speech: SpeechSynthesis | undefined = window.speechSynthesis;
+// Chrome fills the voice list in the background after the first ask, so ask now, well before the
+// first UNO is called.
+speech?.getVoices();
+
+/** Picks an English voice that sounds like the player, or null when the device has none to tell apart. */
+function voiceFor(gender: Gender): SpeechSynthesisVoice | null {
+  const english = (speech?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('en'));
+  const female = english.filter((v) => FEMALE_VOICE.test(v.name));
+  const male = english.filter((v) => !FEMALE_VOICE.test(v.name) && MALE_VOICE.test(v.name));
+  const pool = gender === 'female' ? female : male;
+  return pool.find((v) => v.localService) ?? pool[0] ?? null;
+}
+
+/**
+ * A short, bright shout of "UNO!" in a man's or a woman's voice. Without a matching voice it uses the
+ * default one, pitched down for a man and up for a woman, so the two still sound different.
+ */
+function sayUno(gender: Gender, delay: number): void {
+  if (!speech) return;
+  const utterance = new SpeechSynthesisUtterance('Uno!');
+  const voice = voiceFor(gender);
+  if (voice) utterance.voice = voice;
+  utterance.lang = voice?.lang ?? 'en-US';
+  utterance.pitch = voice ? (gender === 'female' ? 1.15 : 0.9) : gender === 'female' ? 1.6 : 0.6;
+  utterance.rate = 1.1;
+  window.setTimeout(() => speech.speak(utterance), delay * 1000);
+}
+
+const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: number) => void> = {
   // A card slapped down on the table: a quick "fwip" as it leaves the hand, then a crisp crack, a
   // papery thwap and a light thump as the toss lands. Most of the energy sits in 1-4 kHz so it cuts
   // through laptop and phone speakers. Each play varies a little, so a run never sounds machine-made.
@@ -140,6 +207,62 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
     noise(ac, land, 0.09, vary(0.8), vary(1100), vary(700), 0.03);
     noise(ac, land + 0.03, 0.02, 0.25, vary(5000), vary(4500), 0.1);
     tone(ac, ac.destination, 'sine', land, 0.07, 0.35, vary(170), 80);
+  },
+  // A Discard All dumping a handful of cards on the pile: a "fwip", a quick run of slaps that tumble
+  // lower as they land, a broad papery settle with a soft thump, and a light rising flick at the end
+  // because the hand just got lighter.
+  discardAll(ac, at) {
+    const out = ac.destination;
+    const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
+    noise(ac, at, 0.1, vary(0.16), vary(1800), vary(4200), 0.6);
+    for (let i = 0; i < 5; i++) {
+      const hit = at + 0.1 + i * 0.05;
+      noise(
+        ac,
+        hit,
+        0.035,
+        vary(0.65 - i * 0.07),
+        vary(3600 - i * 280),
+        vary(2200 - i * 180),
+        0.02,
+      );
+    }
+    const land = at + 0.38;
+    noise(ac, land, 0.22, vary(0.45), vary(1300), vary(320), 0.05);
+    tone(ac, out, 'sine', land, 0.18, 0.3, vary(130), 60);
+    tone(ac, out, 'triangle', land + 0.06, 0.2, 0.07, 660, 1320);
+  },
+  // A card slid off the draw pile: a soft papery swish falling in pitch, then a light tick as it
+  // lands in the hand. No crack or thump, so it never sounds like a card being played.
+  cardDraw(ac, at) {
+    const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
+    noise(ac, at, 0.16, vary(0.32), vary(3400), vary(1300), 0.3);
+    noise(ac, at + 0.14, 0.025, vary(0.16), vary(2400), vary(1900), 0.1);
+  },
+  // The discards gathered into a new deck: a broad sweep across the felt, two riffles (a burst of
+  // flicks that speeds up as the halves interleave), and a double tap as the deck is squared up.
+  reshuffle(ac, at) {
+    const out = ac.destination;
+    const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
+    noise(ac, at, 0.3, vary(0.28), vary(900), vary(2600), 0.4);
+    for (const start of [at + 0.3, at + 0.62]) {
+      for (let i = 0; i < 12; i++) {
+        noise(ac, start + i * (0.026 - i * 0.0011), 0.02, vary(0.2), vary(3000), vary(4400), 0.1);
+      }
+      noise(ac, start + 0.2, 0.06, vary(0.3), vary(1600), vary(900), 0.05);
+    }
+    for (const tap of [at + 0.92, at + 1.0]) {
+      noise(ac, tap, 0.03, vary(0.4), vary(2200), vary(1400), 0.02);
+      tone(ac, out, 'sine', tap, 0.06, 0.2, vary(160), 90);
+    }
+  },
+  // Color Roulette found its color: a quick bright "ding-ding" a fifth apart, C6 then G6, in
+  // triangle so it sounds like a bell rather than the softer sine chime of your turn.
+  rouletteHit(ac, at) {
+    const out = ac.destination;
+    tone(ac, out, 'triangle', at, 0.14, 0.22, 1046.5);
+    tone(ac, out, 'triangle', at + 0.1, 0.4, 0.24, 1568);
+    tone(ac, out, 'sine', at + 0.1, 0.25, 0.04, 3136);
   },
   // A soft rising chime, A5 then E6, in pure sine so it stays clear without being shrill. A faint
   // octave above the second note gives it a little shine.
@@ -187,7 +310,8 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
       tone(ac, klaxon, 'sawtooth', at + 0.18 + i * 0.42, 0.38, 0.12, 440, 880);
       tone(ac, klaxon, 'square', at + 0.18 + i * 0.42, 0.38, 0.04, 445, 890);
     }
-    tone(ac, klaxon, 'sawtooth', at + 0.18, 1.3, 0.07, 110, 55);
+    // The drone ends last, so the shared filter goes with it.
+    releaseWhenDone(tone(ac, klaxon, 'sawtooth', at + 0.18, 1.3, 0.07, 110, 55), klaxon);
   },
   // A brass fanfare up to a held C major chord, with a few sparkles on top.
   win(ac, at) {
@@ -198,9 +322,11 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
     [392, 523.25, 659.25, 783.99].forEach((hz, i) =>
       tone(ac, brass, 'sawtooth', at + i * 0.12, 0.18, 0.14, hz),
     );
-    for (const hz of [523.25, 659.25, 783.99, 1046.5]) {
-      tone(ac, brass, 'sawtooth', at + 0.5, 1.2, 0.1, hz);
-    }
+    const chord = [523.25, 659.25, 783.99, 1046.5].map((hz) =>
+      tone(ac, brass, 'sawtooth', at + 0.5, 1.2, 0.1, hz),
+    );
+    // The held chord ends last, so the shared filter goes with it.
+    if (chord[0]) releaseWhenDone(chord[0], brass);
     for (let i = 0; i < 6; i++) {
       tone(ac, ac.destination, 'sine', at + 0.6 + i * 0.13, 0.2, 0.05, 2000 + Math.random() * 2000);
     }
@@ -209,9 +335,11 @@ const SOUNDS: Record<SoundKind, (ac: AudioContext, at: number) => void> = {
 
 /**
  * Plays a sound now, or `delay` seconds from now so sounds from one move can follow each other.
- * Skipped until the player has interacted, rather than queued for later.
+ * Skipped until the player has interacted, rather than queued for later. `voice` is whose voice
+ * calls UNO.
  */
-export function playSound(kind: SoundKind, delay = 0): void {
+export function playSound(kind: SoundKind, delay = 0, voice: Gender = 'male'): void {
   if (ctx?.state !== 'running') return;
+  if (kind === 'unoCall') return sayUno(voice, delay);
   SOUNDS[kind](ctx, ctx.currentTime + 0.02 + delay);
 }

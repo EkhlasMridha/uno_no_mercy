@@ -25,15 +25,15 @@ const SIZE: Record<
     cornerIcon: '0.9em',
   },
   md: {
-    box: 'w-[4.5rem] sm:w-20 short:w-16 shorter:w-[3.75rem] rounded-xl border-4 short:border-[3px]',
-    center: 'text-4xl short:text-3xl shorter:text-[1.75rem]',
+    box: 'w-[4.5rem] sm:w-20 short:w-16 shorter:w-[3.75rem] shortest:w-[3.25rem] rounded-xl border-4 short:border-[3px]',
+    center: 'text-4xl short:text-3xl shorter:text-[1.75rem] shortest:text-2xl',
     corner: 'text-xs short:text-[10px]',
     icon: '0.78em',
     cornerIcon: '0.85em',
   },
   lg: {
-    box: 'w-24 sm:w-28 short:w-20 shorter:w-[4.25rem] rounded-2xl short:rounded-xl border-[5px] short:border-4',
-    center: 'text-5xl short:text-4xl shorter:text-[2rem]',
+    box: 'w-24 sm:w-28 short:w-[4.5rem] shorter:w-[4.25rem] shortest:w-14 rounded-2xl short:rounded-xl border-[5px] short:border-4',
+    center: 'text-5xl short:text-[2.15rem] shorter:text-[2rem] shortest:text-2xl',
     corner: 'text-sm short:text-xs',
     icon: '0.83em',
     cornerIcon: '0.85em',
@@ -106,6 +106,8 @@ interface PlayingCardProps {
   onClick?: () => void;
   className?: string;
   animate?: 'in' | 'draw' | null;
+  /** Privacy mode: show the back instead of the face. Never on touch screens. */
+  concealed?: boolean;
 }
 
 /** Original card artwork drawn with CSS: colored face, tilted oval, corner indices. */
@@ -118,6 +120,7 @@ export function PlayingCard({
   onClick,
   className = '',
   animate = null,
+  concealed = false,
 }: PlayingCardProps) {
   const s = SIZE[size];
   const color = colorOf(card);
@@ -140,6 +143,7 @@ export function PlayingCard({
       title={label}
       className={[
         'relative aspect-[5/7] shrink-0 select-none border-white shadow-card transition duration-150',
+        concealed ? 'hoverable:overflow-hidden' : '',
         s.box,
         face,
         playable
@@ -196,6 +200,11 @@ export function PlayingCard({
           </span>
         </>
       )}
+      {concealed && (
+        <span aria-hidden className="absolute inset-0 hidden bg-oxblood hoverable:block">
+          <BackFace size={size} />
+        </span>
+      )}
     </Tag>
   );
 }
@@ -216,6 +225,15 @@ export function CardBack({
       style={style}
       className={`${className.includes('absolute') ? '' : 'relative'} aspect-[5/7] shrink-0 border-chalk bg-oxblood shadow-card ${s.box} ${className}`}
     >
+      <BackFace size={size} />
+    </div>
+  );
+}
+
+/** The house pattern on a card's back, inside its border. */
+function BackFace({ size }: { size: CardSize }) {
+  return (
+    <>
       <span className="absolute inset-[12%] rotate-[28deg] rounded-[50%] bg-room ring-1 ring-brass/70" />
       <span
         className={`absolute inset-0 flex items-center justify-center font-display text-brass drop-shadow-[0_2px_0_rgba(0,0,0,0.6)] ${
@@ -224,6 +242,6 @@ export function CardBack({
       >
         {size === 'xs' ? '' : 'NO MERCY'}
       </span>
-    </div>
+    </>
   );
 }

@@ -75,8 +75,11 @@ export interface GameLogEntry {
 
 export type GamePhaseView =
   | { type: 'turn' }
-  /** The player has started drawing; only their last drawn card may be played. */
-  | { type: 'drawing'; playerId: string }
+  /**
+   * The player has started drawing; only their last drawn card may be played. `lastChance`: that
+   * card was their 25th and it is playable, so they must play it or be knocked out (RULES §5.13).
+   */
+  | { type: 'drawing'; playerId: string; lastChance: boolean }
   | { type: 'rouletteColor'; victimId: string }
   /** The victim draws face-up cards one at a time until a card of `color` appears. */
   | { type: 'rouletteReveal'; victimId: string; color: CardColor; revealed: Card[] }
@@ -117,8 +120,13 @@ export interface PublicGameView {
   pendingDraw: PendingDrawView | null;
   phase: GamePhaseView;
   log: GameLogEntry[];
-  /** Every card played this round, oldest first. Unaffected by reshuffles. */
+  /**
+   * The plays still on the discard pile, oldest first. After a reshuffle only the top card is left:
+   * the earlier plays are face down in the deck and no longer sent to anyone.
+   */
   playHistory: PlayedCardEntry[];
+  /** How many plays this round were shuffled back into the deck: the round position of `playHistory[0]`. */
+  playHistoryStart: number;
 }
 
 /** Actions the requesting player may take right now, computed by the server engine. */

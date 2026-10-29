@@ -8,6 +8,7 @@ import {
   getValidActions,
   seededRng,
 } from '../src/engine/index.js';
+import { phaseView, toPublicGameView } from '../src/engine/game-selectors.js';
 import { matchesTop } from '../src/engine/game.validation.js';
 import {
   act,
@@ -102,7 +103,7 @@ describe('manual drawing', () => {
     const red3 = cardId(s, 0, 0);
     // Red 3 is playable, but the player chooses to draw instead: blue 1 is no match.
     s = run(s, 0, { type: 'draw' });
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null, lastChance: false });
     expect(s.currentIndex).toBe(0);
     expect(getValidActions(s, pid(0))).toMatchObject({ playableCardIds: [], canDraw: true });
     expect(reject(s, 0, { type: 'playCard', cardId: red3 })).toBe('INVALID_MOVE');
@@ -110,7 +111,7 @@ describe('manual drawing', () => {
     // Red 7 is playable, yet the player may still draw more.
     s = run(s, 0, { type: 'draw' });
     const red7 = handOf(s, 0).at(-1)!;
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id, lastChance: false });
     expect(getValidActions(s, pid(0))).toMatchObject({
       playableCardIds: [red7.id],
       drawnPlayableCardId: red7.id,
@@ -119,7 +120,7 @@ describe('manual drawing', () => {
 
     // Drawing past it locks red 7: only the newest card counts.
     s = run(s, 0, { type: 'draw' });
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: null, lastChance: false });
     expect(reject(s, 0, { type: 'playCard', cardId: red7.id })).toBe('INVALID_MOVE');
     s = run(s, 0, { type: 'draw' });
     const red9 = handOf(s, 0).at(-1)!;
@@ -141,9 +142,54 @@ describe('manual drawing', () => {
     );
     const red7 = handOf(s, 0).at(-1)!;
     expect(s.currentIndex).toBe(0);
-    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id });
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red7.id, lastChance: false });
     expect(getValidActions(s, pid(0)).canDraw).toBe(true);
     expect(handOf(run(s, 0, { type: 'draw' }), 0)).toHaveLength(3);
+  });
+
+  it('spares a manual draw to 25 when the drawn card is playable, as long as it is played', () => {
+    let s = run(
+      buildState({
+        hands: [filler(24), filler(3), filler(3)],
+        top: n('red', 5),
+        drawPile: [n('red', 8), ...deckFill()],
+      }),
+      0,
+      { type: 'draw' },
+    );
+    const red8 = handOf(s, 0).at(-1)!;
+    expect(s.players[0]?.status).toBe('active');
+    expect(handOf(s, 0)).toHaveLength(MERCY_HAND_LIMIT);
+    expect(s.phase).toEqual({ type: 'drawing', playableCardId: red8.id, lastChance: true });
+    expect(phaseView(s)).toEqual({ type: 'drawing', playerId: pid(0), lastChance: true });
+
+    // Playing the drawn card is the only move: no drawing on, and nothing else in the hand.
+    const actions = getValidActions(s, pid(0));
+    expect(actions.canDraw).toBe(false);
+    expect(actions.playableCardIds).toEqual([red8.id]);
+    expect(reject(s, 0, { type: 'draw' })).toBe('INVALID_MOVE');
+    expect(reject(s, 0, { type: 'playCard', cardId: cardId(s, 0, 0) })).toBe('INVALID_MOVE');
+
+    s = run(s, 0, { type: 'playCard', cardId: red8.id });
+    expect(s.players[0]?.status).toBe('active');
+    expect(handOf(s, 0)).toHaveLength(MERCY_HAND_LIMIT - 1);
+    expect(s.currentIndex).toBe(1);
+    expect(s.phase).toEqual({ type: 'turn' });
+  });
+
+  it('still knocks out at 25 on a forced draw, even when the 25th card is playable', () => {
+    const s = run(
+      buildState({
+        hands: [filler(23), filler(3), filler(3)],
+        top: n('red', 5),
+        drawPile: [n('red', 7), n('red', 8), ...deckFill()],
+        pendingDraw: { total: 2, lastValue: 2 },
+      }),
+      0,
+      { type: 'acceptPenalty' },
+    );
+    expect(s.players[0]?.status).toBe('eliminated');
+    expect(s.players[0]?.eliminationReason).toBe('mercy');
   });
 
   it('knocks the player out when a manual draw reaches the Mercy limit', () => {
@@ -525,6 +571,60 @@ describe('Mercy Rule', () => {
       winnerId: pid(1),
       reason: 'lastStanding',
     });
+  });
+
+  it('an empty draw pile is rebuilt from the discards under the top card, which stays', () => {
+    const s0 = buildState({
+      hands: [[n('green', 1)], filler(3), filler(3)],
+      top: n('blue', 5),
+      discardBelow: [n('red', 2), wild('wildDraw6'), n('yellow', 8)],
+      currentColor: 'blue',
+    });
+    const top = s0.discardPile[s0.discardPile.length - 1];
+    const recycled = s0.discardPile.slice(0, -1).map((c) => c.id);
+    const s = run(s0, 0, { type: 'draw' });
+
+    expect(s.discardPile).toEqual([top]);
+    expect(s.currentColor).toBe('blue');
+    // The recycled plays are gone from the public history; only the top card's entry is left.
+    expect(s.playHistory.map((e) => e.card.id)).toEqual([top!.id]);
+    expect(s.log.map((e) => e.event)).toContainEqual({ type: 'drawPileReshuffled', cards: 3 });
+    // The drawn card and the new pile are exactly the recycled discards.
+    const drawn = handOf(s, 0)[1]!;
+    expect([...s.drawPile.map((c) => c.id), drawn.id].sort()).toEqual([...recycled].sort());
+    // A recycled wild is just a wild again: the color it was given stays in the play history.
+    const wildCard = [...s.drawPile, drawn].find((c) => c.kind === 'wildDraw6');
+    expect(wildCard && 'color' in wildCard).toBe(false);
+  });
+
+  it('a penalty that runs the pile out keeps drawing from the reshuffled discards', () => {
+    const s0 = buildState({
+      hands: [[act('draw4', 'blue'), n('red', 3)], filler(3), filler(3)],
+      top: n('blue', 5),
+      drawPile: [n('red', 1)],
+      discardBelow: [n('yellow', 1), n('yellow', 2), n('yellow', 3), n('yellow', 4)],
+    });
+    const total = (st: typeof s0) =>
+      st.drawPile.length +
+      st.discardPile.length +
+      st.setAside.length +
+      st.players.reduce((sum, p) => sum + p.hand.length, 0);
+    let s = run(s0, 0, { type: 'playCard', cardId: cardId(s0, 0) });
+    s = run(s, 1, { type: 'acceptPenalty' });
+
+    expect(handOf(s, 1)).toHaveLength(7);
+    expect(s.discardPile.map((c) => c.kind)).toEqual(['draw4']);
+    // What the table is sent: only the +4 on top; the starting card is back in the deck, unseen.
+    const view = toPublicGameView(s, {
+      connected: () => true,
+      isComputer: () => false,
+      gender: () => null,
+      hostId: pid(0),
+    });
+    expect(view.playHistory.map((e) => [e.playerId, e.card.kind])).toEqual([[pid(0), 'draw4']]);
+    expect(view.playHistoryStart).toBe(1);
+    expect(s.log.filter((e) => e.event.type === 'drawPileReshuffled')).toHaveLength(1);
+    expect(total(s)).toBe(total(s0));
   });
 
   it('set-aside hands return to play on the next reshuffle', () => {

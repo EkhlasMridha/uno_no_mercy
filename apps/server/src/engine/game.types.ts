@@ -25,8 +25,10 @@ export type EnginePhase =
   /**
    * The current player has started drawing. Only the card they drew last may be played, and only
    * if it is playable (`playableCardId`); otherwise, or if they prefer, they draw again.
+   * `lastChance`: that draw was their 25th card and it is playable, so playing it is their only move
+   * (docs/RULES.md §5.13).
    */
-  | { type: 'drawing'; playableCardId: string | null }
+  | { type: 'drawing'; playableCardId: string | null; lastChance: boolean }
   /** A Wild Color Roulette was played; the victim (current player) must name a color. */
   | { type: 'rouletteColor'; victimId: string }
   /**
@@ -57,8 +59,13 @@ export interface GameState {
   pendingDraw: PendingDraw | null;
   log: GameLogEntry[];
   logSeq: number;
-  /** Every card played this round, oldest first (public; kept across reshuffles). */
+  /**
+   * The plays still lying on the discard pile, oldest first (public). A reshuffle gathers all but the
+   * top card into the deck, so only the top card's entry survives it.
+   */
   playHistory: PlayedCardEntry[];
+  /** How many plays this round went back into the deck: the round position of `playHistory[0]`. */
+  playHistoryStart: number;
   /** When all of these players are out, the round ends with no winner. Empty: play to the end. */
   endWhenOut: string[];
 }

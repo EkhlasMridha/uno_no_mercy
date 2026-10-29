@@ -1,4 +1,4 @@
-import type { GameEvent, GameLogEntry, PublicPlayerView } from '@nomercy/shared';
+import { type GameEvent, type GameLogEntry, type PublicPlayerView } from '@nomercy/shared';
 import { cardName, COLOR_LABEL } from './cards';
 
 export type NameLookup = (playerId: string) => string;
@@ -79,6 +79,26 @@ export function describeEvent(event: GameEvent, name: NameLookup): string {
   }
 }
 
+/** The player a log line is about, whose face it shows. Null for table-wide events. */
+export function actorOf(event: GameEvent): string | null {
+  switch (event.type) {
+    case 'gameStarted':
+      return event.dealerId;
+    case 'rouletteColorNamed':
+    case 'rouletteCardRevealed':
+    case 'rouletteResolved':
+      return event.victimId;
+    case 'unoCaught':
+      return event.catcherId;
+    case 'directionReversed':
+    case 'handsPassed':
+    case 'drawPileReshuffled':
+      return null;
+    default:
+      return event.playerId;
+  }
+}
+
 export interface BannerSpec {
   title: string;
   subtitle?: string;
@@ -121,6 +141,12 @@ export function bannerFor(event: GameEvent, name: NameLookup): BannerSpec | null
       return { title: 'Caught!', subtitle: `${name(event.playerId)} draws 2`, tone: 'danger' };
     case 'unoCalled':
       return { title: 'UNO!', subtitle: name(event.playerId), tone: 'success' };
+    case 'drawPileReshuffled':
+      return {
+        title: 'Reshuffle!',
+        subtitle: `${event.cards} cards shuffled into a new draw pile`,
+        tone: 'info',
+      };
     case 'discardedAll':
       return event.count > 0
         ? {

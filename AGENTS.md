@@ -123,7 +123,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
   animation starts.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio (no audio files): every
-  card play, the chime when your turn starts, the turn reminder, 0/7 hand exchanges, the
+  card play (a Discard All has its own: a handful of cards hitting the pile), every card drawn from the pile (a Draw or a Color Roulette reveal, so the table hears
+  someone drawing), the sweep and riffle when the discards are reshuffled into a new draw pile, the ding when a roulette reveal finds the named color, a voice shouting "UNO!" when anyone calls it (the browser's own speech voices, a man or a woman to match the caller's avatar), the chime when your turn
+  starts, the turn reminder, 0/7 hand exchanges, the
   mocking trombone everyone hears when a player takes penalty cards, the danger alarm when the Mercy Rule knocks a player out at 25 cards, and the
   win. `useGameSounds` plays them only from
   state the server sent, and the Sound panel
@@ -196,7 +198,8 @@ still pass.
 - Face-up moments everyone should see (like the Color Roulette tray, `RouletteReveal.tsx`) render on the
   felt inside `GameTable.tsx`, not in a modal, so the table stays visible.
 - A choice the player must make before play continues goes in a modal that cannot be dismissed (see
-  `ColorPickerModal` with no `onCancel`).
+  `ColorPickerModal` with no `onCancel`). When the choice depends on what you hold, open it with
+  `overHand`: the panel sits at the top over a fading backdrop, so your hand stays readable.
 
 ### 6. Close the loop
 
@@ -206,17 +209,33 @@ definition of done below.
 
 ## Table design system
 
-The game is drawn as a physical card table seen from above. Keep new UI inside that metaphor.
+The game is drawn as a physical card table seen from above, in a games room at night lit by neon. Keep
+new UI inside that metaphor.
 
-- **Palette** (`tailwind.config.js`): `room` #17100d (the dark room), `walnut` (the rail), `baize` (plum
-  felt), `brass` (highlights, the current turn, primary buttons), `chalk` #f2e8da (text), `oxblood` (card
-  backs). Card colors are `card-red/yellow/green/blue`. Don't introduce new accent colors. Brass is the
-  only highlight.
+- **Palette** (`tailwind.config.js`): `room` #0a0c1a (the dark navy room, with a warm lamp glow in
+  `index.css`), `felt-*` (navy panel darks), `walnut` (the lit rail), `baize` (violet felt), `brass`
+  #ffc22e (neon gold: highlights, the current turn, primary buttons; the token keeps its old name),
+  `chalk` #eef0ff (text), `oxblood` (card backs). Card colors are `card-red/yellow/green/blue`. Don't
+  introduce new accent colors. Gold is the only highlight. The only other glows are each seat's ring
+  in its avatar's disc color (`avatarGlow`) and the top discard in the color in play.
+- **Chrome:** shared classes in `index.css`: `.btn-primary` (gold, with a lip), `.btn-danger` (Leave,
+  Take), `.btn-tile` (top-bar icon over label), `.pill` (small facts on the felt and the status line),
+  `.panel`. The sidebar (`SidePanel.tsx`) holds the game log and the player list as tabs; below `lg` it
+  opens as a sheet from the Log tile.
 - **Type:** _Lilita One_ (`font-display`) for card faces and big moments. _Bricolage Grotesque_
   (`font-sans`) for everything else. Use sentence case and no all-caps labels.
 - **Layout:** the oval table fills the stage. Seats are placed on the rail by `seatAngle` and
   `seatPosition` in `lib/table-geometry.ts`, in turn order, clockwise, with you at the bottom. Your hand is
-  a fan held over the near edge. The last 10 plays stay visible on the felt (`DiscardHeap.tsx`). Cards keep
+  a fan held over the near edge (`PlayerHand.tsx`): grouped by color with a gap between colors, spaced
+  to fit the width so every corner index shows, and split into two tiers when one row would hide them.
+  Under it, your seat shows your card count and, from 20 cards, how many are left before the
+  25-card knockout. The card a player just played sits on their avatar, on the side away from the
+  felt (`LastPlayedCard.tsx`, `useLastPlay`), until the player whose turn came next finishes their move.
+  The last 10 plays stay visible on the felt (`DiscardHeap.tsx`), but only while they are really on the
+  discard pile: a reshuffle drops the recycled plays from `playHistory` on the server, so the heap and
+  the played-cards list restart from the top card, and an empty draw pile is an empty outlined spot. The color in play is a chip left
+  of the draw pile (`ColorInPlay` in `GameTable.tsx`), and the direction shows only as the arrows on
+  the felt. A pending penalty floats under the piles, so it never pushes them into the seats. Cards keep
   their scatter between renders because placement is seeded from history position (`scatter`).
 - **Seat scale:** seats shrink for crowded tables (`lg` ≤ 6, `md` ≤ 10, `sm` above; rooms allow up to
   20). Below the `sm` breakpoint the card fans are hidden. Test new table UI at 390 × 844 with 8 players
@@ -224,9 +243,14 @@ The game is drawn as a physical card table seen from above. Keep new UI inside t
 - **Short screens:** laptops leave little height for the felt, so the `short` (≤ 860 px tall) and
   `shorter` (≤ 640 px) variants in `tailwind.config.js` shrink the table and hand cards, the heap's
   scatter (`--heap-px`) and the seat fans (`--fan-px`). Check 1280 × 575 (a 1080p laptop at 150%).
+  `shortest` (≤ 500 px tall) is a phone held sideways: the cards and buttons shrink and the hand
+  stays one tier. Seats stay on screen through `--seat-inset` and lift clear of the hand through
+  `--seat-low-reach` (`seatPosition`). From `sm` up, nothing scrolls. Only a phone's hand may scroll
+  sideways, and only when it is too big to fit. Check 390 × 844, 375 × 667 and 667 × 375.
 - **Motion:** one meaningful movement per event. A card tossed from the thrower's seat, a draw sliding in,
   drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
-  popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
+  popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events; a Discard All raises the same tag in green (`ink-green`) as `−N cards` with the Discard All
+  mark, counting the card itself), the new deck riffling once after a reshuffle (`anim-riffle`), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
   `handsPassed.passes` pairs the server sends), the turn pulse, and your cards hopping in a ripple
   with the knock after 10 s idle on your move (`anim-nudge`, not `anim-shake`, which means "can't play
   that"). No decorative entrance animations.

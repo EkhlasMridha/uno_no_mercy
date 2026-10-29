@@ -8,12 +8,16 @@ import type {
   CreateRoomPayload,
   DrawPayload,
   JoinRoomPayload,
+  KickPayload,
   PlayCardPayload,
+  ProfilePayload,
   ReadyPayload,
   ReconnectPayload,
   RoomSettingsPayload,
   RouletteColorPayload,
   StartGamePayload,
+  TransferHostPayload,
+  WaitForPlayerPayload,
 } from './schemas.js';
 
 export interface CommandResult {
@@ -30,9 +34,13 @@ export interface ClientToServerEvents {
   'room:join': (payload: JoinRoomPayload, ack: AckCallback<SessionInfo>) => void;
   'room:reconnect': (payload: ReconnectPayload, ack: AckCallback<SessionInfo>) => void;
   'room:leave': (payload: Record<string, never>, ack: AckCallback<null>) => void;
+  'room:profile': (payload: ProfilePayload, ack: AckCallback<null>) => void;
+  'room:kick': (payload: KickPayload, ack: AckCallback<null>) => void;
+  'room:transfer-host': (payload: TransferHostPayload, ack: AckCallback<null>) => void;
   'room:ready': (payload: ReadyPayload, ack: AckCallback<null>) => void;
   'room:settings': (payload: RoomSettingsPayload, ack: AckCallback<null>) => void;
   'room:return-lobby': (payload: Record<string, never>, ack: AckCallback<null>) => void;
+  'room:wait-for-player': (payload: WaitForPlayerPayload, ack: AckCallback<null>) => void;
   'game:start': (payload: StartGamePayload, ack: AckCallback<null>) => void;
   'game:restart': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'game:request-state': (payload: Record<string, never>, ack: AckCallback<null>) => void;

@@ -1,17 +1,14 @@
-import { useId } from 'react';
-import type {
-  AvatarTraits,
-  EyeStyle,
-  HairStyle,
-  MouthStyle,
-  PersonAvatar,
-  RobotAvatar,
-} from '../lib/avatar';
+import { createContext, useContext, useId, type CSSProperties, type ReactNode } from 'react';
+import type { AvatarTraits, PersonAvatar, RobotAvatar } from '../lib/avatar';
 
 const INK = '#2a1a1e';
-const LIPS = '#a3161a';
-// Eight edge marks round the rim, like a poker chip: dash + gap = 2π·30.25 / 8.
-const RIM_DASH = '6 17.76';
+const MOUTH = '#5a1620';
+const TONGUE = '#e8606a';
+const BLUSH = '#ff6b6b';
+const PINK = '#f4a0b4';
+
+/** Gradient ids for the soft light and shadow laid over every rounded shape. */
+const Shading = createContext({ hi: '', lo: '' });
 
 interface PlayerAvatarProps {
   /** This player's face, from `avatarsForTable`. */
@@ -19,258 +16,140 @@ interface PlayerAvatarProps {
   className?: string;
 }
 
-/** A cartoon portrait printed on a poker chip. Decorative: the seat around it carries the label. */
+/**
+ * A cartoon character on a glowing disc, shoulders up. Decorative: the seat around it carries
+ * the label.
+ */
 export function PlayerAvatar({ traits, className = '' }: PlayerAvatarProps) {
-  const clip = useId();
+  const uid = useId();
+  const ids = { clip: `${uid}c`, bg: `${uid}b`, hi: `${uid}h`, lo: `${uid}l` };
+  const { backdrop } = traits;
 
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden focusable="false">
+    <svg viewBox="0 0 128 128" className={className} aria-hidden focusable="false">
       <defs>
-        <clipPath id={clip}>
-          <circle cx="32" cy="32" r="28.5" />
+        <clipPath id={ids.clip}>
+          <circle cx="64" cy="64" r="59.5" />
         </clipPath>
+        <radialGradient id={ids.bg} cx="0.42" cy="0.36" r="0.7">
+          <stop offset="0" stopColor={backdrop.light} />
+          <stop offset="0.55" stopColor={backdrop.base} />
+          <stop offset="1" stopColor={backdrop.dark} />
+        </radialGradient>
+        <radialGradient id={ids.hi} cx="0.34" cy="0.26" r="0.55">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={ids.lo} cx="0.44" cy="0.36" r="0.75">
+          <stop offset="0.55" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity="0.38" />
+        </radialGradient>
       </defs>
-      <circle cx="32" cy="32" r="32" fill={traits.chip} />
-      <g clipPath={`url(#${clip})`}>
-        {traits.kind === 'robot' ? <Robot t={traits} /> : <Person t={traits} />}
-      </g>
-      <circle
-        cx="32"
-        cy="32"
-        r="30.25"
-        fill="none"
-        stroke="#000"
-        strokeOpacity="0.32"
-        strokeWidth="3.5"
-      />
-      <circle
-        cx="32"
-        cy="32"
-        r="30.25"
-        fill="none"
-        stroke="#f2e8da"
-        strokeOpacity="0.75"
-        strokeWidth="3.5"
-        strokeDasharray={RIM_DASH}
-        transform="rotate(-11 32 32)"
-      />
-      <circle cx="32" cy="32" r="28.5" fill="none" stroke="#000" strokeOpacity="0.25" />
+      <circle cx="64" cy="64" r="64" fill={`url(#${ids.bg})`} />
+      <Shading.Provider value={{ hi: `url(#${ids.hi})`, lo: `url(#${ids.lo})` }}>
+        <g clipPath={`url(#${ids.clip})`}>
+          {traits.kind === 'robot' ? <Robot t={traits} /> : <Character t={traits} />}
+        </g>
+      </Shading.Provider>
+      <circle cx="64" cy="64" r="61.5" fill="none" stroke={backdrop.light} strokeWidth="4" />
+      <circle cx="64" cy="64" r="63.5" fill="none" stroke="#000" strokeOpacity="0.35" />
+      <circle cx="64" cy="64" r="59.5" fill="none" stroke="#000" strokeOpacity="0.2" />
     </svg>
   );
 }
 
-function Person({ t }: { t: PersonAvatar }) {
+/** A neon ring in the avatar's own disc color, for the seat that holds it. */
+export function avatarGlow(traits: AvatarTraits): CSSProperties {
+  const { light, base } = traits.backdrop;
+  return { boxShadow: `0 0 0 3px ${light}, 0 0 18px 3px ${base}b3` };
+}
+
+function Character({ t }: { t: PersonAvatar }) {
+  switch (t.character) {
+    case 'gamer':
+      return <Gamer t={t} />;
+    case 'champ':
+      return <Champ t={t} />;
+    case 'fox':
+      return <Fox t={t} />;
+    case 'panda':
+      return <Panda t={t} />;
+    case 'monkey':
+      return <Monkey t={t} />;
+    case 'bunny':
+      return <Bunny t={t} />;
+    case 'cat':
+      return <Cat t={t} />;
+    case 'koala':
+      return <Koala t={t} />;
+  }
+}
+
+/** A filled path with the shared light and shadow over it, so it reads as rounded. */
+function Blob({ d, fill }: { d: string; fill: string }) {
+  const { hi, lo } = useContext(Shading);
   return (
     <>
-      <HairBack style={t.hairStyle} color={t.hair} hat={t.hat} long={t.gender === 'female'} />
-      <path d="M10 64C11 53 20 48 32 48S53 53 54 64Z" fill={t.shirt} />
+      <path d={d} fill={fill} />
+      <path d={d} fill={lo} />
+      <path d={d} fill={hi} />
+    </>
+  );
+}
+
+/** A shaded ellipse. */
+function Ball({
+  cx,
+  cy,
+  rx,
+  ry = rx,
+  fill,
+}: {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry?: number;
+  fill: string;
+}) {
+  const { hi, lo } = useContext(Shading);
+  return (
+    <>
+      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={fill} />
+      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={lo} />
+      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={hi} />
+    </>
+  );
+}
+
+/** Draws the left-hand half and its mirror image. */
+function Pair({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <g transform="translate(128 0) scale(-1 1)">{children}</g>
+    </>
+  );
+}
+
+/** Shoulders in a hoodie, with a shadow where the head sits. */
+function Hoodie({ color, strings = true }: { color: string; strings?: boolean }) {
+  return (
+    <>
+      <Blob d="M4 140C6 108 30 93 64 93S122 108 124 140Z" fill={color} />
       <path
-        d="M28 48.4 32 53l4-4.6"
+        d="M40 96C46 112 82 112 88 96"
         fill="none"
         stroke="#000"
         strokeOpacity="0.22"
-        strokeWidth="1.4"
+        strokeWidth="3"
       />
-      <rect x="28.5" y="40" width="7" height="9" rx="2" fill={t.skin} />
-      <rect x="28.5" y="40" width="7" height="4" fill="#000" fillOpacity="0.12" />
-      <circle cx="19.5" cy="32" r="3" fill={t.skin} />
-      <circle cx="44.5" cy="32" r="3" fill={t.skin} />
-      <ellipse cx="32" cy="31" rx="12.5" ry="13.5" fill={t.skin} />
-      {t.earrings && (
-        <g fill="#e7c886" stroke={INK} strokeOpacity="0.4" strokeWidth="0.5">
-          <circle cx="19.3" cy="36.4" r="1.4" />
-          <circle cx="44.7" cy="36.4" r="1.4" />
-        </g>
-      )}
-
-      {t.blush && (
-        <g fill="#e5383b" fillOpacity="0.25">
-          <ellipse cx="24.5" cy="36" rx="2.4" ry="1.4" />
-          <ellipse cx="39.5" cy="36" rx="2.4" ry="1.4" />
-        </g>
-      )}
-      {t.freckles && (
-        <g fill={INK} fillOpacity="0.35">
-          {[24.5, 26, 23.5, 39.5, 38, 40.5].map((x, i) => (
-            <circle key={i} cx={x} cy={[35, 36.2, 36.5][i % 3]} r="0.55" />
-          ))}
-        </g>
-      )}
-
-      <g fill="none" stroke={t.hair} strokeWidth="1.2" strokeLinecap="round">
-        <path d="M25 27.4q2-1.2 4 0M35 27.4q2-1.2 4 0" />
-      </g>
-      <Eyes style={t.eyes} lashes={t.gender === 'female'} />
-      <path
-        d="M32 32.5q1.6 2.4-.4 3.4"
-        fill="none"
-        stroke={INK}
-        strokeOpacity="0.35"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-
-      {t.beard && (
-        <>
-          <path
-            d="M19.5 32C20 44 25.5 49.5 32 49.5S44 44 44.5 32C42.5 38 38.5 41.5 32 41.5S21.5 38 19.5 32Z"
-            fill={t.hair}
-          />
-          <path d="M28 36.8q4-2.2 8 0-4 1.2-8 0Z" fill={t.hair} />
-        </>
-      )}
-      <Mouth style={t.mouth} lips={t.gender === 'female' ? LIPS : INK} />
-
-      <HairFront style={t.hairStyle} color={t.hair} hat={t.hat} />
-
-      {t.glasses && (
-        <g fill="#fff" fillOpacity="0.12" stroke={INK} strokeWidth="1.3" strokeLinecap="round">
-          <circle cx="27" cy="31.5" r="4" />
-          <circle cx="37" cy="31.5" r="4" />
-          <path d="M31 31q1-.8 2 0M23 31l-3.2-.5M41 31l3.2-.5" fill="none" />
-        </g>
-      )}
-    </>
-  );
-}
-
-function HairBack({
-  style,
-  color,
-  hat,
-  long,
-}: {
-  style: HairStyle;
-  color: string;
-  hat: string;
-  /** Long hair: falls from under a beanie, and curls grow out instead of staying cropped. */
-  long: boolean;
-}) {
-  switch (style) {
-    case 'beanie':
-      return long ? <HairBack style="long" color={color} hat={hat} long /> : null;
-    case 'ponytail':
-      return (
-        <g>
-          <path d="M38 16c9-1 13 6 12 15-1 8-4 14-8 18 1-7 1-13-1-18-1-5-2-9-3-15Z" fill={color} />
-          <circle cx="44" cy="19" r="2" fill={hat} />
-        </g>
-      );
-    case 'pigtails':
-      return (
-        <g>
-          <ellipse cx="14.5" cy="35" rx="4.5" ry="7" fill={color} />
-          <ellipse cx="49.5" cy="35" rx="4.5" ry="7" fill={color} />
-          <circle cx="16.5" cy="28.5" r="1.8" fill={hat} />
-          <circle cx="47.5" cy="28.5" r="1.8" fill={hat} />
-        </g>
-      );
-    case 'long':
-      return (
+      <ellipse cx="64" cy="96" rx="26" ry="6" fill="#000" fillOpacity="0.28" />
+      {strings && (
         <path
-          d="M17.5 31C16.5 18 24 14 32 14S47.5 18 46.5 31l1 21c-4.5 2-8.5 0-9.5-4H26c-1 4-5 6-9.5 4Z"
-          fill={color}
-        />
-      );
-    case 'bob':
-      return (
-        <path
-          d="M17 33C15.5 18 24 13.5 32 13.5S48.5 18 47 33l.5 9c-2.5 2-5.5 1-6.5-1.5H23c-1 2.5-4 3.5-6.5 1.5Z"
-          fill={color}
-        />
-      );
-    case 'curls':
-      return long ? (
-        <g fill={color}>
-          <circle cx="32" cy="24" r="15.5" />
-          <circle cx="19" cy="26" r="6" />
-          <circle cx="45" cy="26" r="6" />
-          <circle cx="24" cy="14.5" r="6.5" />
-          <circle cx="40" cy="14.5" r="6.5" />
-        </g>
-      ) : (
-        <g fill={color}>
-          <circle cx="24" cy="18" r="6" />
-          <circle cx="32" cy="15.5" r="6.5" />
-          <circle cx="40" cy="18" r="6" />
-          <circle cx="20.5" cy="24" r="4.5" />
-          <circle cx="43.5" cy="24" r="4.5" />
-        </g>
-      );
-    case 'bun':
-      return <circle cx="32" cy="13" r="5.5" fill={color} />;
-    case 'crop':
-    case 'swoop':
-    case 'mohawk':
-    case 'bald':
-    case 'spikes':
-      return null;
-  }
-}
-
-function HairFront({ style, color, hat }: { style: HairStyle; color: string; hat: string }) {
-  switch (style) {
-    case 'crop':
-    case 'bun':
-    case 'ponytail':
-      return (
-        <path d="M19 31C18 20 24 15 32 15s14 5 13 16c-1.5-6-6-9-13-9s-11.5 3-13 9Z" fill={color} />
-      );
-    case 'swoop':
-      return (
-        <path d="M19 32C17 19 26 14 34 15s13 7 11 17c-1-6-4-9-7-10-4 3-12 4-19 10Z" fill={color} />
-      );
-    case 'long':
-    case 'pigtails':
-      return (
-        <path
-          d="M19.5 30c0-10 5.5-14 12.5-14s12.5 4 12.5 14c-2.5-6-8-7.5-12.5-7-4.5-.5-10 1-12.5 7Z"
-          fill={color}
-        />
-      );
-    case 'curls':
-      return (
-        <path
-          d="M19.5 29c-.5-7 3.5-11 7.5-10.5 1.5-2 8.5-2 10 0 4-.5 8 3.5 7.5 10.5-2.5-4-4.5-5-7-4.5-1.5-1.5-9.5-1.5-11 0-2.5-.5-4.5.5-7 4.5Z"
-          fill={color}
-        />
-      );
-    case 'mohawk':
-      return <path d="M28.5 22C28 14 30 8 32 7s4 7 3.5 15c-1-1-6-1-7 0Z" fill={color} />;
-    case 'spikes':
-      return (
-        <path
-          d="M19 30l-.5-10 4 1 .5-7 4 4 2-6.5 3 5.5 3-5.5 2 6.5 4-4 .5 7 4-1-.5 10c-2-6-7-8.5-13-8.5S21 24 19 30Z"
-          fill={color}
-        />
-      );
-    case 'bob':
-      return <path d="M19.5 26c.5-7 6-10 12.5-10s12 3 12.5 10Z" fill={color} />;
-    case 'bald':
-      return <ellipse cx="27" cy="21" rx="3" ry="1.6" fill="#fff" fillOpacity="0.3" />;
-    case 'beanie':
-      return (
-        <g>
-          <circle cx="32" cy="8.5" r="3.2" fill={hat} />
-          <circle cx="32" cy="8.5" r="3.2" fill="#fff" fillOpacity="0.3" />
-          <path d="M18.5 25c0-11 6.5-16 13.5-16s13.5 5 13.5 16Z" fill={hat} />
-          <rect x="17.5" y="21" width="29" height="6" rx="3" fill={hat} />
-          <rect x="17.5" y="21" width="29" height="6" rx="3" fill="#000" fillOpacity="0.18" />
-        </g>
-      );
-  }
-}
-
-function Eyes({ style, lashes }: { style: EyeStyle; lashes: boolean }) {
-  return (
-    <>
-      <EyeShapes style={style} />
-      {lashes && (
-        <path
-          d="M24.6 30.4l-1.5-1.1M39.4 30.4l1.5-1.1"
-          fill="none"
-          stroke={INK}
-          strokeWidth="1.1"
+          d="M54 106v14M74 106v14"
+          stroke="#fff"
+          strokeOpacity="0.85"
+          strokeWidth="2.6"
           strokeLinecap="round"
         />
       )}
@@ -278,118 +157,432 @@ function Eyes({ style, lashes }: { style: EyeStyle; lashes: boolean }) {
   );
 }
 
-function EyeShapes({ style }: { style: EyeStyle }) {
-  const arc = (x: number) => (
+/** A big glossy open eye. */
+function Eye({ x, y, iris, r = 1 }: { x: number; y: number; iris: string; r?: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${r})`}>
+      <ellipse rx="6" ry="7.5" fill="#fff" />
+      <ellipse cx="0.5" cy="1" rx="4.6" ry="5.6" fill={iris} />
+      <circle cx="0.5" cy="1.5" r="2.6" fill="#1a0f0c" />
+      <circle cx="-1.3" cy="-1.3" r="1.7" fill="#fff" />
+    </g>
+  );
+}
+
+/** A shut, smiling eye: the wink and the laugh. */
+function Shut({ x, y, color = INK }: { x: number; y: number; color?: string }) {
+  return (
     <path
-      d={`M${x - 2} 32q2-2.4 4 0`}
+      d={`M${x - 6} ${y + 1.5}Q${x} ${y - 5} ${x + 6} ${y + 1.5}`}
       fill="none"
-      stroke={INK}
-      strokeWidth="1.4"
+      stroke={color}
+      strokeWidth="2.8"
       strokeLinecap="round"
     />
   );
-  const dot = (x: number) => <circle cx={x} cy="31.5" r="1.7" fill={INK} />;
-  switch (style) {
-    case 'dots':
-      return (
-        <>
-          {dot(27)}
-          {dot(37)}
-        </>
-      );
-    case 'happy':
-      return (
-        <>
-          {arc(27)}
-          {arc(37)}
-        </>
-      );
-    case 'wink':
-      return (
-        <>
-          {dot(27)}
-          {arc(37)}
-        </>
-      );
-    case 'wide':
-      return (
-        <>
-          {[27, 37].map((x) => (
-            <g key={x}>
-              <circle cx={x} cy="31.5" r="2.7" fill="#fff" />
-              <circle cx={x + 0.4} cy="31.8" r="1.4" fill={INK} />
-            </g>
-          ))}
-        </>
-      );
-  }
 }
 
-function Mouth({ style, lips }: { style: MouthStyle; lips: string }) {
-  const line = { fill: 'none', stroke: lips, strokeWidth: 1.5, strokeLinecap: 'round' as const };
-  switch (style) {
-    case 'smile':
-      return <path d="M28.5 37.5q3.5 3.2 7 0" {...line} />;
-    case 'smirk':
-      return <path d="M29 38.8q3.8 1.2 6.8-1.8" {...line} />;
-    case 'open':
-      return <ellipse cx="32" cy="39" rx="1.9" ry="2.3" fill={INK} />;
-    case 'grin':
-      return (
-        <>
-          <path d="M27.5 37h9q-.6 5.2-4.5 5.2T27.5 37Z" fill={INK} />
-          <path d="M28.3 37.4h7.4v1.5h-7.4Z" fill="#fff" />
-        </>
-      );
-  }
+/** A sly half-lidded eye, lid drawn in the face's own color. */
+function Sly({ x, y, iris, lid }: { x: number; y: number; iris: string; lid: string }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <ellipse rx="6.5" ry="5.5" fill="#fff" />
+      <ellipse cx="1" cy="0.8" rx="4.4" ry="4.6" fill={iris} />
+      <circle cx="1.4" cy="1" r="2.2" fill="#1a0f0c" />
+      <circle cx="0" cy="1.6" r="1.1" fill="#fff" />
+      <path d="M-8 -6H8V0Q0 -3.5 -8 0Z" fill={lid} />
+      <path d="M-7 0Q0 -3.5 7 0" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" />
+    </g>
+  );
 }
 
+/** A wide-open laugh with a row of top teeth. */
+function Laugh({ y = 74 }: { y?: number }) {
+  return (
+    <g transform={`translate(0 ${y - 74})`}>
+      <path d="M50 74Q64 72 78 74Q76 89 64 89Q52 89 50 74Z" fill={MOUTH} />
+      <path d="M51.5 75Q64 73.5 76.5 75L76 78.5Q64 77.5 52 78.5Z" fill="#fff" />
+      <path d="M56 85Q64 80 72 85Q68 89 64 89Q60 89 56 85Z" fill={TONGUE} />
+    </g>
+  );
+}
+
+function Blush({ y = 74, spread = 22 }: { y?: number; spread?: number }) {
+  return (
+    <Pair>
+      <ellipse cx={64 - spread} cy={y} rx="6" ry="3.5" fill={BLUSH} fillOpacity="0.35" />
+    </Pair>
+  );
+}
+
+const FACE = 'M35 57C35 37 48 28 64 28S93 37 93 57C93 77 81 91 64 91S35 77 35 57Z';
+
+/** A kid's head without hair: neck, ears and face. */
+function KidHead({ skin }: { skin: string }) {
+  return (
+    <>
+      <rect x="54" y="80" width="20" height="16" fill={skin} />
+      <rect x="54" y="80" width="20" height="16" fill="#000" fillOpacity="0.15" />
+      <Pair>
+        <Ball cx={36} cy={62} rx={6} ry={8} fill={skin} />
+      </Pair>
+      <Blob d={FACE} fill={skin} />
+      <path
+        d="M63 67q2.5 3-1 4.5"
+        fill="none"
+        stroke={INK}
+        strokeOpacity="0.35"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+/** The gamer: cap turned to the side, a wink and a big laugh. */
+function Gamer({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <KidHead skin={t.skin} />
+      <Blob d="M32 64L27 54L34 56L32 44L40 50Z" fill={t.hair} />
+      <Blob d="M96 64L101 54L94 56L96 44L88 50Z" fill={t.hair} />
+      <path d="M36 44Q40 56 45 50Q48 58 53 49Q57 56 61 47Q64 53 68 46L68 40H36Z" fill={t.hair} />
+      <Blob d="M32 47C32 24 47 14 65 14S97 24 96 46C80 39 50 39 32 47Z" fill={t.hoodie} />
+      <path
+        d="M46 41C47 26 55 18 65 18S77 24 78 39C68 37 56 38 46 41Z"
+        fill="#fff"
+        fillOpacity="0.92"
+      />
+      <Blob d="M74 41C88 36 106 38 117 47C106 52 89 49 76 47Z" fill={t.hoodie} />
+      <path
+        d="M74 41C88 36 106 38 117 47"
+        fill="none"
+        stroke="#000"
+        strokeOpacity="0.25"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M44 54Q51 49 58 53M70 53Q77 49 84 54"
+        fill="none"
+        stroke={t.hair}
+        strokeWidth="3.5"
+        strokeLinecap="round"
+      />
+      <Shut x={51} y={62} />
+      <Eye x={77} y={62} iris="#6b3e1f" />
+      <Blush />
+      <Laugh />
+    </>
+  );
+}
+
+/** The champ: long hair, round glasses, headphones and a laugh. */
+function Champ({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Blob
+        d="M28 60C24 30 42 18 64 18S104 30 100 60C102 80 106 98 110 118H18C22 98 26 80 28 60Z"
+        fill={t.hair}
+      />
+      <Hoodie color={t.hoodie} />
+      <KidHead skin={t.skin} />
+      <Pair>
+        <path d="M31 58C27 80 30 98 22 118L38 112C39 96 39 80 37 64Z" fill={t.hair} />
+      </Pair>
+      <Blob
+        d="M34 56C33 34 47 24 64 24C82 24 95 34 94 56C88 43 78 37 68 35C69 41 64 45 58 45C60 41 59 38 57 36C49 40 40 46 34 56Z"
+        fill={t.hair}
+      />
+      <path
+        d="M30 58C26 20 102 20 98 58"
+        fill="none"
+        stroke="#1f2a4a"
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
+      <Pair>
+        <Ball cx={29} cy={62} rx={8} ry={11} fill="#eef0f4" />
+        <ellipse cx="29" cy="62" rx="4.5" ry="7" fill="#2f6fe0" />
+      </Pair>
+      <Shut x={52} y={63} />
+      <Shut x={76} y={63} />
+      <Pair>
+        <circle
+          cx="52"
+          cy="62"
+          r="9.5"
+          fill="#fff"
+          fillOpacity="0.12"
+          stroke="#1a1214"
+          strokeWidth="2.6"
+        />
+      </Pair>
+      <path d="M61.5 61Q64 59 66.5 61" fill="none" stroke="#1a1214" strokeWidth="2.4" />
+      <Blush y={76} />
+      <Laugh y={75} />
+    </>
+  );
+}
+
+const FOX = '#f07a24';
+const CREAM = '#fbf1e4';
+
+/** The trickster: a fox with a knowing smirk. */
+function Fox({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Pair>
+        <Blob d="M30 50L28 8L58 32Z" fill={FOX} />
+        <path d="M34 42L33 18L51 33Z" fill={CREAM} />
+      </Pair>
+      <Blob
+        d="M24 64C24 44 40 30 64 30S104 44 104 64L114 72L99 76L105 85L87 86C80 92 72 95 64 95S48 92 41 86L23 85L29 76L14 72Z"
+        fill={FOX}
+      />
+      <path
+        d="M38 68C46 78 56 80 64 73C72 80 82 78 90 68C94 82 82 95 64 95S34 82 38 68Z"
+        fill={CREAM}
+      />
+      <path d="M41 51L57 56M87 51L71 56" stroke="#7a3a10" strokeWidth="3.2" strokeLinecap="round" />
+      <Sly x={50} y={63} iris="#e8a23a" lid={FOX} />
+      <Sly x={78} y={63} iris="#e8a23a" lid={FOX} />
+      <Ball cx={64} cy={76} rx={5.5} ry={4} fill="#1a1214" />
+      <path
+        d="M64 80v3M55 82Q64 88 75 80"
+        fill="none"
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+const PANDA = '#f4f2ee';
+const PANDA_BLACK = '#1d1b20';
+
+/** The chill one: a panda in sunglasses. */
+function Panda({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Pair>
+        <Ball cx={34} cy={32} rx={12} fill={PANDA_BLACK} />
+      </Pair>
+      <Ball cx={64} cy={61} rx={35} ry={32} fill={PANDA} />
+      <Pair>
+        <path
+          d="M36 55C36 50 41 48 50 48H58C62 48 63 52 62 56C61 64 56 69 49 69C41 69 36 63 36 55Z"
+          fill="#111"
+        />
+        <path
+          d="M41 53Q46 50 52 51"
+          fill="none"
+          stroke="#fff"
+          strokeOpacity="0.5"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path d="M37 53L28 50" stroke="#111" strokeWidth="3" strokeLinecap="round" />
+      </Pair>
+      <path d="M61 52Q64 50 67 52" fill="none" stroke="#111" strokeWidth="3" />
+      <ellipse cx="64" cy="78" rx="14" ry="10" fill="#fff" />
+      <Ball cx={64} cy={73} rx={5.5} ry={4} fill={PANDA_BLACK} />
+      <path
+        d="M64 77v3M56 80Q64 86 73 79"
+        fill="none"
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+const MONKEY = '#8a5230';
+const MONKEY_FACE = '#e8b48a';
+
+/** The wildcard: a monkey mid-laugh with a wink. */
+function Monkey({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Pair>
+        <Ball cx={31} cy={60} rx={12} fill={MONKEY} />
+        <circle cx="31" cy="60" r="6.5" fill={MONKEY_FACE} />
+      </Pair>
+      <Ball cx={64} cy={60} rx={31} ry={32} fill={MONKEY} />
+      <path d="M50 32Q54 16 63 26Q68 14 75 28Q66 24 50 32Z" fill="#6a3c22" />
+      <Blob
+        d="M40 61C40 47 52 45 64 53C76 45 88 47 88 61C92 75 84 93 64 93S36 75 40 61Z"
+        fill={MONKEY_FACE}
+      />
+      <path
+        d="M42 52Q50 46 58 51M70 51Q78 46 86 52"
+        fill="none"
+        stroke="#4a2814"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+      />
+      <Shut x={51} y={61} />
+      <Eye x={77} y={61} iris="#6b3e1f" />
+      <path d="M61 70h.1M67 70h.1" stroke={INK} strokeWidth="2.6" strokeLinecap="round" />
+      <Laugh y={76} />
+    </>
+  );
+}
+
+const BUNNY = '#f7f3f0';
+
+/** The speedy one: a bunny in a headband, laughing. */
+function Bunny({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Blob d="M44 42C33 22 32 -2 44 -4S57 20 55 40Z" fill={BUNNY} />
+      <path d="M46 36C39 22 39 4 45 3S51 20 51 35Z" fill={PINK} />
+      <Blob d="M73 40C74 18 84 -2 95 2S90 26 83 42Z" fill={BUNNY} />
+      <path d="M77 36C79 20 85 6 91 8S87 24 82 37Z" fill={PINK} />
+      <Ball cx={64} cy={63} rx={31} ry={29} fill={BUNNY} />
+      <Blob d="M33 52C46 41 82 41 95 52L95 60C82 49 46 49 33 60Z" fill="#e5383b" />
+      <path d="M34 54L17 45L21 58ZM34 57L19 66L31 65Z" fill="#c42a2e" />
+      <Shut x={51} y={66} />
+      <Shut x={77} y={66} />
+      <Blush y={76} spread={21} />
+      <path d="M61 71H67L64 74.5Z" fill={PINK} />
+      <path d="M54 77Q64 75 74 77Q72 91 64 91S56 91 54 77Z" fill={MOUTH} />
+      <path d="M59.5 76.5H68.5V82H59.5Z" fill="#fff" />
+      <path d="M64 76.5V82" stroke="#ccc" strokeWidth="0.8" />
+      <path d="M58 87Q64 83 70 87Q67 91 64 91S60 91 58 87Z" fill={TONGUE} />
+    </>
+  );
+}
+
+const CAT = '#9a96a6';
+const CAT_LIGHT = '#e4e1ea';
+
+/** The strategist: a cat with a smug, half-lidded look. */
+function Cat({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Pair>
+        <Blob d="M31 54L33 16L58 38Z" fill={CAT} />
+        <path d="M36 46L37 26L51 38Z" fill={PINK} />
+      </Pair>
+      <Blob
+        d="M30 64C30 44 44 34 64 34S98 44 98 64L108 70L97 74L102 82L88 83C82 90 74 93 64 93S46 90 40 83L26 82L31 74L20 70Z"
+        fill={CAT}
+      />
+      <path
+        d="M58 37v8M64 36v10M70 37v8"
+        stroke="#6e6a7a"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
+      <Pair>
+        <ellipse cx="58" cy="79" rx="8" ry="6" fill={CAT_LIGHT} />
+        <path
+          d="M46 76L30 73M46 80L30 81"
+          stroke="#fff"
+          strokeOpacity="0.8"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+      </Pair>
+      <Sly x={50} y={63} iris="#5ac85a" lid={CAT} />
+      <Sly x={78} y={63} iris="#5ac85a" lid={CAT} />
+      <path d="M60.5 73.5H67.5L64 77Z" fill={PINK} />
+      <path
+        d="M64 77v2.5M56 81Q61 84 64 79.5Q68 85 75 79"
+        fill="none"
+        stroke={INK}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+const KOALA = '#a7a3ad';
+
+/** A koala with big fluffy ears and a shy smile. */
+function Koala({ t }: { t: PersonAvatar }) {
+  return (
+    <>
+      <Hoodie color={t.hoodie} />
+      <Pair>
+        <Ball cx={30} cy={42} rx={16} fill={KOALA} />
+        <circle cx="31" cy="44" r="9" fill="#f2eef0" />
+      </Pair>
+      <Ball cx={64} cy={63} rx={32} ry={29} fill={KOALA} />
+      <Pair>
+        <circle cx="46" cy="60" r="5" fill="#1a1214" />
+        <circle cx="44.5" cy="58.3" r="1.7" fill="#fff" />
+      </Pair>
+      <Blob d="M55 63C55 54 73 54 73 63V73C73 82 55 82 55 73Z" fill="#2a2530" />
+      <Blush y={72} spread={24} />
+      <path
+        d="M58 86Q64 90 70 86"
+        fill="none"
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+const PLATING = '#eef0f4';
+const VISOR = '#141826';
+
+/** A computer player: a friendly robot with glowing eyes. */
 function Robot({ t }: { t: RobotAvatar }) {
   return (
     <>
-      <path d="M12 64c1-10 9-14 20-14s19 4 20 14Z" fill={t.plating} />
-      <path d="M12 64c1-10 9-14 20-14s19 4 20 14Z" fill="#000" fillOpacity="0.22" />
-      <rect x="28" y="41" width="8" height="10" fill={t.plating} />
-      <rect x="28" y="41" width="8" height="10" fill="#000" fillOpacity="0.3" />
-      <path d="M32 17v-7" stroke={t.plating} strokeWidth="2" />
-      <circle cx="32" cy="9" r="2.6" fill={t.glow} />
-      <rect x="15.5" y="27" width="4" height="9" rx="1.5" fill={t.plating} />
-      <rect x="44.5" y="27" width="4" height="9" rx="1.5" fill={t.plating} />
-      <rect x="15.5" y="27" width="4" height="9" rx="1.5" fill="#000" fillOpacity="0.2" />
-      <rect x="44.5" y="27" width="4" height="9" rx="1.5" fill="#000" fillOpacity="0.2" />
-      <rect x="18.5" y="16.5" width="27" height="27" rx="7" fill={t.plating} />
-      <rect x="21.5" y="18.5" width="10" height="2" rx="1" fill="#fff" fillOpacity="0.45" />
-      <g fill={INK} fillOpacity="0.35">
-        <circle cx="21.5" cy="40.5" r="0.8" />
-        <circle cx="42.5" cy="40.5" r="0.8" />
-      </g>
-      <rect x="22" y="22.5" width="20" height="14" rx="4" fill="#17151f" />
-      {t.eyes === 'round' && (
-        <g fill={t.glow}>
-          <circle cx="27.5" cy="29" r="2.3" />
-          <circle cx="36.5" cy="29" r="2.3" />
-        </g>
-      )}
-      {t.eyes === 'bars' && (
-        <g fill={t.glow}>
-          <rect x="25" y="28" width="5" height="2.2" rx="1.1" />
-          <rect x="34" y="28" width="5" height="2.2" rx="1.1" />
-        </g>
-      )}
-      {t.eyes === 'happy' && (
-        <path
-          d="M25.5 30q2-2.6 4 0M34.5 30q2-2.6 4 0"
-          fill="none"
-          stroke={t.glow}
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-      )}
+      <Blob d="M8 140C10 110 32 96 64 96S118 110 120 140Z" fill={PLATING} />
+      <ellipse cx="64" cy="98" rx="24" ry="6" fill="#000" fillOpacity="0.28" />
+      <Pair>
+        <Ball cx={22} cy={116} rx={9} fill="#2f6fe0" />
+      </Pair>
+      <circle cx="64" cy="114" r="5" fill={t.glow} />
+      <Pair>
+        <path d="M50 28L42 10" stroke="#9aa3b2" strokeWidth="3" strokeLinecap="round" />
+        <Ball cx={42} cy={9} rx={4.5} fill="#2f6fe0" />
+        <Ball cx={28} cy={60} rx={8} ry={12} fill="#2f6fe0" />
+      </Pair>
+      <Blob
+        d="M30 58C30 34 44 24 64 24S98 34 98 58C98 80 86 93 64 93S30 80 30 58Z"
+        fill={PLATING}
+      />
       <path
-        d="M29 33.6h6"
+        d="M38 52C38 42 48 38 64 38S90 42 90 52V66C90 78 80 83 64 83S38 78 38 66Z"
+        fill={VISOR}
+      />
+      <path
+        d="M44 46Q54 41 66 42"
+        fill="none"
+        stroke="#fff"
+        strokeOpacity="0.25"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <g fill={t.glow}>
+        <Pair>
+          <ellipse cx="52" cy="58" rx="9" ry="10" fillOpacity="0.2" />
+          {t.eyes === 'round' && <rect x="47" y="51" width="10" height="13" rx="5" />}
+          {t.eyes === 'bars' && <rect x="45.5" y="56" width="13" height="4" rx="2" />}
+        </Pair>
+      </g>
+      {t.eyes === 'happy' && <Shut x={52} y={59} color={t.glow} />}
+      {t.eyes === 'happy' && <Shut x={76} y={59} color={t.glow} />}
+      <path
+        d="M57 70Q64 75 71 70"
+        fill="none"
         stroke={t.glow}
-        strokeOpacity="0.7"
-        strokeWidth="1.4"
+        strokeWidth="2.4"
         strokeLinecap="round"
       />
     </>

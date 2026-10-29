@@ -9,6 +9,11 @@ export const RULES_CONFIG = {
   twoPlayerWildReverseDraw4HitsPlayer: true,
   /** Stack responses only need an equal or higher draw value; color is irrelevant. */
   stackingIgnoresColor: true,
+  /**
+   * A draw you chose to make that brings you to 25 cards spares you if the drawn card is playable:
+   * you must play it straight away (house rule, docs/RULES.md §5.13 and §6 A13).
+   */
+  lastChanceDraw: true,
   /** Mercy knockouts score the 250 bonus; forfeits (leaving/timeouts) do not. */
   forfeitCountsAsKnockout: false,
   /** Max entries kept in the public action log. */

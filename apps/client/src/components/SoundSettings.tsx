@@ -2,11 +2,16 @@ import { useState } from 'react';
 import {
   Bell,
   BellRing,
+  Download,
   Laugh,
   Layers,
+  Layers3,
+  Megaphone,
   Play,
+  Repeat,
   Shuffle,
   Siren,
+  Sparkles,
   Trophy,
   Volume2,
   VolumeX,
@@ -22,6 +27,38 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Card play',
     description: 'A card slapped down on the table whenever anyone plays one.',
     Icon: Layers,
+  },
+  {
+    kind: 'discardAll',
+    label: 'Discard All',
+    description: 'A handful of cards hitting the pile when anyone plays a Discard All.',
+    Icon: Layers3,
+  },
+  {
+    kind: 'cardDraw',
+    label: 'Card draw',
+    description:
+      'A soft swish whenever anyone draws from the pile, including Color Roulette draws.',
+    Icon: Download,
+  },
+  {
+    kind: 'reshuffle',
+    label: 'Reshuffle',
+    description: 'The discards swept up and riffled when the draw pile runs out.',
+    Icon: Repeat,
+  },
+  {
+    kind: 'rouletteHit',
+    label: 'Roulette hit',
+    description: 'A short ding when a Color Roulette draw turns up the named color.',
+    Icon: Sparkles,
+  },
+  {
+    kind: 'unoCall',
+    label: 'UNO call',
+    description:
+      'A voice shouts "UNO!" when a player calls it: a man or a woman, matching their avatar.',
+    Icon: Megaphone,
   },
   {
     kind: 'yourTurn',
@@ -77,7 +114,7 @@ function Toggle({
       />
       <span
         aria-hidden="true"
-        className="h-6 w-11 rounded-full bg-walnut-dark ring-1 ring-walnut-light/60 transition-colors peer-checked:bg-brass peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white motion-reduce:transition-none"
+        className="h-6 w-11 rounded-full bg-felt-700 ring-1 ring-white/15 transition-colors peer-checked:bg-brass peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white motion-reduce:transition-none"
       />
       <span
         aria-hidden="true"
@@ -88,7 +125,14 @@ function Toggle({
 }
 
 /** Top-bar button that opens the sound panel: mute all, plus a toggle and a preview for each sound. */
-export function SoundSettings({ className }: { className: string }) {
+export function SoundSettings({
+  className,
+  labelClassName = 'hidden sm:inline',
+}: {
+  className: string;
+  /** When the "Sound" label shows beside the icon. */
+  labelClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const prefs = useAppState((s) => s.sound);
   const Icon = !prefs.muted && SOUNDS.some(({ kind }) => prefs[kind]) ? Volume2 : VolumeX;
@@ -101,7 +145,7 @@ export function SoundSettings({ className }: { className: string }) {
         onClick={() => setOpen(true)}
         aria-label="Sound settings"
       >
-        <Icon size={16} /> <span className="hidden sm:inline">Sound</span>
+        <Icon size={17} /> <span className={labelClassName}>Sound</span>
       </button>
       {open && (
         <Modal title="Sound" onClose={() => setOpen(false)}>
@@ -134,7 +178,11 @@ export function SoundSettings({ className }: { className: string }) {
                 <button
                   type="button"
                   className="btn-ghost p-2"
-                  onClick={() => playSound(kind)}
+                  // The UNO call previews both voices, a man and then a woman.
+                  onClick={() => {
+                    playSound(kind);
+                    if (kind === 'unoCall') playSound(kind, 0.8, 'female');
+                  }}
                   aria-label={`Play the ${label.toLowerCase()} sound`}
                 >
                   <Play size={18} />
