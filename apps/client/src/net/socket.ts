@@ -1,5 +1,11 @@
 import { io, type Socket } from 'socket.io-client';
-import type { Ack, ClientToServerEvents, ServerToClientEvents, SessionInfo } from '@nomercy/shared';
+import {
+  CHAT_HISTORY_LIMIT,
+  type Ack,
+  type ClientToServerEvents,
+  type ServerToClientEvents,
+  type SessionInfo,
+} from '@nomercy/shared';
 import { getState, pushNotice, setState } from '../state/store';
 import { clearSession, loadSession, saveSession } from './session-storage';
 
@@ -50,7 +56,7 @@ export function adoptSession(session: SessionInfo): void {
 
 export function forgetSession(message?: string): void {
   clearSession();
-  setState({ session: null, room: null, game: null, restoring: false });
+  setState({ session: null, room: null, game: null, chat: [], restoring: false });
   if (message) pushNotice('info', message, 6000);
 }
 
@@ -89,6 +95,17 @@ export function startConnection(): void {
     setState((s) => ({ room, game: room.status === 'lobby' ? null : s.game }));
   });
   socket.on('game:state', (game) => setState({ game }));
+  socket.on('chat:history', (chat) => setState({ chat }));
+  socket.on('chat:message', (message) =>
+    setState((s) =>
+      s.chat.some((m) => m.id >= message.id)
+        ? {}
+        : { chat: [...s.chat, message].slice(-CHAT_HISTORY_LIMIT) },
+    ),
+  );
+  socket.on('chat:update', (message) =>
+    setState((s) => ({ chat: s.chat.map((m) => (m.id === message.id ? message : m)) })),
+  );
   socket.on('room:closed', ({ reason }) => forgetSession(reason));
 
   socket.connect();

@@ -1,4 +1,6 @@
 import {
+  chatReactSchema,
+  chatSendSchema,
   createRoomSchema,
   joinRoomSchema,
   kickSchema,
@@ -68,6 +70,7 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
         : `[room ${room.code}] player rejoined a held seat`,
     );
     broadcaster.room(room);
+    broadcaster.chatHistory(room, player.id);
     return { ok: true, data: sessionInfo(room, player) };
   });
 
@@ -93,6 +96,7 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     }
     socket.data.session = { roomCode: room.code, playerId: player.id };
     broadcaster.room(room);
+    broadcaster.chatHistory(room, player.id);
     return { ok: true, data: sessionInfo(room, player) };
   });
 
@@ -139,6 +143,25 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
   registerHandler(socket, limiter, 'room:settings', roomSettingsSchema, (settings) => {
     const session = requireSession(socket);
     broadcaster.room(manager.updateSettings(session.roomCode, session.playerId, settings));
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'chat:send', chatSendSchema, ({ text }) => {
+    const session = requireSession(socket);
+    const { room, message } = manager.postChat(session.roomCode, session.playerId, text);
+    broadcaster.chatMessage(room, message);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'chat:react', chatReactSchema, ({ messageId, emoji }) => {
+    const session = requireSession(socket);
+    const { room, message } = manager.reactToChat(
+      session.roomCode,
+      session.playerId,
+      messageId,
+      emoji,
+    );
+    broadcaster.chatUpdate(room, message);
     return { ok: true, data: null };
   });
 

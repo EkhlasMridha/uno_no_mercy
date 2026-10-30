@@ -8,6 +8,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { playerNameSchema } from '@nomercy/shared';
 import type {
   Ack,
+  ChatMessage,
   ClientToServerEvents,
   GameStateView,
   RoomView,
@@ -809,6 +810,100 @@ describe('behind a reverse proxy', () => {
     const aliceAgain = await tryConnectTo(proxiedUrl, viaProxy('1.2.3.4, 192.168.1.30'));
     expect(aliceAgain.outcome).not.toBe('connected');
     for (const s of [alice, bob, aliceAgain]) s.socket.close();
+  });
+});
+
+describe('group chat', () => {
+  it('reaches only the players in the same room, in the lobby and in a game', async () => {
+    const [host, guest, outsider, stranger] = await Promise.all([
+      newClient(),
+      newClient(),
+      newClient(),
+      newClient(),
+    ]);
+    const heard = new Map<TestClient, string[]>();
+    for (const c of [host, guest, outsider, stranger]) {
+      heard.set(c, []);
+      c.socket.on('chat:message', (m) => heard.get(c)!.push(m.text));
+    }
+    const room = (await emit<SessionInfo>(host, 'room:create', {
+      name: 'ChatHost',
+      gender: 'male',
+      maxPlayers: 4,
+    })) as { data: SessionInfo };
+    await emit(guest, 'room:join', {
+      code: room.data.roomCode,
+      name: 'ChatGuest',
+      gender: 'female',
+    });
+    await emit(outsider, 'room:create', { name: 'Elsewhere', gender: 'male', maxPlayers: 4 });
+
+    // Not seated anywhere, a socket can't speak.
+    expect(await emit(stranger, 'chat:send', { text: 'hi' })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_IN_ROOM' },
+    });
+    // Payloads are validated: blank, too long, control characters, unknown keys.
+    for (const bad of [
+      { text: '   ' },
+      { text: 'x'.repeat(301) },
+      { text: 'a\nb' },
+      { text: 'a', x: 1 },
+    ]) {
+      expect(await emit(host, 'chat:send', bad)).toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_PAYLOAD' },
+      });
+    }
+
+    expect((await emit(host, 'chat:send', { text: 'hello lobby 👋' })).ok).toBe(true);
+    await until(() => heard.get(guest)!.length === 1);
+    expect(heard.get(host)).toEqual(['hello lobby 👋']);
+    expect(heard.get(guest)).toEqual(['hello lobby 👋']);
+
+    await emit(guest, 'room:ready', { ready: true });
+    expect((await emit(host, 'game:start', {})).ok).toBe(true);
+    expect((await emit(guest, 'chat:send', { text: 'gl hf' })).ok).toBe(true);
+    await until(() => heard.get(host)!.length === 2);
+
+    // Reactions toggle per player, reach only this room, and refuse unknown emoji or messages.
+    const updates: ChatMessage[] = [];
+    host.socket.on('chat:update', (m) => updates.push(m));
+    outsider.socket.on('chat:update', (m) => heard.get(outsider)!.push(m.text));
+    const firstId = 1;
+    expect((await emit(guest, 'chat:react', { messageId: firstId, emoji: '🔥' })).ok).toBe(true);
+    await until(() => updates.length === 1);
+    expect(updates[0]!.reactions).toEqual({ '🔥': [expect.any(String)] });
+    expect((await emit(guest, 'chat:react', { messageId: firstId, emoji: '🔥' })).ok).toBe(true);
+    await until(() => updates.length === 2);
+    expect(updates[1]!.reactions).toEqual({});
+    expect(await emit(guest, 'chat:react', { messageId: firstId, emoji: '🙈' })).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_PAYLOAD' },
+    });
+    expect(await emit(guest, 'chat:react', { messageId: 999, emoji: '🔥' })).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_TARGET' },
+    });
+    expect(await emit(stranger, 'chat:react', { messageId: firstId, emoji: '🔥' })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_IN_ROOM' },
+    });
+
+    // Nothing leaked to the other room or the unseated socket.
+    expect(heard.get(outsider)).toEqual([]);
+    expect(heard.get(stranger)).toEqual([]);
+
+    // A reconnecting player gets the history back, and only their own room's.
+    const returning = await newClient();
+    let history: string[] = [];
+    returning.socket.on('chat:history', (ms) => (history = ms.map((m) => m.text)));
+    await emit(returning, 'room:reconnect', {
+      code: room.data.roomCode,
+      token: room.data.reconnectToken,
+    });
+    await until(() => history.length === 2);
+    expect(history).toEqual(['hello lobby 👋', 'gl hf']);
   });
 });
 

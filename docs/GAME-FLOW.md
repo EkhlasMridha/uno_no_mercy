@@ -15,6 +15,12 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
+- **Group chat** is open to everyone seated in the room, in the lobby and during a game, and never
+  leaves the room. Text and emoji, one line up to 300 characters. The lobby shows it in a column at the
+  right edge; at the table the side panel is split in half, game log and players above, chat below. Either
+  half can be minimized to its header (both start expanded); a minimized chat counts unread lines. Messages take one of six reactions (toggle, shown as counts
+  under the message), lines of only emoji are drawn large, and a pill offers the way back down when
+  new lines arrive while you are reading older ones.
 - **Invite links** (`?join=CODE`) join without asking: under the name this browser last used (kept in
   `localStorage`), or a random one like "Lucky Otter" when there is none or it is taken, with the male
   avatar set. The player can rename and switch avatar set in the lobby; a rename is remembered.
