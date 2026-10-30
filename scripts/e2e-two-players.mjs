@@ -135,7 +135,7 @@ try {
     [alpha, 'Alpha', 'Bravo'],
     [bravo, 'Bravo', 'Alpha'],
   ]) {
-    const hand = `ul[aria-label="Your hand, ${STARTING_HAND_SIZE} cards"] > li`;
+    const hand = `[aria-label="Your hand, ${STARTING_HAND_SIZE} cards"] li`;
     await waitFor(
       () => player(`document.querySelectorAll('${hand}').length === ${STARTING_HAND_SIZE}`),
       `${me} to hold ${STARTING_HAND_SIZE} cards`,
