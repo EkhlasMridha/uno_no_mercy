@@ -1,4 +1,5 @@
 import {
+  CHAT_HISTORY_LIMIT,
   MATCH_TARGET_POINTS,
   MAX_COMPUTERS,
   MAX_PLAYERS,
@@ -7,6 +8,7 @@ import {
   ROOM_CODE_LENGTH,
   TURN_HOLD_MS,
   WAIT_FOR_REJOIN_MS,
+  type ChatMessage,
   type ErrorCode,
   type GameEvent,
   type Gender,
@@ -133,6 +135,7 @@ export class RoomManager {
       players: [player],
       settings: { scoringEnabled: false, maxPlayers: computers > 0 ? computers + 1 : maxPlayers },
       game: null,
+      chat: [],
       roundNumber: 0,
       dealerIndex: this.options.rng(MAX_PLAYERS),
       lastResult: null,
@@ -381,6 +384,43 @@ export class RoomManager {
       p.score = 0;
     }
     return room;
+  }
+
+  /** Adds a chat line from a seated player, in the lobby or mid-game. */
+  postChat(code: string, playerId: string, text: string): { room: Room; message: ChatMessage } {
+    const room = this.requireRoom(code);
+    const sender = this.requireMember(room, playerId);
+    const message: ChatMessage = {
+      id: (room.chat.at(-1)?.id ?? 0) + 1,
+      senderId: sender.id,
+      senderName: sender.name,
+      text,
+      sentAt: this.now(),
+      reactions: {},
+    };
+    room.chat.push(message);
+    if (room.chat.length > CHAT_HISTORY_LIMIT) {
+      room.chat.splice(0, room.chat.length - CHAT_HISTORY_LIMIT);
+    }
+    return { room, message };
+  }
+
+  /** Adds the player's reaction to a chat message, or takes it back if it is already there. */
+  reactToChat(
+    code: string,
+    playerId: string,
+    messageId: number,
+    emoji: string,
+  ): { room: Room; message: ChatMessage } {
+    const room = this.requireRoom(code);
+    this.requireMember(room, playerId);
+    const message = room.chat.find((m) => m.id === messageId);
+    if (!message) throw new RoomError('INVALID_TARGET', 'That message is no longer in the chat');
+    const reacted = (message.reactions[emoji] ?? []).filter((id) => id !== playerId);
+    if (reacted.length === (message.reactions[emoji]?.length ?? 0)) reacted.push(playerId);
+    if (reacted.length > 0) message.reactions[emoji] = reacted;
+    else delete message.reactions[emoji];
+    return { room, message };
   }
 
   /** Runs one game command through the authoritative engine. */

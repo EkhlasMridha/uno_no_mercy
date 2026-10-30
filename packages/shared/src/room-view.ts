@@ -60,6 +60,20 @@ export interface RoomView {
   matchTarget: number;
 }
 
+/** One group chat message. Only ever delivered to the players seated in the same room. */
+export interface ChatMessage {
+  /** Increases by one per message within a room; clients use it to order and de-duplicate. */
+  id: number;
+  senderId: string;
+  /** The sender's name when they wrote it, so the line survives a rename or a departure. */
+  senderName: string;
+  text: string;
+  /** Epoch milliseconds, stamped by the server. */
+  sentAt: number;
+  /** Who reacted with each emoji. An emoji nobody chose is absent. */
+  reactions: Partial<Record<string, string[]>>;
+}
+
 export interface SessionInfo {
   roomCode: string;
   playerId: string;

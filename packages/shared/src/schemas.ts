@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { CARD_COLORS } from './cards.js';
 import {
+  CHAT_MESSAGE_MAX_LENGTH,
   MAX_COMPUTERS,
   MAX_PLAYERS,
+  REACTION_EMOJIS,
   MIN_PLAYERS,
   PLAYER_NAME_MAX_LENGTH,
   ROOM_CODE_LENGTH,
@@ -75,6 +77,23 @@ export const roomSettingsSchema = z
   })
   .strict();
 
+/** A group chat line: one line of text and emoji, no control characters. */
+export const chatSendSchema = z
+  .object({
+    text: z
+      .string()
+      .trim()
+      .min(1, 'Type a message first')
+      .max(CHAT_MESSAGE_MAX_LENGTH, `Messages may be at most ${CHAT_MESSAGE_MAX_LENGTH} characters`)
+      .regex(/^[^\p{Cc}]+$/u, 'Messages must be a single line of text'),
+  })
+  .strict();
+
+/** Toggles the sender's reaction on a chat message. */
+export const chatReactSchema = z
+  .object({ messageId: z.number().int().nonnegative(), emoji: z.enum(REACTION_EMOJIS) })
+  .strict();
+
 const turnCommandShape = { commandId: commandIdSchema, version: stateVersionSchema };
 
 export const playCardSchema = z
@@ -108,6 +127,8 @@ export type ReadyPayload = z.input<typeof readySchema>;
 export type WaitForPlayerPayload = z.input<typeof waitForPlayerSchema>;
 export type StartGamePayload = z.input<typeof startGameSchema>;
 export type RoomSettingsPayload = z.input<typeof roomSettingsSchema>;
+export type ChatSendPayload = z.input<typeof chatSendSchema>;
+export type ChatReactPayload = z.input<typeof chatReactSchema>;
 export type PlayCardPayload = z.input<typeof playCardSchema>;
 export type DrawPayload = z.input<typeof drawSchema>;
 export type AcceptPenaltyPayload = z.input<typeof acceptPenaltySchema>;

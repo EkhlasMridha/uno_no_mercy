@@ -1,4 +1,11 @@
-import type { Ack, Gender, RoomSettings, RoomStatus, RoundResultView } from '@nomercy/shared';
+import type {
+  Ack,
+  ChatMessage,
+  Gender,
+  RoomSettings,
+  RoomStatus,
+  RoundResultView,
+} from '@nomercy/shared';
 import type { GameState } from '../engine/index.js';
 import type { CommandCache } from '../net/command-cache.js';
 
@@ -30,6 +37,8 @@ export interface Room {
   players: RoomPlayer[];
   settings: RoomSettings;
   game: GameState | null;
+  /** Group chat, newest last. Kept in memory only and gone with the room. */
+  chat: ChatMessage[];
   roundNumber: number;
   dealerIndex: number;
   lastResult: RoundResultView | null;

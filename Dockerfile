@@ -1,7 +1,7 @@
 # One image runs everything: the Node server serves the built client bundle and the Socket.IO API.
 # The runtime stage holds only the node binary, one bundled server file and the static client.
 
-FROM node:20-alpine3.23 AS build
+FROM node:22-alpine3.23 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/

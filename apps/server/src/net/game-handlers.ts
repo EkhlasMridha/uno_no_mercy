@@ -24,7 +24,7 @@ interface CommandEnvelope {
  * Wires one game event to an engine command. Every command goes through the same path:
  * session check → duplicate check → version check → engine → broadcast.
  */
-function registerGameCommand<S extends z.ZodType<CommandEnvelope, z.ZodTypeDef, unknown>>(
+function registerGameCommand<S extends z.ZodType<CommandEnvelope>>(
   deps: HandlerDeps,
   event: ClientEventName,
   schema: S,

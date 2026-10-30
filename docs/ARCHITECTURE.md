@@ -132,6 +132,8 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
 | `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
 | `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
+| `chat:send`                  | `{ text }`                                                           | any seated player, lobby or game; 1–300 chars, one line; delivered only to this room's sockets          |
+| `chat:react`                 | `{ messageId, emoji }`                                               | toggles your reaction (one of six fixed emoji) on a message still in the history                        |
 | `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
 | `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)                                                     |
 | `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                                                                     |
@@ -143,7 +145,10 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `game:call-uno`              | `{ commandId }`                                                      |                                                                                                         |
 | `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                                                                         |
 
-Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `room:closed`.
+Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `chat:message`
+(one `ChatMessage`, sent to the sockets seated in that room only), `chat:update` (a message whose reactions changed, same audience), `chat:history` (the last 30 lines, sent on
+join, reconnect and `game:request-state`), `room:closed`. Chat lives in `Room.chat` in memory and is gone
+with the room; it is not part of `room:state`, so it never rides along with game broadcasts.
 
 Differences from the suggested list: the wild color and the 7 swap target travel **inside**
 `game:play-card`, so a wild or a 7 is applied in one atomic step and there are no half-played states.

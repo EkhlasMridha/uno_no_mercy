@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { GameStateView, RoomView, SessionInfo } from '@nomercy/shared';
+import type { ChatMessage, GameStateView, RoomView, SessionInfo } from '@nomercy/shared';
 import type { SoundPrefs } from '../lib/sound';
 import { loadSoundPrefs, saveSoundPrefs } from '../net/session-storage';
 
@@ -16,6 +16,8 @@ export interface AppState {
   session: SessionInfo | null;
   room: RoomView | null;
   game: GameStateView | null;
+  /** This room's group chat, oldest first. Replaced by the server's history on every (re)join. */
+  chat: ChatMessage[];
   /** True while trying to restore a seat after a refresh or network drop. */
   restoring: boolean;
   notices: Notice[];
@@ -31,6 +33,7 @@ let state: AppState = {
   session: null,
   room: null,
   game: null,
+  chat: [],
   restoring: false,
   notices: [],
   sound: loadSoundPrefs(),

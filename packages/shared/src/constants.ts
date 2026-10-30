@@ -15,6 +15,13 @@ export const ROOM_CODE_LENGTH = 5;
 /** Alphabet without easily confused characters (0/O, 1/I/L). */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const PLAYER_NAME_MAX_LENGTH = 20;
+/** Longest group chat message, in characters. */
+export const CHAT_MESSAGE_MAX_LENGTH = 300;
+/** The reactions a player can leave on a chat message. */
+export const REACTION_EMOJIS = ['👍', '😂', '😮', '😭', '🔥', '👏'] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+/** Messages the server keeps per room and replays to a player who joins or reconnects. */
+export const CHAT_HISTORY_LIMIT = 30;
 /** Most computer players a room can seat. */
 export const MAX_COMPUTERS = 9;
 /**
