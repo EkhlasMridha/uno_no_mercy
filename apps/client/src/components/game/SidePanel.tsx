@@ -92,7 +92,12 @@ export function SidePanel({
           </div>
         )}
       </section>
-      <ChatBox meId={meId} avatarOf={avatarOf} open={chatOpen} onToggle={() => setChatOpen((v) => !v)} />
+      <ChatBox
+        meId={meId}
+        avatarOf={avatarOf}
+        open={chatOpen}
+        onToggle={() => setChatOpen((v) => !v)}
+      />
     </div>
   );
 }
