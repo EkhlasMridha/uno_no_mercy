@@ -70,6 +70,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [showPlayed, setShowPlayed] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [shake, setShake] = useState(0);
+  // An action sent and not yet confirmed. The clicked card lifts at once instead of waiting out the
+  // network round trip; buttons lock so a second tap can't send it twice. A refusal puts it back.
+  const [sending, setSending] = useState<{ cardId: string | null } | null>(null);
+  const sendingRef = useRef(false);
   const privateHand = useAppState((s) => s.privateHand);
 
   const playable = useMemo(() => new Set(actions.playableCardIds), [actions.playableCardIds]);
@@ -104,13 +108,25 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     avatarOf,
   );
 
+  const sendAction = async (cardId: string | null, action: () => Promise<unknown>) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending({ cardId });
+    try {
+      await action();
+    } finally {
+      sendingRef.current = false;
+      setSending(null);
+    }
+  };
+
   const send = async (
     card: Card,
     options: { color?: CardColor; swapTargetId?: string; discardIds?: string[] } = {},
   ) => {
     setPending(null);
     const declareUno = unoArmed && actions.canDeclareWithPlay ? true : undefined;
-    await playCard(card.id, { ...options, declareUno });
+    await sendAction(card.id, () => playCard(card.id, { ...options, declareUno }));
     setUnoArmed(false);
   };
 
@@ -137,7 +153,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   };
 
   const onCardClick = (card: Card) => {
-    if (finished) return;
+    if (finished || sendingRef.current) return;
     if (held) {
       pushNotice('info', 'Hold on: everyone gets 2 seconds to call UNO after a play.', 2000);
       return;
@@ -317,6 +333,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 playableIds={playable}
                 isMyTurn={isMyTurn && !finished}
                 onCardClick={onCardClick}
+                sendingId={sending?.cardId ?? null}
                 nudge={nudge}
                 concealed={privateHand}
               />
@@ -373,8 +390,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               statusText={statusText}
               pendingTotal={view.pendingDraw?.total ?? null}
               unoArmed={unoArmed}
-              onDraw={() => void drawCards()}
-              onAccept={() => void acceptPenalty()}
+              onDraw={() => void sendAction(null, drawCards)}
+              onAccept={() => void sendAction(null, acceptPenalty)}
+              busy={sending !== null}
               onUno={onUno}
               privateHand={privateHand}
               onTogglePrivacy={togglePrivateHand}

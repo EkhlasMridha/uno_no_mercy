@@ -9,6 +9,8 @@ interface PlayerHandProps {
   playableIds: ReadonlySet<string>;
   isMyTurn: boolean;
   onCardClick: (card: Card) => void;
+  /** The card just clicked, while the host confirms it: shown lifted and fading. */
+  sendingId?: string | null;
   /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
   nudge: IdleNudge;
   /** Privacy mode: cards show their backs until you point at one (screens with a mouse only). */
@@ -86,6 +88,7 @@ export function PlayerHand({
   playableIds,
   isMyTurn,
   onCardClick,
+  sendingId = null,
   nudge,
   concealed,
 }: PlayerHandProps) {
@@ -226,7 +229,16 @@ export function PlayerHand({
                     {/* Re-keyed on each reminder so the hop replays, rippling across the fan. */}
                     <div
                       key={nudge.count}
-                      className={nudge.active ? 'anim-nudge' : undefined}
+                      className={
+                        [
+                          nudge.active ? 'anim-nudge' : '',
+                          card.id === sendingId
+                            ? 'pointer-events-none -translate-y-5 scale-95 opacity-40 transition duration-150'
+                            : '',
+                        ]
+                          .join(' ')
+                          .trim() || undefined
+                      }
                       style={
                         nudge.active
                           ? { animationDelay: `${Math.min(order * 18, 220)}ms` }

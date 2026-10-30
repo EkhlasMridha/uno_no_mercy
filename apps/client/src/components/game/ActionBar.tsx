@@ -15,6 +15,8 @@ interface ActionBarProps {
   /** Privacy mode is on: your cards show their backs until you point at them. */
   privateHand: boolean;
   onTogglePrivacy: () => void;
+  /** An action is on its way to the host: Draw and Take wait for the answer. */
+  busy?: boolean;
 }
 
 export function ActionBar({
@@ -28,6 +30,7 @@ export function ActionBar({
   onUno,
   privateHand,
   onTogglePrivacy,
+  busy = false,
 }: ActionBarProps) {
   const unoActive = actions.canCallUno || actions.canDeclareWithPlay;
   const unoLabel = actions.canCallUno ? 'UNO!' : unoArmed ? 'UNO armed' : 'UNO';
@@ -50,6 +53,7 @@ export function ActionBar({
             <button
               type="button"
               className="btn-danger min-w-[8.5rem] whitespace-nowrap py-2 font-display text-lg tracking-wide sm:min-w-[9.5rem] sm:py-2.5 sm:text-xl short:py-2 shortest:min-w-[7.5rem] shortest:text-lg"
+              disabled={busy}
               onClick={onAccept}
             >
               <Download size={20} /> Take +{pendingTotal ?? 0}
@@ -58,7 +62,7 @@ export function ActionBar({
             <button
               type="button"
               className="btn-primary min-w-[8.5rem] py-2 font-display text-lg tracking-wide sm:min-w-[9.5rem] sm:py-2.5 sm:text-xl short:py-2 shortest:min-w-[7.5rem] shortest:text-lg"
-              disabled={!actions.canDraw}
+              disabled={!actions.canDraw || busy}
               onClick={onDraw}
             >
               <Download size={20} /> Draw
