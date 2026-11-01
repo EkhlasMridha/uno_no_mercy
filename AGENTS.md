@@ -57,6 +57,10 @@ These keep the game fair and the code testable. Do not trade them away for conve
 5. **Hidden information stays hidden.** Opponents' card ids and faces are never sent. Public events carry
    counts, not cards, unless the card is genuinely face up for everyone (a played card, a Color Roulette
    reveal). `multiplayer.test.ts` checks this byte for byte.
+   Once a round is finished nothing is left to hide, so `GameStateView.reveal` then shows everyone every
+   hand and both piles (`round-reveal.test.ts`); it is `null` in every other phase.
+   The other exception is consented: a knocked-out player may watch a hand the player accepted
+   (`watch.watching`, RULES §5.17), checked on every projection (`hand-watch.test.ts`).
 6. **168 cards, always.** A card is always in exactly one place: draw pile, discard pile, a hand, or set
    aside. `conservation.ts` asserts it in `--dev` and in the simulation test. Never park a card in phase
    state. Put it in a real pile and keep ids in the phase (see `rouletteReveal.revealedIds`).

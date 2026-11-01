@@ -129,6 +129,36 @@ export interface PublicGameView {
   playHistoryStart: number;
 }
 
+/**
+ * Everything on the table once a round is over: no secret is left to keep (docs/RULES.md §5.14).
+ * Sent to every player of the room, and only while the phase is `finished`.
+ */
+export interface RoundReveal {
+  /** Every seat's cards, in seat order; a knocked-out player's hand is the one they were holding. */
+  hands: { playerId: string; cards: Card[] }[];
+  /** The draw pile in the order it would have been drawn: the first card is the next one. */
+  drawPile: Card[];
+  /** The discard pile in the order it was played: oldest first, the top card last. */
+  discardPile: Card[];
+  /** Cards of knocked-out players waiting for the next reshuffle. */
+  setAside: Card[];
+}
+
+/**
+ * Hand watching for the requesting player (docs/RULES.md §5.17): a knocked-out player can ask
+ * someone still in play to show them their hand, and the asked player answers.
+ */
+export interface HandWatchView {
+  /** Your request that is still waiting for an answer. */
+  outgoing: { targetId: string } | null;
+  /** The hand you are allowed to watch, live; null when nobody has accepted you. */
+  watching: { targetId: string; hand: Card[] } | null;
+  /** Knocked-out players asking to watch your hand. `watchingId`: whose hand they watch already. */
+  incoming: { watcherId: string; watchingId: string | null }[];
+  /** Knocked-out players watching your hand right now. */
+  watchers: string[];
+}
+
 /** Actions the requesting player may take right now, computed by the server engine. */
 export interface ValidActions {
   playableCardIds: string[];
@@ -160,4 +190,8 @@ export interface GameStateView {
    * it runs, `validActions` only offers calling UNO; 0 when the table is open.
    */
   turnHoldMs: number;
+  /** The whole table laid open, once the round is finished; null before that. */
+  reveal: RoundReveal | null;
+  /** Hand watching: requests and the hand you are allowed to see. */
+  watch: HandWatchView;
 }

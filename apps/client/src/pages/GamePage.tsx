@@ -15,6 +15,9 @@ import { GameTable } from '../components/game/GameTable';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { PlayerHand } from '../components/game/PlayerHand';
 import { SendFlight, type Flight } from '../components/game/SendFlight';
+import { RoundReview } from '../components/game/RoundReview';
+import { WatchHand } from '../components/game/WatchHand';
+import { WatchRequests } from '../components/game/WatchRequests';
 import { RejoinPrompt } from '../components/game/RejoinPrompt';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
@@ -70,6 +73,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [showSheet, setShowSheet] = useState(false);
   const [showPlayed, setShowPlayed] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // The result popup can be closed to look over the table; a new round opens it again.
+  const [resultsClosed, setResultsClosed] = useState(false);
   const [shake, setShake] = useState(0);
   // An action sent and not yet confirmed. The clicked card lifts at once instead of waiting out the
   // network round trip; buttons lock so a second tap can't send it twice. A refusal puts it back.
@@ -101,6 +106,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  useEffect(() => {
+    if (!finished) setResultsClosed(false);
+  }, [finished]);
   // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
   const held = game.turnHoldMs > 0;
   const myMove = isMyTurn && !finished && me?.status === 'active';
@@ -364,6 +372,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               }`}
             />
             <div key={shake} className={shake ? 'anim-shake' : ''}>
+              {me?.status === 'eliminated' && !finished && (
+                <WatchHand game={game} meId={meId} name={name} />
+              )}
               <PlayerHand
                 hand={heldHand}
                 playableIds={playable}
@@ -450,6 +461,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       </div>
 
       <EventBanner banner={banner} />
+      {!finished && <WatchRequests game={game} name={name} />}
       {flight && <SendFlight key={flight.id} flight={flight} onDone={() => setFlight(null)} />}
 
       {pending?.step === 'color' && (
@@ -529,7 +541,18 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           </div>
         </Modal>
       )}
-      {finished && !confirmLeave && <GameOverModal room={room} game={game} meId={meId} />}
+      {finished && !confirmLeave && !resultsClosed && (
+        <GameOverModal room={room} game={game} meId={meId} onClose={() => setResultsClosed(true)} />
+      )}
+      {finished && !confirmLeave && resultsClosed && (
+        <RoundReview
+          room={room}
+          game={game}
+          meId={meId}
+          name={name}
+          onShowResults={() => setResultsClosed(false)}
+        />
+      )}
     </div>
   );
 }

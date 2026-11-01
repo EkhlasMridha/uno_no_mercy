@@ -2,10 +2,12 @@ import {
   MATCH_TARGET_POINTS,
   MIN_PLAYERS,
   type GameStateView,
+  type RoundReveal,
   type RoomView,
   type ValidActions,
 } from '@nomercy/shared';
-import { getValidActions, toPublicGameView } from '../engine/index.js';
+import { getValidActions, toPublicGameView, type GameState } from '../engine/index.js';
+import { watchViewFor } from './hand-watch.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room } from './room.types.js';
 
@@ -68,6 +70,21 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
       validActions: turnHoldMs > 0 ? onlyCallUno(actions) : actions,
     },
     turnHoldMs,
+    reveal: toRoundReveal(game),
+    watch: watchViewFor(room, playerId),
+  };
+}
+
+/** Once the round is over every card is turned face up for the whole table; before that, nothing. */
+function toRoundReveal(game: GameState): RoundReveal | null {
+  if (game.phase.type !== 'finished') return null;
+  const copy = <T extends object>(cards: readonly T[]): T[] => cards.map((card) => ({ ...card }));
+  return {
+    hands: game.players.map((p) => ({ playerId: p.id, cards: copy(p.hand) })),
+    // The engine draws from the end of the array, so the next card is the last one.
+    drawPile: copy([...game.drawPile].reverse()),
+    discardPile: copy(game.discardPile),
+    setAside: copy(game.setAside),
   };
 }
 

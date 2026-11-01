@@ -18,6 +18,19 @@ function report<T>(result: Ack<T>): Ack<T> {
   return result;
 }
 
+// ---- watching a hand after a knockout ----
+
+/** A knocked-out player asks someone still in play to show them their hand. */
+export const requestWatch = async (targetId: string) =>
+  report(await request('watch:request', { targetId }));
+
+/** The asked player accepts or declines; declining a watch already granted ends it. */
+export const respondToWatch = async (watcherId: string, accept: boolean) =>
+  report(await request('watch:respond', { watcherId, accept }));
+
+/** Withdraws your request, or stops watching the hand you were shown. */
+export const stopWatching = async () => report(await request('watch:stop', {}));
+
 // ---- room ----
 
 /** With `computers`, the server seats computer opponents and deals straight away. */

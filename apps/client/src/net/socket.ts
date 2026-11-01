@@ -106,6 +106,12 @@ export function startConnection(): void {
   socket.on('chat:update', (message) =>
     setState((s) => ({ chat: s.chat.map((m) => (m.id === message.id ? message : m)) })),
   );
+  socket.on('watch:answer', ({ targetId, accepted }) => {
+    const target = getState().game?.public.players.find((p) => p.id === targetId);
+    const who = target?.name ?? 'The player';
+    if (accepted) pushNotice('info', `${who} accepted. You can see their hand now.`, 4000);
+    else pushNotice('info', `${who} declined to show you their hand.`, 4000);
+  });
   socket.on('room:closed', ({ reason }) => forgetSession(reason));
 
   socket.connect();
