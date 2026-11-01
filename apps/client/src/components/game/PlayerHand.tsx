@@ -11,6 +11,8 @@ interface PlayerHandProps {
   onCardClick: (card: Card) => void;
   /** The card just clicked, while the host confirms it: shown lifted and fading. */
   sendingId?: string | null;
+  /** The card a flight is carrying across the table right now: its slot stays, the card is gone. */
+  flyingId?: string | null;
   /** The idle turn reminder's nudge: each new count replays the cards' hop while it's active. */
   nudge: IdleNudge;
   /** Privacy mode: cards show their backs until you point at one (screens with a mouse only). */
@@ -89,6 +91,7 @@ export function PlayerHand({
   isMyTurn,
   onCardClick,
   sendingId = null,
+  flyingId = null,
   nudge,
   concealed,
 }: PlayerHandProps) {
@@ -218,6 +221,7 @@ export function PlayerHand({
                     // Hovering or focusing a card brings it to the front so you can read all of it.
                     className="hover:!z-[300] focus-within:!z-[300]"
                     data-playable={playable || undefined}
+                    data-card-id={card.id}
                     onPointerEnter={() => setRevealed(true)}
                     style={{
                       marginLeft,
@@ -232,7 +236,8 @@ export function PlayerHand({
                       className={
                         [
                           nudge.active ? 'anim-nudge' : '',
-                          card.id === sendingId
+                          card.id === flyingId ? 'pointer-events-none invisible' : '',
+                          card.id === sendingId && card.id !== flyingId
                             ? 'pointer-events-none -translate-y-5 scale-95 opacity-40 transition duration-150'
                             : '',
                         ]
