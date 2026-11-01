@@ -203,6 +203,12 @@ single card enters a hand: penalties, mandatory draws, roulette reveals and UNO 
    ends at once with **no winner** and no points, so nobody watches the computers play on. If a single
    computer is left, it still wins as last standing. Tables with only people are unaffected.
 
+4. **The table is turned face up (house rule).** When a round ends, every player may close the
+   result and look over the whole table: each seat's hand, the discard pile in the order it was
+   played, and the draw pile in the order it would have been drawn. Nothing is hidden any more, so
+   this changes nothing about play. Until the round is finished the server sends none of it. The next
+   round deals a new table and the view goes away.
+
 ### 5.15 Optional scoring (official)
 
 When enabled in the lobby, the winner scores the cards left in the active opponents' hands: number cards are

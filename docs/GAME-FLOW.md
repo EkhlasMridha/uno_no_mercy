@@ -68,6 +68,14 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
    Every revealed card is shown face up to the whole table. When the named color appears, the revealed
    cards join the victim's hand, the reveal clears, and play continues with the player after the victim.
 
+## After the round ends
+
+The result popup can be closed. The table stays on screen with a bar at the bottom: **Review the table**,
+**Results** (reopens the popup) and, for the host, **Next round** and **Back to lobby**. The review
+drawer has three tabs: every player's hand, the cards played in the order they landed on the pile, and
+the draw pile in draw order. All of it comes from `GameStateView.reveal`, which the server fills only
+once the phase is `finished`. A new round replaces the state, so the bar and drawer disappear.
+
 ## Event ordering inside one command
 
 For `playCard`:

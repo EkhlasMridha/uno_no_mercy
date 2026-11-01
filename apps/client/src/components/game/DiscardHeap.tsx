@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import type { CardColor, PlayedCardEntry, PublicGameView } from '@nomercy/shared';
 import { cardName, COLOR_BG } from '../../lib/cards';
 import type { NameLookup } from '../../lib/event-text';
@@ -88,6 +88,9 @@ export function DiscardHeap({
   onShowPlayed,
   landedCardId = null,
 }: DiscardHeapProps) {
+  // Remembered after the flight is gone, or the card would sweep in again when the flight ends.
+  const landed = useRef<string | null>(null);
+  if (landedCardId) landed.current = landedCardId;
   const history: PlayedCardEntry[] =
     view.playHistory.length > 0
       ? view.playHistory
@@ -128,7 +131,7 @@ export function DiscardHeap({
           style={p.style}
         >
           <div
-            className={p.toss && p.entry.card.id !== landedCardId ? 'anim-toss' : ''}
+            className={p.toss && p.entry.card.id !== landed.current ? 'anim-toss' : ''}
             style={p.toss ?? undefined}
           >
             <PlayingCard

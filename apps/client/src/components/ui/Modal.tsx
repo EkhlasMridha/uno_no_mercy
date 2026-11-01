@@ -9,6 +9,8 @@ interface ModalProps {
   /** Mandatory choices (7 swap target, roulette color) cannot be dismissed. */
   dismissible?: boolean;
   wide?: boolean;
+  /** Wider still on laptops and desktops, for content laid out in rows such as standings. */
+  extraWide?: boolean;
   /** Sit at the top over a backdrop that clears toward the bottom, so your hand stays readable. */
   overHand?: boolean;
 }
@@ -19,6 +21,7 @@ export function Modal({
   onClose,
   dismissible = true,
   wide = false,
+  extraWide = false,
   overHand = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -57,7 +60,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel anim-toast max-h-[90vh] w-full overflow-y-auto p-5 outline-none ${wide || overHand ? 'max-w-2xl' : 'max-w-md'} ${overHand ? 'short:p-4' : ''}`}
+        className={`panel anim-toast max-h-[90vh] w-full overflow-y-auto p-5 outline-none ${extraWide ? 'max-w-3xl' : wide || overHand ? 'max-w-2xl' : 'max-w-md'} ${overHand ? 'short:p-4' : ''}`}
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="font-display text-2xl tracking-wide">{title}</h2>

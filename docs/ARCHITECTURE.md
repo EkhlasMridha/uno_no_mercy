@@ -106,7 +106,10 @@ expected state version. When a game finishes it records the round result and sco
 
 `Broadcaster` sends each socket `room:state` plus `game:state` built by `toGameView(room, playerId)`, which
 copies only that player's hand. Swaps and passes therefore reach each player only as their own new hand.
-Opponents' card ids are never sent. The integration test checks this byte for byte.
+Opponents' card ids are never sent while the round is on. The integration test checks this byte for byte.
+The one exception is a finished round: `GameStateView.reveal` (`RoundReveal`) then carries every hand, the
+draw pile in draw order and the discard pile in play order to everyone, so the table can be inspected
+after the win (docs/RULES.md §5.14). It is `null` in every other phase.
 
 **UNO breather.** After a command that plays a card or changes whose turn it is, `RoomManager` sets
 `room.turnHoldUntil` to `TURN_HOLD_MS` (2 s) ahead (docs/RULES.md §5.9). Until then `executeGameCommand`
