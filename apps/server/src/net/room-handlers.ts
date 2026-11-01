@@ -11,6 +11,8 @@ import {
   startGameSchema,
   transferHostSchema,
   waitForPlayerSchema,
+  watchRequestSchema,
+  watchRespondSchema,
   type SessionInfo,
 } from '@nomercy/shared';
 import { z } from 'zod';
@@ -170,6 +172,31 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
     const room = manager.startGame(session.roomCode, session.playerId, fillWithComputers);
     console.info(`[room ${room.code}] round ${room.roundNumber} started`);
     broadcaster.room(room);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'watch:request', watchRequestSchema, ({ targetId }) => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.requestWatch(session.roomCode, session.playerId, targetId));
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'watch:respond', watchRespondSchema, (answer) => {
+    const session = requireSession(socket);
+    const { room, granted } = manager.respondToWatch(
+      session.roomCode,
+      session.playerId,
+      answer.watcherId,
+      answer.accept,
+    );
+    broadcaster.room(room);
+    broadcaster.watchAnswer(room, answer.watcherId, session.playerId, granted);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'watch:stop', emptySchema, () => {
+    const session = requireSession(socket);
+    broadcaster.room(manager.stopWatching(session.roomCode, session.playerId));
     return { ok: true, data: null };
   });
 

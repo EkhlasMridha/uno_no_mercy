@@ -94,6 +94,13 @@ export const chatReactSchema = z
   .object({ messageId: z.number().int().nonnegative(), emoji: z.enum(REACTION_EMOJIS) })
   .strict();
 
+/** A knocked-out player asking another player to show them their hand. */
+export const watchRequestSchema = z.object({ targetId: playerIdSchema }).strict();
+/** The asked player's answer; declining a watch already granted ends it. */
+export const watchRespondSchema = z
+  .object({ watcherId: playerIdSchema, accept: z.boolean() })
+  .strict();
+
 const turnCommandShape = { commandId: commandIdSchema, version: stateVersionSchema };
 
 export const playCardSchema = z
@@ -129,6 +136,8 @@ export type StartGamePayload = z.input<typeof startGameSchema>;
 export type RoomSettingsPayload = z.input<typeof roomSettingsSchema>;
 export type ChatSendPayload = z.input<typeof chatSendSchema>;
 export type ChatReactPayload = z.input<typeof chatReactSchema>;
+export type WatchRequestPayload = z.input<typeof watchRequestSchema>;
+export type WatchRespondPayload = z.input<typeof watchRespondSchema>;
 export type PlayCardPayload = z.input<typeof playCardSchema>;
 export type DrawPayload = z.input<typeof drawSchema>;
 export type AcceptPenaltyPayload = z.input<typeof acceptPenaltySchema>;

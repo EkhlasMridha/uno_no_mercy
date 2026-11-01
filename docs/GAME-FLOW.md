@@ -68,6 +68,13 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
    Every revealed card is shown face up to the whole table. When the named color appears, the revealed
    cards join the victim's hand, the reveal clears, and play continues with the player after the victim.
 
+## When you are knocked out
+
+A player out by the Mercy Rule sees **Watch a hand** where their cards were: buttons for each person still
+in play, one request at a time. The asked player gets a card at the top of the screen naming the asker
+and, if there is one, whose hand they already watch, with **Accept** and **Decline**. Yes shows the asker
+that hand live; the watched player sees who is watching and can **Stop** them. See RULES.md §5.17.
+
 ## After the round ends
 
 The result popup can be closed. The table stays on screen with a bar at the bottom: **Review the table**,

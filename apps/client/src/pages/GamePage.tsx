@@ -16,6 +16,8 @@ import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { PlayerHand } from '../components/game/PlayerHand';
 import { SendFlight, type Flight } from '../components/game/SendFlight';
 import { RoundReview } from '../components/game/RoundReview';
+import { WatchHand } from '../components/game/WatchHand';
+import { WatchRequests } from '../components/game/WatchRequests';
 import { RejoinPrompt } from '../components/game/RejoinPrompt';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
@@ -370,6 +372,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               }`}
             />
             <div key={shake} className={shake ? 'anim-shake' : ''}>
+              {me?.status === 'eliminated' && !finished && (
+                <WatchHand game={game} meId={meId} name={name} />
+              )}
               <PlayerHand
                 hand={heldHand}
                 playableIds={playable}
@@ -456,6 +461,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       </div>
 
       <EventBanner banner={banner} />
+      {!finished && <WatchRequests game={game} name={name} />}
       {flight && <SendFlight key={flight.id} flight={flight} onDone={() => setFlight(null)} />}
 
       {pending?.step === 'color' && (

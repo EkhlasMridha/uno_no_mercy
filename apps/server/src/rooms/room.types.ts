@@ -7,6 +7,7 @@ import type {
   RoundResultView,
 } from '@nomercy/shared';
 import type { GameState } from '../engine/index.js';
+import type { WatchState } from './hand-watch.js';
 import type { CommandCache } from '../net/command-cache.js';
 
 export interface RoomPlayer {
@@ -49,4 +50,6 @@ export interface Room {
   turnHoldUntil: number;
   /** Re-sends the table when the breather ends, so clients see their actions open again. */
   holdTimer: ReturnType<typeof setTimeout> | null;
+  /** Knocked-out players asking to watch a hand, and the watches that were accepted. */
+  watch: WatchState;
 }

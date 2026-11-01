@@ -11,6 +11,8 @@ function roomFor(game: GameState): Room {
     hostId: PLAYER_IDS[0],
     game,
     turnHoldUntil: 0,
+    status: game.phase.type === 'finished' ? 'roundOver' : 'inGame',
+    watch: { requests: [], grants: [] },
     players: game.players.map((p) => ({
       id: p.id,
       socketId: 's',

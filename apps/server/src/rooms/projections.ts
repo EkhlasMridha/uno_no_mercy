@@ -7,6 +7,7 @@ import {
   type ValidActions,
 } from '@nomercy/shared';
 import { getValidActions, toPublicGameView, type GameState } from '../engine/index.js';
+import { watchViewFor } from './hand-watch.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room } from './room.types.js';
 
@@ -70,6 +71,7 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
     },
     turnHoldMs,
     reveal: toRoundReveal(game),
+    watch: watchViewFor(room, playerId),
   };
 }
 
