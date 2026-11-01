@@ -25,6 +25,8 @@ interface GameTableProps {
   onShowPlayed: () => void;
   /** The last play, shown on its player's seat until the next player finishes their move. */
   lastPlay: LastPlay | null;
+  /** The card your own throw already landed on the heap while the host confirmed it. */
+  landedCardId?: string | null;
 }
 
 const COLOR_STROKE = {
@@ -47,6 +49,7 @@ export function GameTable({
   onCatch,
   onShowPlayed,
   lastPlay,
+  landedCardId = null,
 }: GameTableProps) {
   const count = view.players.length;
   const myIndex = Math.max(
@@ -100,6 +103,7 @@ export function GameTable({
                 name={name}
                 angleOf={(id) => angles.get(id) ?? null}
                 onShowPlayed={onShowPlayed}
+                landedCardId={landedCardId}
               />
 
               {view.pendingDraw && (
@@ -193,6 +197,7 @@ function DrawPile({
       <button
         ref={pileRef}
         type="button"
+        data-draw-pile
         onClick={onDraw}
         disabled={!canDraw}
         aria-label={

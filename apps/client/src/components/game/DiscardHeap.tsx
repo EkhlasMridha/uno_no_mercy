@@ -22,6 +22,8 @@ interface DiscardHeapProps {
   /** Seat angle of a player, used to lean each card toward whoever threw it. */
   angleOf: (playerId: string) => number | null;
   onShowPlayed: () => void;
+  /** A card a flight already threw onto the heap: its arrival isn't animated a second time. */
+  landedCardId?: string | null;
 }
 
 interface Placement {
@@ -79,7 +81,13 @@ function place(
  * The last few cards played, lying on the felt the way they landed. The server only sends plays
  * still on the discard pile, so after a reshuffle this is just the top card.
  */
-export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapProps) {
+export function DiscardHeap({
+  view,
+  name,
+  angleOf,
+  onShowPlayed,
+  landedCardId = null,
+}: DiscardHeapProps) {
   const history: PlayedCardEntry[] =
     view.playHistory.length > 0
       ? view.playHistory
@@ -104,6 +112,7 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
   return (
     <button
       type="button"
+      data-discard-heap
       onClick={onShowPlayed}
       aria-live="polite"
       aria-label={`Top card: ${cardName(top.card)}${thrower ? `, played by ${thrower}` : ''}. Show all played cards`}
@@ -118,7 +127,10 @@ export function DiscardHeap({ view, name, angleOf, onShowPlayed }: DiscardHeapPr
           className="absolute left-1/2 top-1/2"
           style={p.style}
         >
-          <div className={p.toss ? 'anim-toss' : ''} style={p.toss ?? undefined}>
+          <div
+            className={p.toss && p.entry.card.id !== landedCardId ? 'anim-toss' : ''}
+            style={p.toss ?? undefined}
+          >
             <PlayingCard
               card={p.entry.card}
               size="lg"
