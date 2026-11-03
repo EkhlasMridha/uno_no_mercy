@@ -23,6 +23,12 @@ export interface AppState {
   sound: SoundPrefs;
   /** Privacy mode: your hand shows card backs until you hover a card. Kept for this page only. */
   privateHand: boolean;
+  /**
+   * When this page saw the room go from the lobby or a finished round into a new game
+   * (`performance.now()`), so the table deals the cards out. Null after a reload or reconnect, so
+   * joining a game in progress never replays the deal.
+   */
+  dealtAt: number | null;
 }
 
 /** Client-side view cache. The server stays authoritative; this only mirrors what it sent. */
@@ -35,6 +41,7 @@ let state: AppState = {
   notices: [],
   sound: loadSoundPrefs(),
   privateHand: false,
+  dealtAt: null,
 };
 const listeners = new Set<() => void>();
 

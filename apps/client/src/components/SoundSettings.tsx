@@ -3,8 +3,10 @@ import {
   Bell,
   BellRing,
   Download,
+  Hammer,
   Laugh,
   Layers,
+  Layers2,
   Layers3,
   Megaphone,
   Play,
@@ -33,6 +35,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Discard All',
     description: 'A handful of cards hitting the pile when anyone plays a Discard All.',
     Icon: Layers3,
+  },
+  {
+    kind: 'deal',
+    label: 'Deal',
+    description: 'Cards flicked out to every player when a round starts.',
+    Icon: Layers2,
   },
   {
     kind: 'cardDraw',
@@ -81,8 +89,15 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
   {
     kind: 'penalty',
     label: 'Penalty',
-    description: 'A mocking sad trombone for everyone when a player takes penalty cards.',
+    description:
+      'A mocking sad trombone for everyone when a player takes penalty cards or is knocked out.',
     Icon: Laugh,
+  },
+  {
+    kind: 'hammer',
+    label: 'Hammer',
+    description: 'A hammer bonking the head of whoever takes penalty cards.',
+    Icon: Hammer,
   },
   {
     kind: 'knockout',
@@ -90,7 +105,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     description: 'A danger alarm for everyone when a player reaches 25 cards and is out.',
     Icon: Siren,
   },
-  { kind: 'win', label: 'Win', description: 'A fanfare when you win the round.', Icon: Trophy },
+  {
+    kind: 'win',
+    label: 'Win',
+    description: 'A fanfare for everyone when a player wins the round.',
+    Icon: Trophy,
+  },
 ];
 
 /** A brass-and-walnut switch drawn over a real checkbox, so keyboards and screen readers still work. */

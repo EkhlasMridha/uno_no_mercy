@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Gender, PublicGameView } from '@nomercy/shared';
 import type { TableAvatars } from '../lib/avatar';
-import { playSound, type SoundKind } from '../lib/sound';
+import { HAMMER_BLOW_S, HAMMER_BLOWS, playSound, type SoundKind } from '../lib/sound';
 import { getState } from '../state/store';
 
 const REMINDER_MS = 10_000;
@@ -11,7 +11,8 @@ function isOn(kind: SoundKind): boolean {
   return !prefs.muted && prefs[kind];
 }
 
-function playIfOn(kind: SoundKind, delay = 0): void {
+/** Plays a sound unless the player switched it off or muted them all. */
+export function playIfOn(kind: SoundKind, delay = 0): void {
   if (isOn(kind)) playSound(kind, delay);
 }
 
@@ -109,13 +110,24 @@ export function useGameSounds(
         e.event.type === 'cardsDrawn' &&
         (e.event.reason === 'penalty' || e.event.reason === 'unoPenalty'),
     );
-    // Reaching 25 cards knocks a player out (docs/RULES.md, Mercy Rule). That alarm replaces the
-    // trombone, since the knockout usually arrives with the penalty that caused it.
+    // Reaching 25 cards knocks a player out (docs/RULES.md, Mercy Rule): the alarm sounds, then the
+    // table mocks them with the trombone. The penalty that caused it gets no trombone of its own.
     const knockedOut = fresh.some(
       (e) => e.event.type === 'playerEliminated' && e.event.reason === 'mercy',
     );
-    if (knockedOut && isOn('knockout')) playIfOn('knockout', played ? 0.3 : 0);
-    else if (penalized) playIfOn('penalty', played ? 0.3 : 0);
+    // The hammer comes down on the penalized player's head first, in time with `HammerHit`.
+    let at = played ? 0.3 : 0;
+    if (penalized && isOn('hammer')) {
+      playSound('hammer', at);
+      at += HAMMER_BLOWS * HAMMER_BLOW_S + 0.15;
+    }
+    if (knockedOut) {
+      if (isOn('knockout')) {
+        playSound('knockout', at);
+        at += 1.6;
+      }
+      playIfOn('penalty', at);
+    } else if (penalized) playIfOn('penalty', at);
 
     // Your turn: when the move comes round to you, or straight back (a Skip with two players).
     const othersPlayed = fresh.some(
@@ -128,14 +140,14 @@ export function useGameSounds(
     actingBefore.current = mustAct;
   }, [view.log, mustAct, meId, avatarOf]);
 
-  // Only the moment of winning cheers, after the final card lands; reloading into a finished game
-  // stays quiet.
-  const iWon = view.phase.type === 'finished' && view.phase.winnerId === meId;
-  const wonBefore = useRef(iWon);
+  // Everyone cheers the moment anyone wins, after the final card lands; reloading into a finished
+  // game stays quiet.
+  const someoneWon = view.phase.type === 'finished' && view.phase.winnerId !== null;
+  const wonBefore = useRef(someoneWon);
   useEffect(() => {
-    if (iWon && !wonBefore.current) playIfOn('win', 0.3);
-    wonBefore.current = iWon;
-  }, [iWon]);
+    if (someoneWon && !wonBefore.current) playIfOn('win', 0.3);
+    wonBefore.current = someoneWon;
+  }, [someoneWon]);
 
   // Worked out here rather than reset in an effect: a move only drops the class, so nothing remounts
   // and a card drawn right after a nudge still slides in.

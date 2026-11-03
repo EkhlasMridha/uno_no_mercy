@@ -5,8 +5,10 @@ import type { TableAvatars } from '../../lib/avatar';
 import type { NameLookup } from '../../lib/event-text';
 import { seatAngle } from '../../lib/table-geometry';
 import { CardBack } from '../card/PlayingCard';
+import { DealAnimation } from './DealAnimation';
 import { DiscardHeap } from './DiscardHeap';
 import { DrawFlight } from './DrawFlight';
+import { HammerHit } from './HammerHit';
 import { HandExchange } from './HandExchange';
 import { RouletteReveal } from './RouletteReveal';
 import { TableSeat, type SeatScale } from './TableSeat';
@@ -142,6 +144,21 @@ export function GameTable({
         meId={meId}
         angleOf={(id) => angles.get(id) ?? null}
         pileRef={pileRef}
+        scale={scale}
+      />
+
+      <DealAnimation
+        view={view}
+        meId={meId}
+        angleOf={(id) => angles.get(id) ?? null}
+        pileRef={pileRef}
+        scale={scale}
+      />
+
+      <HammerHit
+        log={view.log}
+        meId={meId}
+        angleOf={(id) => angles.get(id) ?? null}
         scale={scale}
       />
 
