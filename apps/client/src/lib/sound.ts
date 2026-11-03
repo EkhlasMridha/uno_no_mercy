@@ -1,13 +1,16 @@
 import type { Gender } from '@nomercy/shared';
+import hammerUrl from '../assets/sounds/punch-hammer-hit.mp3';
 
 /**
  * The game sounds. Each is synthesized with Web Audio, or spoken by the browser's own speech voices
- * for the UNO call, so the client ships no audio files.
+ * for the UNO call. The one exception is the hammer, a short recorded hit bundled with the client,
+ * so it still plays with no internet.
  */
 export type SoundKind =
   | 'cardPlay'
   | 'discardAll'
   | 'cardDraw'
+  | 'deal'
   | 'reshuffle'
   | 'rouletteHit'
   | 'unoCall'
@@ -15,6 +18,7 @@ export type SoundKind =
   | 'turnReminder'
   | 'handExchange'
   | 'penalty'
+  | 'hammer'
   | 'knockout'
   | 'win';
 
@@ -43,6 +47,47 @@ export function unlockAudio(): void {
   if (!AudioContextCtor || ctx?.state === 'running') return;
   ctx ??= new AudioContextCtor();
   void ctx.resume();
+  loadHammer(ctx);
+}
+
+/** The recorded hammer hit, decoded once the first time audio is unlocked. */
+let hammer: AudioBuffer | null = null;
+let hammerLoading = false;
+
+function loadHammer(ac: AudioContext): void {
+  if (hammer || hammerLoading) return;
+  hammerLoading = true;
+  fetch(hammerUrl)
+    .then((res) => res.arrayBuffer())
+    .then((bytes) => ac.decodeAudioData(bytes))
+    .then((buffer) => {
+      hammer = buffer;
+    })
+    // A failed load leaves the hammer silent; the next unlock tries again.
+    .catch(() => {
+      hammerLoading = false;
+    });
+}
+
+/** Seconds between the hammer's blows, matching the swing in `HammerHit.tsx`. */
+export const HAMMER_BLOW_S = 0.3;
+/** How many times the hammer comes down, matching `HammerHit.tsx`. */
+export const HAMMER_BLOWS = 3;
+
+/** The recorded hit, once per blow, each a little softer, like a hammer bouncing off a head. */
+function playHammer(ac: AudioContext, at: number): void {
+  if (!hammer) return;
+  for (let i = 0; i < HAMMER_BLOWS; i++) {
+    const source = ac.createBufferSource();
+    source.buffer = hammer;
+    // Each blow lands a touch lower, so the three don't sound copy-pasted.
+    source.playbackRate.value = 1 - i * 0.06;
+    const amp = ac.createGain();
+    amp.gain.value = 0.9 - i * 0.2;
+    source.connect(amp).connect(ac.destination);
+    releaseWhenDone(source, source, amp);
+    source.start(at + i * HAMMER_BLOW_S);
+  }
 }
 
 /**
@@ -195,7 +240,10 @@ function sayUno(gender: Gender, delay: number): void {
   window.setTimeout(() => speech.speak(utterance), delay * 1000);
 }
 
-const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: number) => void> = {
+const SOUNDS: Record<
+  Exclude<SoundKind, 'unoCall' | 'hammer'>,
+  (ac: AudioContext, at: number) => void
+> = {
   // A card slapped down on the table: a quick "fwip" as it leaves the hand, then a crisp crack, a
   // papery thwap and a light thump as the toss lands. Most of the energy sits in 1-4 kHz so it cuts
   // through laptop and phone speakers. Each play varies a little, so a run never sounds machine-made.
@@ -234,6 +282,13 @@ const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: numbe
   },
   // A card slid off the draw pile: a soft papery swish falling in pitch, then a light tick as it
   // lands in the hand. No crack or thump, so it never sounds like a card being played.
+  // One card dealt: a crisp flick off the top of the deck and a soft tap as it lands in front of a
+  // player. Short, so a whole table's deal stays a quick patter.
+  deal(ac, at) {
+    const vary = (v: number) => v * (0.85 + Math.random() * 0.3);
+    noise(ac, at, 0.05, vary(0.22), vary(4200), vary(2200), 0.2);
+    noise(ac, at + 0.045, 0.03, vary(0.12), vary(1100), vary(700), 0.1);
+  },
   cardDraw(ac, at) {
     const vary = (v: number) => v * (0.9 + Math.random() * 0.2);
     noise(ac, at, 0.16, vary(0.32), vary(3400), vary(1300), 0.3);
@@ -341,5 +396,6 @@ const SOUNDS: Record<Exclude<SoundKind, 'unoCall'>, (ac: AudioContext, at: numbe
 export function playSound(kind: SoundKind, delay = 0, voice: Gender = 'male'): void {
   if (ctx?.state !== 'running') return;
   if (kind === 'unoCall') return sayUno(voice, delay);
+  if (kind === 'hammer') return playHammer(ctx, ctx.currentTime + 0.02 + delay);
   SOUNDS[kind](ctx, ctx.currentTime + 0.02 + delay);
 }
