@@ -7,7 +7,7 @@ import {
   type ValidActions,
 } from '@nomercy/shared';
 import { getValidActions, toPublicGameView, type GameState } from '../engine/index.js';
-import { watchViewFor } from './hand-watch.js';
+import { handShareView } from './hand-share.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room } from './room.types.js';
 
@@ -69,9 +69,9 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
       hand: seat.hand.map((card) => ({ ...card })),
       validActions: turnHoldMs > 0 ? onlyCallUno(actions) : actions,
     },
+    handShare: handShareView(room, playerId),
     turnHoldMs,
     reveal: toRoundReveal(game),
-    watch: watchViewFor(room, playerId),
   };
 }
 

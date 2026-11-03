@@ -53,13 +53,6 @@ export class Broadcaster {
     if (player?.socketId) this.io.to(player.socketId).emit('chat:history', room.chat);
   }
 
-  /** Tells a knocked-out player how the player they asked answered their request to watch. */
-  watchAnswer(room: Room, watcherId: string, targetId: string, accepted: boolean): void {
-    const watcher = room.players.find((p) => p.id === watcherId);
-    if (watcher?.socketId)
-      this.io.to(watcher.socketId).emit('watch:answer', { targetId, accepted });
-  }
-
   /** Tells one socket it no longer has a seat, and unbinds it so it can join another room. */
   removed(socketId: string, reason: string): void {
     this.io.to(socketId).emit('room:closed', { reason });

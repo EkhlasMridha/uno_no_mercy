@@ -7,7 +7,6 @@ import type {
   RoundResultView,
 } from '@nomercy/shared';
 import type { GameState } from '../engine/index.js';
-import type { WatchState } from './hand-watch.js';
 import type { CommandCache } from '../net/command-cache.js';
 
 export interface RoomPlayer {
@@ -31,6 +30,14 @@ export interface RoomPlayer {
   seatHeld: boolean;
 }
 
+/** A knocked-out player's request to see an active player's hand (docs/RULES.md §5.17). */
+export interface HandShare {
+  viewerId: string;
+  targetId: string;
+  /** Waiting for the target, agreed, or refused for the rest of the round. */
+  status: 'pending' | 'allowed' | 'denied';
+}
+
 export interface Room {
   code: string;
   hostId: string;
@@ -50,6 +57,6 @@ export interface Room {
   turnHoldUntil: number;
   /** Re-sends the table when the breather ends, so clients see their actions open again. */
   holdTimer: ReturnType<typeof setTimeout> | null;
-  /** Knocked-out players asking to watch a hand, and the watches that were accepted. */
-  watch: WatchState;
+  /** Hand-sharing requests this round. Cleared when a round is dealt. */
+  handShares: HandShare[];
 }

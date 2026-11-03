@@ -28,7 +28,6 @@ import {
   computerNames,
   fallbackComputerMove,
 } from './computer-player.js';
-import { canBeWatched, canWatch, emptyWatch, liveWatch } from './hand-watch.js';
 import { scoreRound } from './match-scoring.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room, RoomPlayer } from './room.types.js';
@@ -144,7 +143,7 @@ export class RoomManager {
       computerTimer: null,
       turnHoldUntil: 0,
       holdTimer: null,
-      watch: emptyWatch(),
+      handShares: [],
     };
     player.ready = true;
     this.addComputers(room, computers);
@@ -379,85 +378,13 @@ export class RoomManager {
     room.game = null;
     room.lastResult = null;
     room.roundNumber = 0;
+    room.handShares = [];
     // Computers leave with the round, so the open seats are free for people again.
     room.players = room.players.filter((p) => !p.departed && !p.isComputer);
     for (const p of room.players) {
       p.ready = p.id === room.hostId;
       p.score = 0;
     }
-    return room;
-  }
-
-  /** A knocked-out player asks someone still in play to show them their hand (docs/RULES.md §5.17). */
-  requestWatch(code: string, watcherId: string, targetId: string): Room {
-    const room = this.requireRoom(code);
-    this.requireMember(room, watcherId);
-    if (room.status !== 'inGame') {
-      throw new RoomError('GAME_NOT_ACTIVE', 'There is no game in progress');
-    }
-    if (!canWatch(room, watcherId)) {
-      throw new RoomError('INVALID_MOVE', 'You can ask to watch a hand once you are knocked out');
-    }
-    const target = room.players.find((p) => p.id === targetId);
-    if (!target || !canBeWatched(room, targetId)) {
-      throw new RoomError('INVALID_TARGET', 'Ask a player who is still in the game');
-    }
-    const live = liveWatch(room);
-    const pending = live.requests.find((l) => l.watcherId === watcherId);
-    if (pending) {
-      const asked = room.players.find((p) => p.id === pending.targetId);
-      throw new RoomError(
-        'INVALID_MOVE',
-        `You already asked ${asked?.name ?? 'someone'}. Wait for the answer or cancel it first.`,
-      );
-    }
-    if (live.grants.some((l) => l.watcherId === watcherId && l.targetId === targetId)) {
-      throw new RoomError('INVALID_MOVE', `You are already watching ${target.name}'s hand`);
-    }
-    room.watch = { ...live, requests: [...live.requests, { watcherId, targetId }] };
-    return room;
-  }
-
-  /**
-   * The asked player answers. Accepting moves the watcher's one watch onto this hand; declining a
-   * request refuses it, and declining a watch already granted ends it.
-   */
-  respondToWatch(
-    code: string,
-    targetId: string,
-    watcherId: string,
-    accept: boolean,
-  ): { room: Room; granted: boolean } {
-    const room = this.requireRoom(code);
-    this.requireMember(room, targetId);
-    const live = liveWatch(room);
-    const open = live.requests.some((l) => l.watcherId === watcherId && l.targetId === targetId);
-    const granted = live.grants.some((l) => l.watcherId === watcherId && l.targetId === targetId);
-    if (!open && !(granted && !accept)) {
-      throw new RoomError('INVALID_TARGET', 'That request is no longer open');
-    }
-    const requests = live.requests.filter(
-      (l) => !(l.watcherId === watcherId && l.targetId === targetId),
-    );
-    // One hand at a time: a new yes replaces the watcher's earlier one.
-    const grants = live.grants.filter((l) => l.watcherId !== watcherId);
-    if (!accept && granted) {
-      room.watch = { requests, grants };
-      return { room, granted: false };
-    }
-    room.watch = { requests, grants: accept ? [...grants, { watcherId, targetId }] : live.grants };
-    return { room, granted: accept };
-  }
-
-  /** The watcher withdraws a request that is waiting, or stops watching the hand they were shown. */
-  stopWatching(code: string, watcherId: string): Room {
-    const room = this.requireRoom(code);
-    this.requireMember(room, watcherId);
-    const live = liveWatch(room);
-    room.watch = {
-      requests: live.requests.filter((l) => l.watcherId !== watcherId),
-      grants: live.grants.filter((l) => l.watcherId !== watcherId),
-    };
     return room;
   }
 
@@ -604,7 +531,7 @@ export class RoomManager {
     room.status = 'inGame';
     room.lastResult = null;
     room.turnHoldUntil = 0;
-    room.watch = emptyWatch();
+    room.handShares = [];
     this.scheduleComputers(room);
   }
 
@@ -728,6 +655,9 @@ export class RoomManager {
     } else {
       player.departed = true;
       player.ready = false;
+      room.handShares = room.handShares.filter(
+        (s) => s.viewerId !== player.id && s.targetId !== player.id,
+      );
       const seat = room.game?.players.find((p) => p.id === player.id);
       if (room.status === 'inGame' && room.game && seat?.status === 'active') {
         const outcome = applyCommand(room.game, player.id, { type: 'forfeit' }, this.options.rng, {

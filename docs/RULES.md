@@ -238,28 +238,27 @@ A person who loses their connection mid-game keeps their seat and hand for the r
    tab can no longer reclaim the seat. The wait always ends: on rejoin, on a refusal, or when the hold
    runs out.
 
-### 5.17 Watching a hand after a knockout (house rule)
+### 5.17 Seeing a hand once you're out (house rule)
 
-A player knocked out by the Mercy Rule (§5.13) while the round is still running can ask to watch
-another player's hand. The watched player decides.
+A player knocked out of the round (the Mercy Rule, §5.13) is told so in a dialog and may keep watching
+the table. From it, or from **See a hand** at their seat, they can ask a player still in the round to
+show them their hand.
 
-1. **Who may ask:** a player knocked out in this round who is still at the table. Someone who left or
-   forfeited has no seat to watch from. The player asked must be a person still in play: computers are
-   not asked, and nobody is asked who is out themselves.
-2. **One question at a time:** a knocked-out player has at most one request waiting. They can withdraw
-   it, or ask someone else once it is answered.
-3. **What the asked player sees:** who is asking, and whose hand that player is already watching, if
-   any. They accept or decline. Declining a request tells the asker; nothing else is revealed.
-4. **Watching:** an accepted request shows the asker the live hand: it follows every draw and play.
-   A knocked-out player watches one hand at a time; being accepted by a second player moves the watch
-   there and ends the first. Many knocked-out players may watch the same hand.
-5. **Always visible and revocable:** the watched player sees who is watching them and can end any watch
-   at any time (by declining the grant again). The watcher can stop whenever they like.
-6. **When it ends:** the watch ends by itself when the watched player is knocked out or leaves, when the
-   watcher leaves, and when the round ends. At the end of the round every hand is open to all anyway
-   (§5.14). Requests and watches never carry over to the next round.
-7. **Nothing else changes:** watchers cannot act. The server sends a hand to a watcher only while the
-   asked player's consent stands (checked on every update), never to anyone else.
+1. **Who may ask:** only a knocked-out player who is still at the table. They may ask about any player
+   still in the round, one hand at a time: asking someone else replaces their earlier request.
+2. **Who answers:** the player asked. They see the request on the table and choose **Show** or **No**.
+   Play never waits for the answer. A computer player always agrees, straight away.
+3. **Showing:** once they agree, the knocked-out player sees that hand, live, in place of their own.
+   Nobody else learns anything: the cards go to the viewer alone, and only the two of them know about the
+   request.
+4. **Stopping:** the viewer can stop watching at any time, and may ask that player again later. The player
+   shown can **Stop** at any time; that counts as a no.
+5. **A no stands for the round:** a player who said no can't be asked again until the next deal, so
+   nobody can be pestered with requests.
+6. **Edge cases:** it ends on its own when the player shown is knocked out or leaves, when the viewer
+   leaves, and when the round ends (every hand is then open to all anyway, §5.14). Every request is cleared when a new round is dealt. A player who
+   forfeited has left the table and can't ask. Sharing never changes the game: it only decides whose
+   hand one player's view includes.
 
 ## 6. Ambiguities and chosen policies
 

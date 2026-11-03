@@ -12,7 +12,7 @@ function roomFor(game: GameState): Room {
     game,
     turnHoldUntil: 0,
     status: game.phase.type === 'finished' ? 'roundOver' : 'inGame',
-    watch: { requests: [], grants: [] },
+    handShares: [],
     players: game.players.map((p) => ({
       id: p.id,
       socketId: 's',
