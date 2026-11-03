@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, Layers, LogOut, ScrollText, Skull, Users } from 'lucide-react';
 import {
   colorOf,
   isWildCard,
@@ -12,12 +12,11 @@ import {
 import { ActionBar } from '../components/game/ActionBar';
 import { EventBanner } from '../components/game/EventBanner';
 import { GameTable } from '../components/game/GameTable';
+import { HandShareRequests } from '../components/game/HandShareRequests';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { PlayerHand } from '../components/game/PlayerHand';
 import { SendFlight, type Flight } from '../components/game/SendFlight';
 import { RoundReview } from '../components/game/RoundReview';
-import { WatchHand } from '../components/game/WatchHand';
-import { WatchRequests } from '../components/game/WatchRequests';
 import { RejoinPrompt } from '../components/game/RejoinPrompt';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
@@ -25,6 +24,7 @@ import { SoundSettings } from '../components/SoundSettings';
 import { ColorPickerModal } from '../components/modals/ColorPickerModal';
 import { DiscardChoiceModal } from '../components/modals/DiscardChoiceModal';
 import { GameOverModal } from '../components/modals/GameOverModal';
+import { KnockedOutModal } from '../components/modals/KnockedOutModal';
 import { PlayedCardsModal } from '../components/modals/PlayedCardsModal';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { SwapTargetModal } from '../components/modals/SwapTargetModal';
@@ -41,12 +41,17 @@ import {
   catchUno,
   chooseRouletteColor,
   drawCards,
+  endHandShare,
   leaveRoom,
   playCard,
 } from '../net/actions';
 import { clearNotices, pushNotice, togglePrivateHand, useAppState } from '../state/store';
 
 type PendingChoice = { card: Card; step: 'color' | 'swap' | 'discard' };
+
+/** A watched hand is for looking at only: nothing in it can be played, and it never nudges. */
+const NONE_PLAYABLE: ReadonlySet<string> = new Set();
+const NO_NUDGE = { count: 0, active: false };
 
 export function GamePage({ room, game }: { room: RoomView; game: GameStateView }) {
   const meId = game.me.playerId;
@@ -112,6 +117,32 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
   const held = game.turnHoldMs > 0;
   const myMove = isMyTurn && !finished && me?.status === 'active';
+  const out = me?.status === 'eliminated';
+
+  // Knocked out mid-round: say so once, the moment it happens (a reload into it stays quiet).
+  const [showOut, setShowOut] = useState(false);
+  const wasOut = useRef(out);
+  useEffect(() => {
+    if (out && !wasOut.current && !finished) setShowOut(true);
+    wasOut.current = out;
+  }, [out, finished]);
+  // The hand you asked to see, once its player agreed. While out, it takes the place of yours.
+  const handShare = game.handShare;
+  const watched = out && handShare.watching?.status === 'allowed' ? handShare.watching : null;
+  const watchedHand = watched?.hand ?? null;
+  useEffect(() => {
+    if (watched) setShowOut(false);
+  }, [watched?.targetId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tell the viewer when a player says no, or stops showing their hand.
+  const refusedCount = handShare.refusedIds.length;
+  const seenRefusals = useRef(refusedCount);
+  useEffect(() => {
+    if (refusedCount > seenRefusals.current) {
+      const who = handShare.refusedIds[refusedCount - 1];
+      if (who) pushNotice('info', `${name(who)} won't show you their hand.`);
+    }
+    seenRefusals.current = refusedCount;
+  }, [refusedCount]); // eslint-disable-line react-hooks/exhaustive-deps
   const nudge = useGameSounds(
     view,
     meId,
@@ -224,6 +255,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const statusText = (() => {
     if (finished) return 'Game over';
+    if (watched) return `You are out — watching ${name(watched.targetId)}'s hand.`;
     if (me?.status === 'eliminated') return 'You are out — watching the rest of the game.';
     if (held) {
       if (actions.canCallUno) return 'One card left — call UNO before anyone catches you!';
@@ -357,6 +389,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 view.pendingDraw && current ? (current.id === meId ? 'You' : current.name) : null
               }
             />
+            {!finished && <HandShareRequests watchers={handShare.watchers} name={name} />}
           </section>
 
           {/* your seat: the hand is held over the near edge of the table */}
@@ -371,21 +404,50 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 myMove ? 'opacity-100' : 'opacity-0'
               }`}
             />
-            <div key={shake} className={shake ? 'anim-shake' : ''}>
-              {me?.status === 'eliminated' && !finished && (
-                <WatchHand game={game} meId={meId} name={name} />
-              )}
-              <PlayerHand
-                hand={heldHand}
-                playableIds={playable}
-                isMyTurn={isMyTurn && !finished}
-                onCardClick={onCardClick}
-                sendingId={sending?.cardId ?? null}
-                flyingId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}
-                nudge={nudge}
-                concealed={privateHand}
-              />
-            </div>
+            {watched && watchedHand ? (
+              <div>
+                <p className="mb-1 flex items-center justify-center gap-2 text-sm">
+                  <span className="pill flex items-center gap-1.5">
+                    <Eye size={14} className="text-brass" aria-hidden />
+                    {name(watched.targetId)}'s hand
+                  </span>
+                  <button
+                    type="button"
+                    className="pill flex items-center gap-1 font-semibold text-rose-300 hover:text-rose-200"
+                    onClick={() => void endHandShare()}
+                  >
+                    <EyeOff size={14} aria-hidden /> Stop watching
+                  </button>
+                </p>
+                <PlayerHand
+                  hand={watchedHand}
+                  playableIds={NONE_PLAYABLE}
+                  isMyTurn={false}
+                  onCardClick={() =>
+                    pushNotice(
+                      'info',
+                      `These are ${name(watched.targetId)}'s cards. You're out.`,
+                      2500,
+                    )
+                  }
+                  nudge={NO_NUDGE}
+                  concealed={false}
+                />
+              </div>
+            ) : (
+              <div key={shake} className={shake ? 'anim-shake' : ''}>
+                <PlayerHand
+                  hand={heldHand}
+                  playableIds={playable}
+                  isMyTurn={isMyTurn && !finished}
+                  onCardClick={onCardClick}
+                  sendingId={sending?.cardId ?? null}
+                  flyingId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}
+                  nudge={nudge}
+                  concealed={privateHand}
+                />
+              </div>
+            )}
             <ActionBar
               seat={
                 <div className="flex items-center gap-3">
@@ -420,6 +482,15 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                         <span className="flex items-center gap-1 text-rose-300">
                           <Skull size={14} /> Out
                         </span>
+                      )}
+                      {out && !finished && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 rounded-full px-1 font-semibold text-brass-soft hover:text-brass focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass"
+                          onClick={() => setShowOut(true)}
+                        >
+                          <Eye size={14} aria-hidden /> See a hand
+                        </button>
                       )}
                       {hand.length >= MERCY_HAND_LIMIT - 5 && me?.status === 'active' && (
                         <span className="font-semibold text-rose-300">
@@ -461,7 +532,6 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       </div>
 
       <EventBanner banner={banner} />
-      {!finished && <WatchRequests game={game} name={name} />}
       {flight && <SendFlight key={flight.id} flight={flight} onDone={() => setFlight(null)} />}
 
       {pending?.step === 'color' && (
@@ -540,6 +610,15 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
             </button>
           </div>
         </Modal>
+      )}
+      {showOut && out && !finished && me && (
+        <KnockedOutModal
+          me={me}
+          players={view.players}
+          handShare={handShare}
+          avatarOf={avatarOf}
+          onClose={() => setShowOut(false)}
+        />
       )}
       {finished && !confirmLeave && !resultsClosed && (
         <GameOverModal room={room} game={game} meId={meId} onClose={() => setResultsClosed(true)} />

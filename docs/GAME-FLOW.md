@@ -67,13 +67,10 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
    the cards on the discard pile over it, to check before naming a color), then presses **Draw** once per card.
    Every revealed card is shown face up to the whole table. When the named color appears, the revealed
    cards join the victim's hand, the reveal clears, and play continues with the player after the victim.
-
-## When you are knocked out
-
-A player out by the Mercy Rule sees **Watch a hand** where their cards were: buttons for each person still
-in play, one request at a time. The asked player gets a card at the top of the screen naming the asker
-and, if there is one, whose hand they already watch, with **Accept** and **Decline**. Yes shows the asker
-that hand live; the watched player sees who is watching and can **Stop** them. See RULES.md §5.17.
+7. Knocked out at 25 cards: the player gets a **You're out** dialog. They can keep watching, or ask a
+   player still in the round to show them their hand (RULES.md §5.17). The player asked sees the
+   request on the table and answers **Show** or **No** whenever they like; play doesn't wait. Once
+   shown, the hand takes the place of the viewer's own, live, until either of them stops it.
 
 ## After the round ends
 
@@ -121,6 +118,9 @@ Automated (`npm test`):
 - Mercy at 25 in the middle of a penalty (the rest is void), the last player standing wins, set-aside cards
   return when reshuffled.
 - UNO catching, the window closing after the next player acts, declaring with the play or afterwards.
+- Seeing a hand once out: only a knocked-out player may ask, only about a player still in; the hand
+  reaches the viewer alone and only after a yes; a no or a Stop holds for the round; it ends on a
+  knockout, a departure or a new deal; computers agree at once.
 - Out-of-turn plays, cards not in hand, a winning Draw card applies no penalty, forfeits, and rejected
   commands that leave the state untouched.
 - 120 random complete games (2–6 players) that check all 168 cards are still there after every move and that

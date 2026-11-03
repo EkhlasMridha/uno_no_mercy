@@ -144,21 +144,6 @@ export interface RoundReveal {
   setAside: Card[];
 }
 
-/**
- * Hand watching for the requesting player (docs/RULES.md §5.17): a knocked-out player can ask
- * someone still in play to show them their hand, and the asked player answers.
- */
-export interface HandWatchView {
-  /** Your request that is still waiting for an answer. */
-  outgoing: { targetId: string } | null;
-  /** The hand you are allowed to watch, live; null when nobody has accepted you. */
-  watching: { targetId: string; hand: Card[] } | null;
-  /** Knocked-out players asking to watch your hand. `watchingId`: whose hand they watch already. */
-  incoming: { watcherId: string; watchingId: string | null }[];
-  /** Knocked-out players watching your hand right now. */
-  watchers: string[];
-}
-
 /** Actions the requesting player may take right now, computed by the server engine. */
 export interface ValidActions {
   playableCardIds: string[];
@@ -180,11 +165,25 @@ export interface PrivatePlayerView {
   validActions: ValidActions;
 }
 
+/**
+ * Knocked-out players asking to see an active player's hand (docs/RULES.md §5.17), as one player
+ * may know it: only their own request and the requests on their own hand.
+ */
+export interface HandShareView {
+  /** Whose hand you asked to see. `hand` is filled in once they agree. */
+  watching: { targetId: string; status: 'pending' | 'allowed'; hand: Card[] | null } | null;
+  /** Players who said no to you this round, so you can't ask them again. */
+  refusedIds: string[];
+  /** Knocked-out players asking to see your hand, or watching it. */
+  watchers: { viewerId: string; status: 'pending' | 'allowed' }[];
+}
+
 export interface GameStateView {
   roomCode: string;
   version: number;
   public: PublicGameView;
   me: PrivatePlayerView;
+  handShare: HandShareView;
   /**
    * Milliseconds left in the UNO breather after a play or turn change (docs/RULES.md §5.9). While
    * it runs, `validActions` only offers calling UNO; 0 when the table is open.
@@ -192,6 +191,4 @@ export interface GameStateView {
   turnHoldMs: number;
   /** The whole table laid open, once the round is finished; null before that. */
   reveal: RoundReveal | null;
-  /** Hand watching: requests and the hand you are allowed to see. */
-  watch: HandWatchView;
 }

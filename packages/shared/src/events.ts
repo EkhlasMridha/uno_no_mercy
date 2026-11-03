@@ -3,25 +3,26 @@ import type { GameStateView } from './game-view.js';
 import type { ChatMessage, RoomView, SessionInfo } from './room-view.js';
 import type {
   AcceptPenaltyPayload,
+  AnswerHandRequestPayload,
   CallUnoPayload,
   CatchUnoPayload,
   ChatReactPayload,
   ChatSendPayload,
   CreateRoomPayload,
   DrawPayload,
+  EndHandSharePayload,
   JoinRoomPayload,
   KickPayload,
   PlayCardPayload,
   ProfilePayload,
   ReadyPayload,
   ReconnectPayload,
+  RequestHandPayload,
   RoomSettingsPayload,
   RouletteColorPayload,
   StartGamePayload,
   TransferHostPayload,
   WaitForPlayerPayload,
-  WatchRequestPayload,
-  WatchRespondPayload,
 } from './schemas.js';
 
 export interface CommandResult {
@@ -47,10 +48,6 @@ export interface ClientToServerEvents {
   'room:wait-for-player': (payload: WaitForPlayerPayload, ack: AckCallback<null>) => void;
   'chat:send': (payload: ChatSendPayload, ack: AckCallback<null>) => void;
   'chat:react': (payload: ChatReactPayload, ack: AckCallback<null>) => void;
-  'watch:request': (payload: WatchRequestPayload, ack: AckCallback<null>) => void;
-  'watch:respond': (payload: WatchRespondPayload, ack: AckCallback<null>) => void;
-  /** Withdraws your request, or stops watching the hand you were allowed to see. */
-  'watch:stop': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'game:start': (payload: StartGamePayload, ack: AckCallback<null>) => void;
   'game:restart': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'game:request-state': (payload: Record<string, never>, ack: AckCallback<null>) => void;
@@ -63,6 +60,10 @@ export interface ClientToServerEvents {
   ) => void;
   'game:call-uno': (payload: CallUnoPayload, ack: AckCallback<CommandResult>) => void;
   'game:catch-uno': (payload: CatchUnoPayload, ack: AckCallback<CommandResult>) => void;
+  /** Knocked out: ask to see a player's hand. */
+  'game:request-hand': (payload: RequestHandPayload, ack: AckCallback<null>) => void;
+  'game:answer-hand-request': (payload: AnswerHandRequestPayload, ack: AckCallback<null>) => void;
+  'game:end-hand-share': (payload: EndHandSharePayload, ack: AckCallback<null>) => void;
 }
 
 /** Server → client events. `game:state` is a per-player projection. */
@@ -74,8 +75,6 @@ export interface ServerToClientEvents {
   'chat:message': (message: ChatMessage) => void;
   /** A message whose reactions changed, to replace the copy the client holds. */
   'chat:update': (message: ChatMessage) => void;
-  /** Tells a knocked-out player how the player they asked answered. */
-  'watch:answer': (payload: { targetId: string; accepted: boolean }) => void;
   'room:closed': (payload: { reason: string }) => void;
 }
 

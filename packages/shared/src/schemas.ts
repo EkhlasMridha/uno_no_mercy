@@ -94,13 +94,6 @@ export const chatReactSchema = z
   .object({ messageId: z.number().int().nonnegative(), emoji: z.enum(REACTION_EMOJIS) })
   .strict();
 
-/** A knocked-out player asking another player to show them their hand. */
-export const watchRequestSchema = z.object({ targetId: playerIdSchema }).strict();
-/** The asked player's answer; declining a watch already granted ends it. */
-export const watchRespondSchema = z
-  .object({ watcherId: playerIdSchema, accept: z.boolean() })
-  .strict();
-
 const turnCommandShape = { commandId: commandIdSchema, version: stateVersionSchema };
 
 export const playCardSchema = z
@@ -124,6 +117,15 @@ export const catchUnoSchema = z
   .object({ commandId: commandIdSchema, targetId: playerIdSchema })
   .strict();
 
+/** A knocked-out player asking to see an active player's hand. */
+export const requestHandSchema = z.object({ targetId: playerIdSchema }).strict();
+/** The player asked answering: show their hand to that viewer, or not. */
+export const answerHandRequestSchema = z
+  .object({ viewerId: playerIdSchema, allow: z.boolean() })
+  .strict();
+/** Stop watching (no `viewerId`), or stop showing your hand to that viewer. */
+export const endHandShareSchema = z.object({ viewerId: playerIdSchema.optional() }).strict();
+
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
 export type ReconnectPayload = z.input<typeof reconnectSchema>;
@@ -136,11 +138,12 @@ export type StartGamePayload = z.input<typeof startGameSchema>;
 export type RoomSettingsPayload = z.input<typeof roomSettingsSchema>;
 export type ChatSendPayload = z.input<typeof chatSendSchema>;
 export type ChatReactPayload = z.input<typeof chatReactSchema>;
-export type WatchRequestPayload = z.input<typeof watchRequestSchema>;
-export type WatchRespondPayload = z.input<typeof watchRespondSchema>;
 export type PlayCardPayload = z.input<typeof playCardSchema>;
 export type DrawPayload = z.input<typeof drawSchema>;
 export type AcceptPenaltyPayload = z.input<typeof acceptPenaltySchema>;
 export type RouletteColorPayload = z.input<typeof rouletteColorSchema>;
 export type CallUnoPayload = z.input<typeof callUnoSchema>;
 export type CatchUnoPayload = z.input<typeof catchUnoSchema>;
+export type RequestHandPayload = z.input<typeof requestHandSchema>;
+export type AnswerHandRequestPayload = z.input<typeof answerHandRequestSchema>;
+export type EndHandSharePayload = z.input<typeof endHandShareSchema>;
