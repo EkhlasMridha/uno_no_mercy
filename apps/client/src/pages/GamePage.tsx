@@ -14,6 +14,10 @@ import { EventBanner } from '../components/game/EventBanner';
 import { GameTable } from '../components/game/GameTable';
 import { LastPlayedCard } from '../components/game/LastPlayedCard';
 import { PlayerHand } from '../components/game/PlayerHand';
+import { SendFlight, type Flight } from '../components/game/SendFlight';
+import { RoundReview } from '../components/game/RoundReview';
+import { WatchHand } from '../components/game/WatchHand';
+import { WatchRequests } from '../components/game/WatchRequests';
 import { RejoinPrompt } from '../components/game/RejoinPrompt';
 import { SidePanel, type SideTab } from '../components/game/SidePanel';
 import { avatarGlow, PlayerAvatar } from '../components/PlayerAvatar';
@@ -69,7 +73,16 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const [showSheet, setShowSheet] = useState(false);
   const [showPlayed, setShowPlayed] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // The result popup can be closed to look over the table; a new round opens it again.
+  const [resultsClosed, setResultsClosed] = useState(false);
   const [shake, setShake] = useState(0);
+  // An action sent and not yet confirmed. The clicked card lifts at once instead of waiting out the
+  // network round trip; buttons lock so a second tap can't send it twice. A refusal puts it back.
+  const [sending, setSending] = useState<{ cardId: string | null } | null>(null);
+  const sendingRef = useRef(false);
+  // The card standing in for that action while it travels: thrown at the heap, or peeled off the deck.
+  const [flight, setFlight] = useState<Flight | null>(null);
+  const flightSeq = useRef(0);
   const privateHand = useAppState((s) => s.privateHand);
 
   const playable = useMemo(() => new Set(actions.playableCardIds), [actions.playableCardIds]);
@@ -93,6 +106,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const current = view.players.find((p) => p.id === view.currentPlayerId) ?? null;
   const isMyTurn = view.currentPlayerId === meId;
   const finished = view.phase.type === 'finished';
+  useEffect(() => {
+    if (!finished) setResultsClosed(false);
+  }, [finished]);
   // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
   const held = game.turnHoldMs > 0;
   const myMove = isMyTurn && !finished && me?.status === 'active';
@@ -104,13 +120,56 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     avatarOf,
   );
 
+  /** Measures where a flight starts and ends, or null when motion is off or the spots aren't on screen. */
+  const launchFlight = (card: Card | null): Flight | null => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
+    const source = card
+      ? document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(card.id)}"] button`)
+      : document.querySelector<HTMLElement>('[data-draw-pile]');
+    const target = document.querySelector<HTMLElement>(
+      card ? '[data-discard-heap]' : '[data-draw-pile]',
+    );
+    if (!source || !target) return null;
+    const from = source.getBoundingClientRect();
+    const to = target.getBoundingClientRect();
+    if (from.width === 0 || to.width === 0) return null;
+    return {
+      id: ++flightSeq.current,
+      kind: card ? 'play' : 'draw',
+      card,
+      from,
+      to,
+      // The heap's laid-out width against its on-screen width: the table shrinks on small phones.
+      toScale: target.offsetWidth > 0 ? to.width / target.offsetWidth : 1,
+      status: 'pending',
+    };
+  };
+
+  const sendAction = async (card: Card | null, action: () => Promise<unknown>) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending({ cardId: card?.id ?? null });
+    const launched = launchFlight(card);
+    if (launched) setFlight(launched);
+    let accepted = false;
+    try {
+      const result = await action();
+      accepted = !(typeof result === 'object' && result !== null && 'ok' in result && !result.ok);
+    } finally {
+      sendingRef.current = false;
+      setSending(null);
+      const status = accepted ? 'accepted' : 'refused';
+      setFlight((f) => (f && f.id === launched?.id ? { ...f, status } : f));
+    }
+  };
+
   const send = async (
     card: Card,
     options: { color?: CardColor; swapTargetId?: string; discardIds?: string[] } = {},
   ) => {
     setPending(null);
     const declareUno = unoArmed && actions.canDeclareWithPlay ? true : undefined;
-    await playCard(card.id, { ...options, declareUno });
+    await sendAction(card, () => playCard(card.id, { ...options, declareUno }));
     setUnoArmed(false);
   };
 
@@ -137,7 +196,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   };
 
   const onCardClick = (card: Card) => {
-    if (finished) return;
+    if (finished || sendingRef.current) return;
     if (held) {
       pushNotice('info', 'Hold on: everyone gets 2 seconds to call UNO after a play.', 2000);
       return;
@@ -289,10 +348,11 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               avatarOf={avatarOf}
               canDraw={actions.canDraw}
               catchableIds={actions.catchablePlayerIds}
-              onDraw={() => void drawCards()}
+              onDraw={() => void sendAction(null, drawCards)}
               onCatch={(id) => void catchUno(id)}
               onShowPlayed={() => setShowPlayed(true)}
               lastPlay={lastPlay}
+              landedCardId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}
               targetName={
                 view.pendingDraw && current ? (current.id === meId ? 'You' : current.name) : null
               }
@@ -312,11 +372,16 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               }`}
             />
             <div key={shake} className={shake ? 'anim-shake' : ''}>
+              {me?.status === 'eliminated' && !finished && (
+                <WatchHand game={game} meId={meId} name={name} />
+              )}
               <PlayerHand
                 hand={heldHand}
                 playableIds={playable}
                 isMyTurn={isMyTurn && !finished}
                 onCardClick={onCardClick}
+                sendingId={sending?.cardId ?? null}
+                flyingId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}
                 nudge={nudge}
                 concealed={privateHand}
               />
@@ -373,8 +438,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               statusText={statusText}
               pendingTotal={view.pendingDraw?.total ?? null}
               unoArmed={unoArmed}
-              onDraw={() => void drawCards()}
-              onAccept={() => void acceptPenalty()}
+              onDraw={() => void sendAction(null, drawCards)}
+              onAccept={() => void sendAction(null, acceptPenalty)}
+              busy={sending !== null}
               onUno={onUno}
               privateHand={privateHand}
               onTogglePrivacy={togglePrivateHand}
@@ -395,6 +461,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
       </div>
 
       <EventBanner banner={banner} />
+      {!finished && <WatchRequests game={game} name={name} />}
+      {flight && <SendFlight key={flight.id} flight={flight} onDone={() => setFlight(null)} />}
 
       {pending?.step === 'color' && (
         <ColorPickerModal
@@ -473,7 +541,18 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
           </div>
         </Modal>
       )}
-      {finished && !confirmLeave && <GameOverModal room={room} game={game} meId={meId} />}
+      {finished && !confirmLeave && !resultsClosed && (
+        <GameOverModal room={room} game={game} meId={meId} onClose={() => setResultsClosed(true)} />
+      )}
+      {finished && !confirmLeave && resultsClosed && (
+        <RoundReview
+          room={room}
+          game={game}
+          meId={meId}
+          name={name}
+          onShowResults={() => setResultsClosed(false)}
+        />
+      )}
     </div>
   );
 }

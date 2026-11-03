@@ -147,7 +147,7 @@ export function PlayingCard({
         s.box,
         face,
         playable
-          ? 'ring-4 ring-amber-300 -translate-y-2 sm:-translate-y-3 hover:-translate-y-4'
+          ? 'ring-4 ring-amber-300 -translate-y-2 sm:-translate-y-3 hover:-translate-y-4 active:-translate-y-5 active:scale-105'
           : '',
         dimmed ? 'brightness-[0.55] saturate-50' : '',
         interactive

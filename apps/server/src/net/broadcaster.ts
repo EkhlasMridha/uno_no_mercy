@@ -1,3 +1,4 @@
+import type { ChatMessage } from '@nomercy/shared';
 import { toGameView, toRoomView } from '../rooms/projections.js';
 import type { Room } from '../rooms/room.types.js';
 import type { GameServer } from './socket-types.js';
@@ -25,6 +26,38 @@ export class Broadcaster {
     target.emit('room:state', toRoomView(room));
     const gameView = toGameView(room, playerId);
     if (gameView) target.emit('game:state', gameView);
+    target.emit('chat:history', room.chat);
+  }
+
+  /** Delivers a chat message to the sockets seated in this room and nobody else. */
+  chatMessage(room: Room, message: ChatMessage): void {
+    for (const player of room.players) {
+      if (player.socketId && !player.departed) {
+        this.io.to(player.socketId).emit('chat:message', message);
+      }
+    }
+  }
+
+  /** Re-sends a message whose reactions changed, to this room only. */
+  chatUpdate(room: Room, message: ChatMessage): void {
+    for (const player of room.players) {
+      if (player.socketId && !player.departed) {
+        this.io.to(player.socketId).emit('chat:update', message);
+      }
+    }
+  }
+
+  /** Replays the room's recent chat to one player who just joined or reconnected. */
+  chatHistory(room: Room, playerId: string): void {
+    const player = room.players.find((p) => p.id === playerId);
+    if (player?.socketId) this.io.to(player.socketId).emit('chat:history', room.chat);
+  }
+
+  /** Tells a knocked-out player how the player they asked answered their request to watch. */
+  watchAnswer(room: Room, watcherId: string, targetId: string, accepted: boolean): void {
+    const watcher = room.players.find((p) => p.id === watcherId);
+    if (watcher?.socketId)
+      this.io.to(watcher.socketId).emit('watch:answer', { targetId, accepted });
   }
 
   /** Tells one socket it no longer has a seat, and unbinds it so it can join another room. */

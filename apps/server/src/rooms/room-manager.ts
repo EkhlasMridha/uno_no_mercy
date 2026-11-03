@@ -1,4 +1,5 @@
 import {
+  CHAT_HISTORY_LIMIT,
   MATCH_TARGET_POINTS,
   MAX_COMPUTERS,
   MAX_PLAYERS,
@@ -7,6 +8,7 @@ import {
   ROOM_CODE_LENGTH,
   TURN_HOLD_MS,
   WAIT_FOR_REJOIN_MS,
+  type ChatMessage,
   type ErrorCode,
   type GameEvent,
   type Gender,
@@ -26,6 +28,7 @@ import {
   computerNames,
   fallbackComputerMove,
 } from './computer-player.js';
+import { canBeWatched, canWatch, emptyWatch, liveWatch } from './hand-watch.js';
 import { scoreRound } from './match-scoring.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room, RoomPlayer } from './room.types.js';
@@ -133,6 +136,7 @@ export class RoomManager {
       players: [player],
       settings: { scoringEnabled: false, maxPlayers: computers > 0 ? computers + 1 : maxPlayers },
       game: null,
+      chat: [],
       roundNumber: 0,
       dealerIndex: this.options.rng(MAX_PLAYERS),
       lastResult: null,
@@ -140,6 +144,7 @@ export class RoomManager {
       computerTimer: null,
       turnHoldUntil: 0,
       holdTimer: null,
+      watch: emptyWatch(),
     };
     player.ready = true;
     this.addComputers(room, computers);
@@ -383,6 +388,116 @@ export class RoomManager {
     return room;
   }
 
+  /** A knocked-out player asks someone still in play to show them their hand (docs/RULES.md §5.17). */
+  requestWatch(code: string, watcherId: string, targetId: string): Room {
+    const room = this.requireRoom(code);
+    this.requireMember(room, watcherId);
+    if (room.status !== 'inGame') {
+      throw new RoomError('GAME_NOT_ACTIVE', 'There is no game in progress');
+    }
+    if (!canWatch(room, watcherId)) {
+      throw new RoomError('INVALID_MOVE', 'You can ask to watch a hand once you are knocked out');
+    }
+    const target = room.players.find((p) => p.id === targetId);
+    if (!target || !canBeWatched(room, targetId)) {
+      throw new RoomError('INVALID_TARGET', 'Ask a player who is still in the game');
+    }
+    const live = liveWatch(room);
+    const pending = live.requests.find((l) => l.watcherId === watcherId);
+    if (pending) {
+      const asked = room.players.find((p) => p.id === pending.targetId);
+      throw new RoomError(
+        'INVALID_MOVE',
+        `You already asked ${asked?.name ?? 'someone'}. Wait for the answer or cancel it first.`,
+      );
+    }
+    if (live.grants.some((l) => l.watcherId === watcherId && l.targetId === targetId)) {
+      throw new RoomError('INVALID_MOVE', `You are already watching ${target.name}'s hand`);
+    }
+    room.watch = { ...live, requests: [...live.requests, { watcherId, targetId }] };
+    return room;
+  }
+
+  /**
+   * The asked player answers. Accepting moves the watcher's one watch onto this hand; declining a
+   * request refuses it, and declining a watch already granted ends it.
+   */
+  respondToWatch(
+    code: string,
+    targetId: string,
+    watcherId: string,
+    accept: boolean,
+  ): { room: Room; granted: boolean } {
+    const room = this.requireRoom(code);
+    this.requireMember(room, targetId);
+    const live = liveWatch(room);
+    const open = live.requests.some((l) => l.watcherId === watcherId && l.targetId === targetId);
+    const granted = live.grants.some((l) => l.watcherId === watcherId && l.targetId === targetId);
+    if (!open && !(granted && !accept)) {
+      throw new RoomError('INVALID_TARGET', 'That request is no longer open');
+    }
+    const requests = live.requests.filter(
+      (l) => !(l.watcherId === watcherId && l.targetId === targetId),
+    );
+    // One hand at a time: a new yes replaces the watcher's earlier one.
+    const grants = live.grants.filter((l) => l.watcherId !== watcherId);
+    if (!accept && granted) {
+      room.watch = { requests, grants };
+      return { room, granted: false };
+    }
+    room.watch = { requests, grants: accept ? [...grants, { watcherId, targetId }] : live.grants };
+    return { room, granted: accept };
+  }
+
+  /** The watcher withdraws a request that is waiting, or stops watching the hand they were shown. */
+  stopWatching(code: string, watcherId: string): Room {
+    const room = this.requireRoom(code);
+    this.requireMember(room, watcherId);
+    const live = liveWatch(room);
+    room.watch = {
+      requests: live.requests.filter((l) => l.watcherId !== watcherId),
+      grants: live.grants.filter((l) => l.watcherId !== watcherId),
+    };
+    return room;
+  }
+
+  /** Adds a chat line from a seated player, in the lobby or mid-game. */
+  postChat(code: string, playerId: string, text: string): { room: Room; message: ChatMessage } {
+    const room = this.requireRoom(code);
+    const sender = this.requireMember(room, playerId);
+    const message: ChatMessage = {
+      id: (room.chat.at(-1)?.id ?? 0) + 1,
+      senderId: sender.id,
+      senderName: sender.name,
+      text,
+      sentAt: this.now(),
+      reactions: {},
+    };
+    room.chat.push(message);
+    if (room.chat.length > CHAT_HISTORY_LIMIT) {
+      room.chat.splice(0, room.chat.length - CHAT_HISTORY_LIMIT);
+    }
+    return { room, message };
+  }
+
+  /** Adds the player's reaction to a chat message, or takes it back if it is already there. */
+  reactToChat(
+    code: string,
+    playerId: string,
+    messageId: number,
+    emoji: string,
+  ): { room: Room; message: ChatMessage } {
+    const room = this.requireRoom(code);
+    this.requireMember(room, playerId);
+    const message = room.chat.find((m) => m.id === messageId);
+    if (!message) throw new RoomError('INVALID_TARGET', 'That message is no longer in the chat');
+    const reacted = (message.reactions[emoji] ?? []).filter((id) => id !== playerId);
+    if (reacted.length === (message.reactions[emoji]?.length ?? 0)) reacted.push(playerId);
+    if (reacted.length > 0) message.reactions[emoji] = reacted;
+    else delete message.reactions[emoji];
+    return { room, message };
+  }
+
   /** Runs one game command through the authoritative engine. */
   executeGameCommand(
     code: string,
@@ -489,6 +604,7 @@ export class RoomManager {
     room.status = 'inGame';
     room.lastResult = null;
     room.turnHoldUntil = 0;
+    room.watch = emptyWatch();
     this.scheduleComputers(room);
   }
 

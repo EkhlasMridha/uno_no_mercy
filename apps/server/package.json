@@ -18,7 +18,7 @@
     "@nomercy/shared": "*",
     "express": "^4.21.1",
     "socket.io": "^4.8.1",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

@@ -15,6 +15,12 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
+- **Group chat** is open to everyone seated in the room, in the lobby and during a game, and never
+  leaves the room. Text and emoji, one line up to 300 characters. The lobby shows it in a column at the
+  right edge; at the table the side panel is split in half, game log and players above, chat below. Either
+  half can be minimized to its header (both start expanded); a minimized chat counts unread lines. Messages take one of six reactions (toggle, shown as counts
+  under the message), lines of only emoji are drawn large, and a pill offers the way back down when
+  new lines arrive while you are reading older ones.
 - **Invite links** (`?join=CODE`) join without asking: under the name this browser last used (kept in
   `localStorage`), or a random one like "Lucky Otter" when there is none or it is taken, with the male
   avatar set. The player can rename and switch avatar set in the lobby; a rename is remembered.
@@ -62,6 +68,21 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
    Every revealed card is shown face up to the whole table. When the named color appears, the revealed
    cards join the victim's hand, the reveal clears, and play continues with the player after the victim.
 
+## When you are knocked out
+
+A player out by the Mercy Rule sees **Watch a hand** where their cards were: buttons for each person still
+in play, one request at a time. The asked player gets a card at the top of the screen naming the asker
+and, if there is one, whose hand they already watch, with **Accept** and **Decline**. Yes shows the asker
+that hand live; the watched player sees who is watching and can **Stop** them. See RULES.md §5.17.
+
+## After the round ends
+
+The result popup can be closed. The table stays on screen with a bar at the bottom: **Review the table**,
+**Results** (reopens the popup) and, for the host, **Next round** and **Back to lobby**. The review
+drawer has three tabs: every player's hand, the cards played in the order they landed on the pile, and
+the draw pile in draw order. All of it comes from `GameStateView.reveal`, which the server fills only
+once the phase is `finished`. A new round replaces the state, so the bar and drawer disappear.
+
 ## Event ordering inside one command
 
 For `playCard`:
@@ -107,6 +128,9 @@ Automated (`npm test`):
 - Socket.IO integration: create, join, ready, start. Each player sees only their own cards and token. Late
   joins are rejected. `NOT_YOUR_TURN` and `STALE_STATE` work. A repeated command id runs once. Reconnecting
   restores the seat without duplicating the player, and a bad token is rejected.
+- A 3-player game over Socket.IO, played to a winner: UNO armed with the second-to-last card, pressed on
+  the last card (then uncatchable), and forgotten (caught for +2), each seen by all three players. The
+  `3-player UNO game` workflow runs it on every pull request into `main` or `develop`.
 
 Manual (browser, production build over the LAN address): created a room on `localhost`, joined from a second
 tab through the machine's LAN IP, readied up and started. Played a Wild +6 with the color dialog. The target

@@ -31,6 +31,8 @@ export function HomePage() {
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lights the name field red after a try with a missing or bad name, until you type in it.
+  const [nameInvalid, setNameInvalid] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showComputer, setShowComputer] = useState(false);
@@ -41,6 +43,7 @@ export function HomePage() {
 
   const validName = () => {
     const parsed = playerNameSchema.safeParse(name);
+    setNameInvalid(!parsed.success);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Invalid name');
       return null;
@@ -183,7 +186,12 @@ export function HomePage() {
             maxLength={20}
             autoComplete="nickname"
             placeholder="e.g. Sam"
-            onChange={(e) => setName(e.target.value)}
+            aria-invalid={nameInvalid}
+            aria-describedby={nameInvalid ? 'home-error' : undefined}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameInvalid(false);
+            }}
           />
         </label>
 
@@ -226,7 +234,11 @@ export function HomePage() {
         </form>
 
         {error && (
-          <p role="alert" className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200">
+          <p
+            id="home-error"
+            role="alert"
+            className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200"
+          >
             {error}
           </p>
         )}

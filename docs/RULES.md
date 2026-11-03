@@ -203,6 +203,12 @@ single card enters a hand: penalties, mandatory draws, roulette reveals and UNO 
    ends at once with **no winner** and no points, so nobody watches the computers play on. If a single
    computer is left, it still wins as last standing. Tables with only people are unaffected.
 
+4. **The table is turned face up (house rule).** When a round ends, every player may close the
+   result and look over the whole table: each seat's hand, the discard pile in the order it was
+   played, and the draw pile in the order it would have been drawn. Nothing is hidden any more, so
+   this changes nothing about play. Until the round is finished the server sends none of it. The next
+   round deals a new table and the view goes away.
+
 ### 5.15 Optional scoring (official)
 
 When enabled in the lobby, the winner scores the cards left in the active opponents' hands: number cards are
@@ -231,6 +237,29 @@ A person who loses their connection mid-game keeps their seat and hand for the r
    player already knocked out is not asked about. Rejoining replaces the lost session's token, so the old
    tab can no longer reclaim the seat. The wait always ends: on rejoin, on a refusal, or when the hold
    runs out.
+
+### 5.17 Watching a hand after a knockout (house rule)
+
+A player knocked out by the Mercy Rule (§5.13) while the round is still running can ask to watch
+another player's hand. The watched player decides.
+
+1. **Who may ask:** a player knocked out in this round who is still at the table. Someone who left or
+   forfeited has no seat to watch from. The player asked must be a person still in play: computers are
+   not asked, and nobody is asked who is out themselves.
+2. **One question at a time:** a knocked-out player has at most one request waiting. They can withdraw
+   it, or ask someone else once it is answered.
+3. **What the asked player sees:** who is asking, and whose hand that player is already watching, if
+   any. They accept or decline. Declining a request tells the asker; nothing else is revealed.
+4. **Watching:** an accepted request shows the asker the live hand: it follows every draw and play.
+   A knocked-out player watches one hand at a time; being accepted by a second player moves the watch
+   there and ends the first. Many knocked-out players may watch the same hand.
+5. **Always visible and revocable:** the watched player sees who is watching them and can end any watch
+   at any time (by declining the grant again). The watcher can stop whenever they like.
+6. **When it ends:** the watch ends by itself when the watched player is knocked out or leaves, when the
+   watcher leaves, and when the round ends. At the end of the round every hand is open to all anyway
+   (§5.14). Requests and watches never carry over to the next round.
+7. **Nothing else changes:** watchers cannot act. The server sends a hand to a watcher only while the
+   asked player's consent stands (checked on every update), never to anyone else.
 
 ## 6. Ambiguities and chosen policies
 

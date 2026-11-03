@@ -1,4 +1,4 @@
-import type { Ack, CardColor, CommandResult, Gender } from '@nomercy/shared';
+import type { Ack, CardColor, CommandResult, Gender, ReactionEmoji } from '@nomercy/shared';
 import { randomPlayerName } from '../lib/random-name';
 import { getState, pushNotice } from '../state/store';
 import { adoptSession, forgetSession, request } from './socket';
@@ -17,6 +17,19 @@ function report<T>(result: Ack<T>): Ack<T> {
   }
   return result;
 }
+
+// ---- watching a hand after a knockout ----
+
+/** A knocked-out player asks someone still in play to show them their hand. */
+export const requestWatch = async (targetId: string) =>
+  report(await request('watch:request', { targetId }));
+
+/** The asked player accepts or declines; declining a watch already granted ends it. */
+export const respondToWatch = async (watcherId: string, accept: boolean) =>
+  report(await request('watch:respond', { watcherId, accept }));
+
+/** Withdraws your request, or stops watching the hand you were shown. */
+export const stopWatching = async () => report(await request('watch:stop', {}));
 
 // ---- room ----
 
@@ -83,6 +96,13 @@ export const returnToLobby = async () => report(await request('room:return-lobby
 /** The decider's answer for a dropped player: hold their seat, or let them forfeit. */
 export const waitForPlayer = async (playerId: string, wait: boolean) =>
   report(await request('room:wait-for-player', { playerId, wait }));
+
+/** Sends a line to everyone in the room. */
+export const sendChat = async (text: string) => report(await request('chat:send', { text }));
+
+/** Adds your reaction to a chat message, or removes it if you already reacted that way. */
+export const reactToChat = async (messageId: number, emoji: ReactionEmoji) =>
+  report(await request('chat:react', { messageId, emoji }));
 
 // ---- game ----
 

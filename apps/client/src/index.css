@@ -107,6 +107,10 @@ body {
     @apply w-full rounded-xl bg-felt-950/70 px-4 py-3 text-white ring-1 ring-white/15 placeholder:text-white/35
       focus:outline-none focus:ring-2 focus:ring-accent;
   }
+  /* a field that failed its check: the alert's rose, kept while focused so the gold ring can't hide it */
+  .input[aria-invalid='true'] {
+    @apply bg-rose-500/10 ring-2 ring-rose-400 placeholder:text-rose-200/50;
+  }
   .card-symbol-text {
     paint-order: stroke fill;
     -webkit-text-stroke: 3px rgba(0, 0, 0, 0.35);

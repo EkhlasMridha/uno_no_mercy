@@ -106,7 +106,13 @@ expected state version. When a game finishes it records the round result and sco
 
 `Broadcaster` sends each socket `room:state` plus `game:state` built by `toGameView(room, playerId)`, which
 copies only that player's hand. Swaps and passes therefore reach each player only as their own new hand.
-Opponents' card ids are never sent. The integration test checks this byte for byte.
+Opponents' card ids are never sent while the round is on, with one consented exception: a knocked-out player the
+asked player has said yes to receives that one hand in `GameStateView.watch.watching` (`rooms/hand-watch.ts`,
+checked on every projection, so it stops the moment the consent or either seat stops making sense).
+The server also emits `watch:answer` to the asker. The integration test checks this byte for byte.
+The one exception is a finished round: `GameStateView.reveal` (`RoundReveal`) then carries every hand, the
+draw pile in draw order and the discard pile in play order to everyone, so the table can be inspected
+after the win (docs/RULES.md §5.14). It is `null` in every other phase.
 
 **UNO breather.** After a command that plays a card or changes whose turn it is, `RoomManager` sets
 `room.turnHoldUntil` to `TURN_HOLD_MS` (2 s) ahead (docs/RULES.md §5.9). Until then `executeGameCommand`
@@ -132,6 +138,11 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
 | `room:ready`                 | `{ ready }`                                                          |                                                                                                         |
 | `room:settings`              | `{ scoringEnabled }`                                                 | host, lobby only                                                                                        |
+| `chat:send`                  | `{ text }`                                                           | any seated player, lobby or game; 1–300 chars, one line; delivered only to this room's sockets          |
+| `chat:react`                 | `{ messageId, emoji }`                                               | toggles your reaction (one of six fixed emoji) on a message still in the history                        |
+| `watch:request`              | `{ targetId }`                                                       | knocked-out player, game running; asks a person still in play to show their hand (RULES §5.17)          |
+| `watch:respond`              | `{ watcherId, accept }`                                              | the asked player; yes shows the watcher this hand live, no refuses it (or ends a watch already granted) |
+| `watch:stop`                 | `{}`                                                                 | the watcher withdraws a waiting request or stops watching                                               |
 | `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
 | `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)                                                     |
 | `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                                                                     |
@@ -143,7 +154,10 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `game:call-uno`              | `{ commandId }`                                                      |                                                                                                         |
 | `game:catch-uno`             | `{ commandId, targetId }`                                            |                                                                                                         |
 
-Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `room:closed`.
+Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `chat:message`
+(one `ChatMessage`, sent to the sockets seated in that room only), `chat:update` (a message whose reactions changed, same audience), `chat:history` (the last 30 lines, sent on
+join, reconnect and `game:request-state`), `room:closed`. Chat lives in `Room.chat` in memory and is gone
+with the room; it is not part of `room:state`, so it never rides along with game broadcasts.
 
 Differences from the suggested list: the wild color and the 7 swap target travel **inside**
 `game:play-card`, so a wild or a 7 is applied in one atomic step and there are no half-played states.
