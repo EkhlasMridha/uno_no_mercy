@@ -1,7 +1,7 @@
 {
-  "name": "No Mercy LAN",
+  "name": "UNO No Mercy",
   "short_name": "No Mercy",
-  "description": "A real-time multiplayer card game for your local network.",
+  "description": "The 168-card No Mercy card game, free in your browser for 2 to 20 players or bots.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

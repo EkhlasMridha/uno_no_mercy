@@ -1,5 +1,5 @@
 import { Crown, Hand, Skull, WifiOff } from 'lucide-react';
-import type { PublicPlayerView } from '@nomercy/shared';
+import { MERCY_WARNING_AT, type PublicPlayerView } from '@nomercy/shared';
 import type { LastPlay } from '../../hooks/useLastPlay';
 import { cardName } from '../../lib/cards';
 import { seatPosition } from '../../lib/table-geometry';
@@ -52,7 +52,7 @@ export function TableSeat({
 }: TableSeatProps) {
   const s = SCALE[scale];
   const out = player.status === 'eliminated';
-  const danger = player.handCount >= 20 && !out;
+  const danger = player.handCount >= MERCY_WARNING_AT && !out;
   const fan = out ? 0 : Math.min(player.handCount, s.fan);
   const rad = (angle * Math.PI) / 180;
 

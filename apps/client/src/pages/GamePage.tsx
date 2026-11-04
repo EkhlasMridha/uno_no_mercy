@@ -4,6 +4,7 @@ import {
   colorOf,
   isWildCard,
   MERCY_HAND_LIMIT,
+  MERCY_WARNING_AT,
   type Card,
   type CardColor,
   type GameStateView,
@@ -492,7 +493,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                           <Eye size={14} aria-hidden /> See a hand
                         </button>
                       )}
-                      {hand.length >= MERCY_HAND_LIMIT - 5 && me?.status === 'active' && (
+                      {hand.length >= MERCY_WARNING_AT && me?.status === 'active' && (
                         <span className="font-semibold text-rose-300">
                           {hand.length >= MERCY_HAND_LIMIT
                             ? 'Last chance: play the card you drew!'

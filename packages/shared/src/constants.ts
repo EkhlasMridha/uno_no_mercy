@@ -8,6 +8,8 @@ export const STARTING_HAND_SIZE = 7;
 export const DECK_SIZE = 168;
 /** Mercy Rule: a player holding this many cards or more is eliminated. */
 export const MERCY_HAND_LIMIT = 25;
+/** From this many cards a seat warns how many are left before the Mercy Rule knocks it out. */
+export const MERCY_WARNING_AT = MERCY_HAND_LIMIT - 5;
 export const UNO_PENALTY_CARDS = 2;
 export const MATCH_TARGET_POINTS = 1000;
 export const KNOCKOUT_BONUS_POINTS = 250;

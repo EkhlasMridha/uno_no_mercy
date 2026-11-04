@@ -3,13 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>UNO No Mercy · Multiplayer card game for your online game</title>
+    <title>UNO No Mercy online: play the 168-card No Mercy game free in your browser</title>
     <meta
       name="description"
-      content="A real-time multiplayer card game with all 168 No Mercy cards. Host on one machine, then 2 to 20 friends join from any browser on the same network. No sign-up."
+      content="Play UNO No Mercy free in your browser with 2 to 20 friends or bots. All 168 cards: stack draws up to +10, swap hands on 7, and survive the Mercy Rule at 25 cards. No sign-up."
     />
-    <meta name="application-name" content="No Mercy LAN" />
+    <meta name="application-name" content="UNO No Mercy" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://nomercy.shimoolz.com/" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0c1a" />
     <meta name="format-detection" content="telephone=no" />
@@ -23,10 +24,10 @@
     <meta property="og:title" content="UNO No Mercy: the card game with no mercy" />
     <meta
       property="og:description"
-      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players, right in the browser on your local network."
+      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players or bots, free in your browser."
     />
     <meta property="og:image" content="https://nomercy.shimoolz.com/social-card.webp" />
-    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:type" content="image/webp" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
@@ -38,9 +39,9 @@
     <meta name="twitter:title" content="UNO No Mercy: the card game with no mercy" />
     <meta
       name="twitter:description"
-      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players, right in the browser on your local network."
+      content="Stack the draws, swap hands and survive the Mercy Rule. 2 to 20 players or bots, free in your browser."
     />
-    <meta name="twitter:image" content="/social-card.jpg" />
+    <meta name="twitter:image" content="/social-card.webp" />
     <meta
       name="twitter:image:alt"
       content="UNO No Mercy logo on a black card, surrounded by red, yellow, green, blue and wild cards on a red splash"
@@ -50,7 +51,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="apple-mobile-web-app-title" content="No Mercy" />
+    <meta name="apple-mobile-web-app-title" content="UNO No Mercy" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
@@ -59,7 +60,7 @@
         "@context": "https://schema.org",
         "@type": "VideoGame",
         "name": "UNO No Mercy",
-        "description": "A real-time multiplayer card game for a local network, played with all 168 No Mercy cards in the browser.",
+        "description": "A real-time multiplayer card game played in the browser with all 168 No Mercy cards, for 2 to 20 players or computer opponents.",
         "genre": ["Card game", "Party game"],
         "gamePlatform": "Web browser",
         "applicationCategory": "GameApplication",
@@ -68,14 +69,143 @@
         "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 2, "maxValue": 20 },
         "inLanguage": "en",
         "isAccessibleForFree": true,
-        "image": "/social-card.jpg",
+        "image": "https://nomercy.shimoolz.com/social-card.webp",
+        "url": "https://nomercy.shimoolz.com/",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <!-- Keep these answers in step with the FAQ on the landing page (src/pages/HomePage.tsx). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is UNO No Mercy free to play here?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. There is no account, no download and no ads. Open the page, press Play and you are the host of a new room."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How many people can play?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "From 2 to 20 in one room. The host sets the number of seats in the lobby and can change it until the deal."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I play against the computer?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Press Start in the lobby with seats still open and computer players fill them, up to 9. You can play alone against bots or mix them in with friends."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do my friends join?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Send them the invite link from the lobby, or read out the 5-character room code for them to enter under Join a room. They can play from any browser, phone or laptop."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What is the Mercy Rule?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Anyone holding 25 or more cards is knocked out on the spot. The last player standing, or the first to empty their hand, wins the round."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can you stack a +2 on a +4?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. A stack only goes up: answer with a Draw card of equal or higher value, in any color. +2 goes under +4, +4 under +6, +6 under +10, and only a +10 answers a +10."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What do the 7 and the 0 do?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Play a 7 and you must swap your whole hand with a player you choose. Play a 0 and everyone passes their hand to the next player in the direction of play."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What happens when the draw pile runs out?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Every discard except the top card is shuffled into a new draw pile, along with the hands of players already knocked out."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is there scoring?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "It is optional. Turn it on in the lobby and the winner of each round scores the cards left in the other hands, plus 250 for every player knocked out. First to 1,000 wins the match."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What if my connection drops mid-game?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Your seat and hand are held while the table decides whether to wait for you. Reload the page to take your seat back, or use Join a room on another device with the room code and the name you were playing under."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I host it on my own network?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. One computer runs the game server and everyone else joins over the same Wi-Fi. Rooms live only in the server’s memory and are gone when the last player leaves."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is this the official UNO game?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. It is a fan-made browser version built to the published rules of the 168-card No Mercy deck, with its own original card artwork. It is not affiliated with or endorsed by Mattel."
+            }
+          }
+        ]
       }
     </script>
   </head>
   <body class="bg-felt-950 text-white">
     <noscript>UNO No Mercy needs JavaScript to run in your browser.</noscript>
-    <div id="root"></div>
+    <!-- Crawlers that don't run scripts read this summary; React replaces it on the first render. -->
+    <div id="root">
+      <main>
+        <h1>UNO No Mercy</h1>
+        <p>
+          The 168-card shedding game that hits back, played free in your browser. Stack draws up to
+          +10, swap hands on a 7, and drop out the moment you hold 25 cards. Bring 2 to 20 friends,
+          or fill the table with computer players.
+        </p>
+        <h2>How to play UNO No Mercy</h2>
+        <p>
+          Everyone is dealt 7 cards. Play a card that matches the top card by color, number or
+          symbol, or a wild. If you can't play, keep drawing until you can. Answer a Draw card with
+          one of equal or higher value to stack it on to the next player. Anyone who reaches 25
+          cards is knocked out by the Mercy Rule. Empty your hand, or be the last player standing,
+          to win.
+        </p>
+        <h2>The action cards</h2>
+        <p>
+          Skip, Reverse, Draw 2, Draw 4, Discard All, Skip Everyone, Wild Reverse Draw 4, Wild Draw
+          6, Wild Draw 10 and Wild Color Roulette.
+        </p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

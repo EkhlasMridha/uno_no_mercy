@@ -41,15 +41,30 @@ export async function joinRoom(code: string, name: string, gender: Gender) {
 /**
  * Joins from an invite link without asking anything: under `savedName` when there is one, otherwise
  * (or when someone at the table already has it) under a random name the player can change in the lobby.
+ * With `inline`, a failure is returned for the caller to show next to its field instead of as a toast.
  */
-export async function joinFromInvite(code: string, savedName: string | null) {
+export async function joinFromInvite(
+  code: string,
+  savedName: string | null,
+  { inline = false }: { inline?: boolean } = {},
+) {
   const join = (name: string) => request('room:join', { code, name, gender: 'male' });
   let result = await join(savedName ?? randomPlayerName());
   for (let retry = 0; retry < 3 && !result.ok && result.error.code === 'NAME_TAKEN'; retry++) {
     result = await join(randomPlayerName());
   }
   if (result.ok) adoptSession(result.data);
-  return report(result);
+  return inline ? result : report(result);
+}
+
+/**
+ * Joins under exactly the name typed, with no random fallback: the server only hands a held seat
+ * back to the name it was held for (docs/RULES.md §5.16). Failures are returned, not toasted.
+ */
+export async function joinAs(code: string, name: string, gender: Gender) {
+  const result = await request('room:join', { code, name, gender });
+  if (result.ok) adoptSession(result.data);
+  return result;
 }
 
 /** Renames this player, or switches their avatar set, while in the lobby. */

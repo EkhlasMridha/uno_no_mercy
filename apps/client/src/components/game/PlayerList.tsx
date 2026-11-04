@@ -1,5 +1,5 @@
 import { Crown, Skull, WifiOff } from 'lucide-react';
-import type { PublicPlayerView } from '@nomercy/shared';
+import { MERCY_WARNING_AT, type PublicPlayerView } from '@nomercy/shared';
 import type { TableAvatars } from '../../lib/avatar';
 import { avatarGlow, PlayerAvatar } from '../PlayerAvatar';
 
@@ -63,7 +63,7 @@ export function PlayerList({
             )}
             <span
               className={`min-w-[2rem] rounded-full px-2 py-0.5 text-center text-sm font-bold tabular-nums ring-1 ${
-                p.handCount >= 20 && !out
+                p.handCount >= MERCY_WARNING_AT && !out
                   ? 'bg-rose-500/20 text-rose-200 ring-rose-400/60'
                   : 'bg-felt-950 text-chalk ring-white/15'
               }`}

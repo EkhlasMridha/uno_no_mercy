@@ -5,7 +5,8 @@ import { Modal } from '../ui/Modal';
 
 const sample = (card: CardFace): Card => ({ ...card, id: `crule${card.kind}` }) as Card;
 
-const CARD_RULES: Array<{ card: Card; text: ReactNode }> = [
+/** What each action card does, shared by this panel and the landing page. */
+export const CARD_RULES: Array<{ card: Card; text: ReactNode }> = [
   { card: sample({ kind: 'skip', color: 'blue' }), text: 'Next player loses their turn.' },
   {
     card: sample({ kind: 'reverse', color: 'green' }),

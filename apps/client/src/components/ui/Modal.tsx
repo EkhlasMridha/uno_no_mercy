@@ -37,9 +37,27 @@ export function Modal({
   }, []);
 
   useEffect(() => {
-    if (!dismissible || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && dismissible && onClose) onClose();
+      // Keep Tab inside the dialog: it is modal, so the page behind can't be reached.
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!first || !last) return;
+        if (
+          e.shiftKey &&
+          (document.activeElement === first || document.activeElement === dialogRef.current)
+        ) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -51,8 +69,12 @@ export function Modal({
       className={`fixed inset-0 z-50 flex justify-center p-4 ${
         overHand
           ? 'items-start bg-gradient-to-b from-black/75 via-black/45 to-transparent pt-3 sm:pt-[7vh] short:pt-4'
-          : 'items-end bg-black/60 backdrop-blur-sm sm:items-center'
+          : 'items-end bg-black/60 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center'
       }`}
+      // A press on the backdrop itself closes a dismissible dialog, as Escape and ✕ do.
+      onMouseDown={(e) => {
+        if (dismissible && onClose && e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         ref={dialogRef}
@@ -60,12 +82,17 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel anim-toast max-h-[90vh] w-full overflow-y-auto p-5 outline-none ${extraWide ? 'max-w-3xl' : wide || overHand ? 'max-w-2xl' : 'max-w-md'} ${overHand ? 'short:p-4' : ''}`}
+        className={`panel anim-toast max-h-[90dvh] w-full overflow-y-auto p-5 outline-none ${extraWide ? 'max-w-3xl' : wide || overHand ? 'max-w-2xl' : 'max-w-md'} ${overHand ? 'short:p-4' : ''}`}
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="font-display text-2xl tracking-wide">{title}</h2>
           {dismissible && onClose && (
-            <button type="button" className="btn-ghost p-2" onClick={onClose} aria-label="Close">
+            <button
+              type="button"
+              className="btn-ghost min-h-11 min-w-11 p-2"
+              onClick={onClose}
+              aria-label="Close"
+            >
               <X size={20} />
             </button>
           )}
