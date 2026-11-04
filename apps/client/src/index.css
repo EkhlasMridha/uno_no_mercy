@@ -111,9 +111,89 @@ body {
   .input[aria-invalid='true'] {
     @apply bg-rose-500/10 ring-2 ring-rose-400 placeholder:text-rose-200/50;
   }
+  /* button sizes: the top bar, a secondary action, and the landing page's one big action */
+  .btn-nav {
+    @apply min-h-11 px-3 py-2 text-sm;
+  }
+  .btn-lg {
+    @apply px-6 py-3.5 text-lg;
+  }
+  .btn-hero {
+    @apply min-w-[12rem] px-10 py-4 font-display text-3xl tracking-wide;
+  }
+  /* a short message in a tinted box: an invite on its way, a join that failed */
+  .notice {
+    @apply rounded-xl px-3 py-2 text-sm ring-1;
+  }
+
+  /* ---- landing page ---- */
+  .landing-section {
+    scroll-margin-top: 4.5rem;
+  }
+  .landing-container {
+    @apply mx-auto max-w-6xl px-4 py-16 sm:py-24;
+  }
+  .landing-h2 {
+    @apply font-display text-[clamp(2.25rem,5vw,3.5rem)] leading-[0.95] text-chalk;
+  }
+  .landing-h3 {
+    @apply font-display text-2xl leading-tight text-chalk;
+  }
+  /* the title of a section's feature block, such as a demo with its explanation */
+  .landing-h3-lg {
+    @apply font-display text-3xl leading-tight text-chalk;
+  }
+  .landing-lede {
+    @apply mt-4 max-w-[40rem] text-lg leading-relaxed text-chalk/75;
+  }
+  .landing-body {
+    @apply mt-3 max-w-[38rem] leading-relaxed text-chalk/75;
+  }
+  /* body text tucked right under a heading in a compact block */
+  .landing-caption {
+    @apply mt-1 leading-relaxed text-chalk/75;
+  }
+  .landing-faq summary::-webkit-details-marker {
+    display: none;
+  }
   .card-symbol-text {
     paint-order: stroke fill;
     -webkit-text-stroke: 3px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* keep anchor jumps and focused controls clear of the landing page's sticky top bar */
+html {
+  scroll-padding-top: 4.5rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* the wordmark: neon gold, with the four card colors printed off-register behind it, dealt out once */
+.landing-wordmark {
+  color: #ffc22e;
+  text-shadow:
+    0.035em 0.035em 0 #e5383b,
+    0.07em 0.07em 0 #2f6fe0,
+    0.105em 0.105em 0 #22a559,
+    0 0 0.6em rgba(255, 194, 46, 0.35);
+  animation: wordmark-deal 900ms cubic-bezier(0.2, 0.8, 0.3, 1.1) 150ms both;
+}
+@keyframes wordmark-deal {
+  from {
+    text-shadow:
+      0 0 0 #e5383b,
+      0 0 0 #2f6fe0,
+      0 0 0 #22a559,
+      0 0 0 rgba(255, 194, 46, 0);
+    transform: translateY(0.12em) rotate(-2deg);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
   }
 }
 

@@ -23,10 +23,21 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
   new lines arrive while you are reading older ones.
 - **Invite links** (`?join=CODE`) join without asking: under the name this browser last used (kept in
   `localStorage`), or a random one like "Lucky Otter" when there is none or it is taken, with the male
-  avatar set. The player can rename and switch avatar set in the lobby; a rename is remembered.
-- **Play with computer** skips the lobby: the player picks 1–9 computer opponents, the server seats
-  them under generated names and deals the first round at once. Computers move by themselves after a
-  short pause; the player is the host for Next round and Back to lobby. The room closes when they leave.
+  avatar set. The player can rename and switch avatar set in the lobby; a rename is remembered. An
+  invite is used once per page load, so leaving that room (or being removed from it) does not join it
+  again. If the join fails, the page says why and makes "Join CODE" the main button, with "Start my
+  own room" beside it; only a code the server couldn't find opens the join popup to check it.
+- **The landing page** (`HomePage.tsx`) is the brand page: a shuffling deck (two deals, then it
+  rests), the rules with small hands-on demos (stacking, the Mercy Rule), every action card and an
+  FAQ. The top bar has How to play, Cards, FAQ, Join and Play; on phones only How to play (as an
+  icon) and Play. **Play** opens a lobby at once as host, under the name this browser last used or a
+  random one, with the male avatar set and 4 seats; all of it can be changed in the lobby, and
+  computers fill the open seats from there. While the server is unreachable, Play reads
+  "Connecting…" and a line under it says why. **Join a room** opens a popup for the room code (a
+  pasted invite link or invite text works too) and an optional name. A typed name is sent exactly,
+  with no random fallback, so a held seat can be taken back from another device (docs/RULES.md
+  §5.16); join errors show inside the popup. The FAQ in `index.html`'s JSON-LD mirrors the one on
+  the page.
 - **Filling empty seats:** when the host presses Start with seats still open, a prompt shows the table
   with computers in the open seats. "Add N computers and start" fills them (up to 9); "Start with N
   players" starts as is (only with 2 or more people). A host on their own can start this way.
