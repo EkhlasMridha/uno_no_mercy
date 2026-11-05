@@ -1,5 +1,10 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer, request as httpRequest, type Server as HttpServer } from 'node:http';
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type Server as HttpServer,
+} from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -637,6 +642,7 @@ describe('network guard', () => {
         '<meta property="og:image" content="/social-card.jpg" />' +
         '<meta property="og:url" content="/" />',
     );
+    writeFileSync(path.join(siteDir, 'social-card.jpg'), 'jpeg');
     guarded = createServer(createHttpApp(siteDir));
     const { io } = createSocketServer(guarded, {
       rng: seededRng(7),
@@ -685,6 +691,15 @@ describe('network guard', () => {
       expect(page.body).toContain(`content="http://${host}/social-card.jpg"`);
       expect(page.body).toContain(`content="http://${host}/"`);
     }
+  });
+
+  it('lets other sites embed the share image but nothing else', async () => {
+    const host = new URL(guardedUrl).host;
+    const image = await get('/social-card.jpg', host);
+    expect(image.status).toBe(200);
+    expect(image.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    const page = await get('/', host);
+    expect(page.headers['cross-origin-resource-policy']).toBe('same-origin');
   });
 
   it('answers malformed requests without stack traces or file paths', async () => {
@@ -922,13 +937,15 @@ function tryConnectTo(url: string, headers: Record<string, string> = {}) {
 }
 
 function getFrom(url: string, pathname: string, headers: Record<string, string>) {
-  return new Promise<{ status: number; body: string }>((resolve, reject) => {
-    const req = httpRequest(`${url}${pathname}`, { headers }, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
-    });
-    req.on('error', reject);
-    req.end();
-  });
+  return new Promise<{ status: number; body: string; headers: IncomingHttpHeaders }>(
+    (resolve, reject) => {
+      const req = httpRequest(`${url}${pathname}`, { headers }, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body, headers: res.headers }));
+      });
+      req.on('error', reject);
+      req.end();
+    },
+  );
 }
