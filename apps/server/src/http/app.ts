@@ -3,6 +3,9 @@ import express, { type ErrorRequestHandler, type Express, type RequestHandler } 
 import { createIndexPage } from './index-page.js';
 import { createRequestGuard, type RequestGuardOptions } from './request-guard.js';
 
+/** The link-preview image named by og:image and twitter:image in the client's index.html. */
+const SHARE_IMAGE_PATH = '/social-card.jpg';
+
 function httpStatusOf(error: unknown): number {
   const status =
     typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
@@ -56,6 +59,12 @@ export function createHttpApp(
       express.static(path.join(clientDist, 'assets'), { immutable: true, maxAge: '30d' }),
     );
     app.get('/index.html', sendIndex);
+    // WhatsApp and Messenger on the web and desktop load the link-preview image straight from
+    // this server inside their own page, which a same-origin resource policy blocks.
+    app.get(SHARE_IMAGE_PATH, (_req, res, next) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      next();
+    });
     app.use(express.static(clientDist, { index: false, maxAge: 0 }));
     app.get('*', sendIndex);
   } else {

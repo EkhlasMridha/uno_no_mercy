@@ -183,8 +183,9 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   disconnected. Socket.IO payloads are capped at 16 KB.
 - **Secrets:** reconnect tokens are 256-bit random values compared in constant time. They are never placed
   in URLs or logs and are only sent to their owner. Logs record room events, never hands or tokens.
-- **HTTP:** CSP `default-src 'self'`, `nosniff`, `frame-ancestors 'none'`, COOP/CORP `same-origin`, a
-  `Permissions-Policy` that turns off camera, microphone and location, no `x-powered-by`. Error responses
+- **HTTP:** CSP `default-src 'self'`, `nosniff`, `frame-ancestors 'none'`, COOP/CORP `same-origin`
+  (CORP is `cross-origin` on `/social-card.jpg` only, so web and desktop messengers can show the link
+  preview), a `Permissions-Policy` that turns off camera, microphone and location, no `x-powered-by`. Error responses
   are plain "Bad request" / "Server error" with no stack trace. All assets, including the font, are bundled
   locally. Headers must arrive within 10 s and a request within 30 s; the server holds at most 1,000 sockets.
 - **Host surface:** nothing a player sends reaches the file system, a shell, `eval` or a database. Static
