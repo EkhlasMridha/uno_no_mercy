@@ -187,7 +187,8 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   (CORP is `cross-origin` on `/social-card.jpg` only, so web and desktop messengers can show the link
   preview), a `Permissions-Policy` that turns off camera, microphone and location, no `x-powered-by`. Error responses
   are plain "Bad request" / "Server error" with no stack trace. All assets, including the font, are bundled
-  locally. Headers must arrive within 10 s and a request within 30 s; the server holds at most 1,000 sockets.
+  locally. The one exception is Google Tag Manager (`public/analytics.js`), which the CSP lets load from
+  `googletagmanager.com` and report to Google Analytics; without internet it fails silently. Headers must arrive within 10 s and a request within 30 s; the server holds at most 1,000 sockets.
 - **Host surface:** nothing a player sends reaches the file system, a shell, `eval` or a database. Static
   files come only from the client bundle, through Express's traversal-safe `static`. The server ignores
   `X-Forwarded-*` headers unless `TRUST_PROXY` is set for a reverse proxy; then it takes the public host
