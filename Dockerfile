@@ -1,7 +1,8 @@
 # One image runs everything: the Node server serves the built client bundle and the Socket.IO API.
-# The runtime stage holds only the node binary, one bundled server file and the static client.
+# The runtime stage holds only node, one bundled server file and the static client.
+# Both stages track node:22-alpine, so a rebuild picks up the latest Node 22 and Alpine patches.
 
-FROM node:22-alpine3.23 AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
@@ -14,10 +15,11 @@ COPY apps/server apps/server
 COPY apps/client apps/client
 RUN npm run build && npm run bundle -w @nomercy/server && find apps/client/dist -name '*.map' -delete
 
-# Same Alpine release as the build image, so node's musl and libstdc++ match.
-FROM alpine:3.23 AS runtime
-COPY --from=build /usr/local/bin/node /usr/local/bin/node
-COPY --from=build /usr/lib/libstdc++.so.6 /usr/lib/libgcc_s.so.1 /usr/lib/
+# The same base as the build, so the two always match. The server runs on node alone, so the package
+# managers are removed from the running container.
+FROM node:22-alpine AS runtime
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+  /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 WORKDIR /app
 COPY --from=build /app/apps/server/bundle/server.mjs ./server.mjs
 COPY --from=build /app/apps/client/dist ./public
