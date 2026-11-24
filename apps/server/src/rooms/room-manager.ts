@@ -23,6 +23,7 @@ import {
   type Rng,
 } from '../engine/index.js';
 import { CommandCache } from '../net/command-cache.js';
+import type { SeatRegion } from './region.js';
 import {
   chooseComputerMove,
   computerMoves,
@@ -108,6 +109,8 @@ export interface GlobalSeat {
   gender: Gender;
   avatar: number;
   socketId: string | null;
+  /** A person's rough region, for matchmaking only (`region.ts`). Null for computers and unknowns. */
+  region?: SeatRegion | null;
 }
 
 export interface JoinResult {

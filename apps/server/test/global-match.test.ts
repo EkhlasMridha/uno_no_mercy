@@ -4,8 +4,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { io as connect, type Socket } from 'socket.io-client';
 import {
   AVATAR_VARIANTS,
+  GLOBAL_TABLE_SIZE,
   MATCH_EMOTE_COOLDOWN_MS,
+  MATCH_FOUND_PAUSE_MS,
   playerNameSchema,
+  searchMatchSchema,
   type Ack,
   type ClientToServerEvents,
   type GameStateView,
@@ -21,6 +24,7 @@ import { chooseComputerMove } from '../src/rooms/computer-player.js';
 import { requestHand } from '../src/rooms/hand-share.js';
 import { humanizeMoves, pickAvatar, screenNames, thinkingTimeMs } from '../src/rooms/human-like.js';
 import { Matchmaker } from '../src/rooms/matchmaker.js';
+import { regionDistance, regionOf, UNKNOWN_REGION_DISTANCE } from '../src/rooms/region.js';
 import { toGameView, toRoomView } from '../src/rooms/projections.js';
 import { RoomError, RoomManager, type GlobalSeat } from '../src/rooms/room-manager.js';
 import type { Room } from '../src/rooms/room.types.js';
@@ -28,7 +32,7 @@ import { buildState, cardId, filler, n, PLAYER_IDS } from './helpers.js';
 
 const SEARCH_MS = 90_000;
 const WINDOW_MS = 25_000;
-const PAUSE_MS = 1_500;
+const PAUSE_MS = MATCH_FOUND_PAUSE_MS;
 
 function newManager(seed = 7, onRoomUpdated: (room: Room) => void = () => {}) {
   return new RoomManager({
@@ -90,12 +94,12 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
 
   it('deals a full table of people at once, with no computers', () => {
     const { matchmaker, ready } = newMatchmaker();
-    ['A', 'B', 'C', 'D'].forEach((name, i) => matchmaker.search(`s${i}`, name, 'male'));
+    for (let i = 0; i < GLOBAL_TABLE_SIZE; i++) matchmaker.search(`s${i}`, `P${i}`, 'male');
     expect(matchmaker.viewFor(matchmaker.matchOf('s0')!, 'x').found).toBe(true);
     expect(ready).toHaveLength(0);
     vi.advanceTimersByTime(PAUSE_MS);
     expect(ready).toHaveLength(1);
-    expect(people(ready[0]!)).toHaveLength(4);
+    expect(people(ready[0]!)).toHaveLength(GLOBAL_TABLE_SIZE);
     // The next searcher starts a new match.
     expect(matchmaker.isSearching('s0')).toBe(false);
   });
@@ -117,14 +121,14 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
     vi.advanceTimersByTime(PAUSE_MS);
     expect(ready).toHaveLength(1);
     const seats = ready[0]!;
-    expect(seats).toHaveLength(4);
+    expect(seats).toHaveLength(GLOBAL_TABLE_SIZE);
     expect(people(seats).map((s) => s.name)).toEqual(['Solo']);
     for (const s of seats) {
       expect(playerNameSchema.safeParse(s.name).success).toBe(true);
       expect(s.avatar).toBeGreaterThanOrEqual(0);
       expect(s.avatar).toBeLessThan(AVATAR_VARIANTS);
     }
-    expect(new Set(seats.map((s) => s.name.toLowerCase())).size).toBe(4);
+    expect(new Set(seats.map((s) => s.name.toLowerCase())).size).toBe(GLOBAL_TABLE_SIZE);
   });
 
   it('lets a person take a free seat while computers are arriving', () => {
@@ -157,14 +161,14 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
 
   it('gives a seat left during the pause to a computer, and deals nothing if all people left', () => {
     const { matchmaker, ready } = newMatchmaker();
-    ['A', 'B', 'C', 'D'].forEach((name, i) => matchmaker.search(`s${i}`, name, 'male'));
-    matchmaker.cancel('s3');
+    for (let i = 0; i < GLOBAL_TABLE_SIZE; i++) matchmaker.search(`s${i}`, `P${i}`, 'male');
+    matchmaker.cancel('s0');
     vi.advanceTimersByTime(PAUSE_MS);
-    expect(ready[0]).toHaveLength(4);
-    expect(people(ready[0]!)).toHaveLength(3);
+    expect(ready[0]).toHaveLength(GLOBAL_TABLE_SIZE);
+    expect(people(ready[0]!)).toHaveLength(GLOBAL_TABLE_SIZE - 1);
 
-    ['E', 'F', 'G', 'H'].forEach((name, i) => matchmaker.search(`t${i}`, name, 'male'));
-    ['t0', 't1', 't2', 't3'].forEach((id) => matchmaker.cancel(id));
+    for (let i = 0; i < GLOBAL_TABLE_SIZE; i++) matchmaker.search(`t${i}`, `Q${i}`, 'male');
+    for (let i = 0; i < GLOBAL_TABLE_SIZE; i++) matchmaker.cancel(`t${i}`);
     vi.advanceTimersByTime(PAUSE_MS);
     expect(ready).toHaveLength(1);
   });
@@ -210,6 +214,81 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
     const b = matchmaker.search('s2', 'sam', 'female');
     expect(b.match).not.toBe(a.match);
     expect(() => matchmaker.search('s1', 'Other', 'male')).toThrow(RoomError);
+  });
+});
+
+describe('Play global regions: nearer players join the base player first (§5.19)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads a time zone into an offset and measures the gap the short way round', () => {
+    const at = new Date('2026-01-15T12:00:00Z');
+    expect(regionOf('Asia/Dhaka', at)).toEqual({
+      timeZone: 'Asia/Dhaka',
+      area: 'Asia',
+      offsetMinutes: 360,
+    });
+    expect(regionOf('America/St_Johns', at)?.offsetMinutes).toBe(-210);
+    expect(regionOf('UTC', at)?.offsetMinutes).toBe(0);
+    expect(regionOf('Mars/Olympus', at)).toBeNull();
+    expect(regionOf(undefined, at)).toBeNull();
+
+    const dhaka = regionOf('Asia/Dhaka', at);
+    expect(regionDistance(dhaka, regionOf('Asia/Dhaka', at))).toBe(0);
+    expect(regionDistance(dhaka, regionOf('Asia/Kolkata', at))).toBe(0.5);
+    // Same clock gap, other area: a little further.
+    expect(regionDistance(regionOf('Europe/London', at), regionOf('Africa/Abidjan', at))).toBe(1);
+    // Auckland (+13) and Honolulu (-10) are 1 hour apart across the date line, plus the area.
+    expect(regionDistance(regionOf('Pacific/Auckland', at), regionOf('Pacific/Honolulu', at))).toBe(
+      1,
+    );
+    expect(regionDistance(dhaka, null)).toBe(UNKNOWN_REGION_DISTANCE);
+  });
+
+  it('refuses a time zone that is not a plain zone name', () => {
+    const base = { name: 'Ana', gender: 'female' };
+    expect(searchMatchSchema.safeParse({ ...base, timeZone: 'Asia/Dhaka' }).success).toBe(true);
+    expect(searchMatchSchema.safeParse(base).success).toBe(true);
+    expect(searchMatchSchema.safeParse({ ...base, timeZone: '<script>' }).success).toBe(false);
+    expect(searchMatchSchema.safeParse({ ...base, timeZone: 'x'.repeat(65) }).success).toBe(false);
+  });
+
+  it('seats a searcher with the nearest base player, even over an older match', () => {
+    vi.setSystemTime(new Date('2026-01-15T12:00:00Z'));
+    const { matchmaker } = newMatchmaker();
+    const dhaka = matchmaker.search('s1', 'Sam', 'male', 'Asia/Dhaka');
+    // Same name, so a second match opens, with a London base.
+    const london = matchmaker.search('s2', 'Sam', 'male', 'Europe/London');
+    expect(london.match).not.toBe(dhaka.match);
+
+    expect(matchmaker.search('s3', 'Pierre', 'male', 'Europe/Paris').match).toBe(london.match);
+    expect(matchmaker.search('s4', 'Priya', 'female', 'Asia/Kolkata').match).toBe(dhaka.match);
+    // No region known: every base is as near, so the oldest match comes first.
+    expect(matchmaker.search('s5', 'Lee', 'male').match).toBe(dhaka.match);
+  });
+
+  it('hands the base to the next person when the first one leaves', () => {
+    vi.setSystemTime(new Date('2026-01-15T12:00:00Z'));
+    const { matchmaker } = newMatchmaker();
+    const first = matchmaker.search('s1', 'Sam', 'male', 'Asia/Dhaka');
+    matchmaker.search('s2', 'Olga', 'female', 'Europe/Moscow');
+    expect(matchmaker.baseOf(first.match)?.name).toBe('Sam');
+    matchmaker.cancel('s1');
+    expect(matchmaker.baseOf(first.match)?.name).toBe('Olga');
+  });
+
+  it("keeps every searcher's region to the server", () => {
+    const { matchmaker } = newMatchmaker();
+    const { match, seat } = matchmaker.search('s1', 'Sam', 'male', 'Asia/Dhaka');
+    matchmaker.search('s2', 'Olga', 'female', 'Europe/Moscow');
+    const view = JSON.stringify(matchmaker.viewFor(match, seat.id));
+    expect(view).not.toContain('Asia');
+    expect(view).not.toContain('Europe');
+    expect(view).not.toContain('offset');
   });
 });
 
@@ -434,7 +513,10 @@ describe('Play global over Socket.IO', () => {
       name: 'Ana',
       gender: 'female',
     });
-    expect(searched).toMatchObject({ ok: true, data: { tableSize: 4, found: false } });
+    expect(searched).toMatchObject({
+      ok: true,
+      data: { tableSize: GLOBAL_TABLE_SIZE, found: false },
+    });
     const twice = await a.emit('match:search', { name: 'Ana', gender: 'female' });
     expect(twice).toMatchObject({ ok: false, error: { code: 'ALREADY_IN_ROOM' } });
     const create = await a.emit('room:create', { name: 'Ana', gender: 'female', maxPlayers: 4 });
@@ -447,7 +529,7 @@ describe('Play global over Socket.IO', () => {
     expect(a.found()!.roomCode).toBe(b.found()!.roomCode);
     expect(a.found()!.playerId).toBe(a.search.at(-1)!.meId);
     expect(a.seen.room!.mode).toBe('global');
-    expect(a.seen.room!.players).toHaveLength(4);
+    expect(a.seen.room!.players).toHaveLength(GLOBAL_TABLE_SIZE);
     expect(
       a.seen.game!.public.players.every((p) => !p.isComputer && p.gender && p.avatar !== null),
     ).toBe(true);

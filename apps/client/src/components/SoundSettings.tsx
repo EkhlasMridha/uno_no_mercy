@@ -16,6 +16,7 @@ import {
   Siren,
   Sparkles,
   Trophy,
+  UserPlus,
   Volume2,
   VolumeX,
   type LucideIcon,
@@ -111,6 +112,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Win',
     description: 'A fanfare for everyone when a player wins the round.',
     Icon: Trophy,
+  },
+  {
+    kind: 'playerFound',
+    label: 'Player found',
+    description: 'A soft pop as each player found by Play global takes their seat.',
+    Icon: UserPlus,
   },
   {
     kind: 'chatMessage',

@@ -10,13 +10,19 @@ const emptySchema = z.object({}).strict();
 export function registerMatchHandlers(deps: HandlerDeps): void {
   const { socket, matchmaker, limiter } = deps;
 
-  registerHandler(socket, limiter, 'match:search', searchMatchSchema, ({ name, gender }) => {
-    if (socket.data.session) {
-      throw new RoomError('ALREADY_IN_ROOM', 'Leave your current room first');
-    }
-    const { match, seat } = matchmaker.search(socket.id, name, gender);
-    return { ok: true, data: matchmaker.viewFor(match, seat.id) };
-  });
+  registerHandler(
+    socket,
+    limiter,
+    'match:search',
+    searchMatchSchema,
+    ({ name, gender, timeZone }) => {
+      if (socket.data.session) {
+        throw new RoomError('ALREADY_IN_ROOM', 'Leave your current room first');
+      }
+      const { match, seat } = matchmaker.search(socket.id, name, gender, timeZone);
+      return { ok: true, data: matchmaker.viewFor(match, seat.id) };
+    },
+  );
 
   registerHandler(socket, limiter, 'match:cancel', emptySchema, () => {
     matchmaker.cancel(socket.id);

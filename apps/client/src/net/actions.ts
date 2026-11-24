@@ -88,9 +88,22 @@ export const transferHost = async (playerId: string) =>
 
 // ---- Play global (docs/RULES.md §5.19) ----
 
+/**
+ * The browser's time zone, a rough region so the server can match nearby players first. Left out
+ * when the browser does not report a plain IANA name.
+ */
+function browserTimeZone(): string | undefined {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return /^[A-Za-z0-9_+\-/]{1,64}$/.test(zone) ? zone : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Starts searching for a global match. The search screen opens once the server has seated you. */
 export async function searchMatch(name: string, gender: Gender) {
-  const result = await request('match:search', { name, gender });
+  const result = await request('match:search', { name, gender, timeZone: browserTimeZone() });
   if (result.ok) {
     setState({
       search: searchState(result.data),

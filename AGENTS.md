@@ -138,7 +138,7 @@ These keep the game fair and the code testable. Do not trade them away for conve
   `assets/sounds/flesh-impact.mp3`, bundled so it works offline), then the
   mocking trombone everyone hears, the danger alarm when the Mercy Rule knocks a player out at 25 cards (followed by the
   trombone), the win, which everyone hears whoever wins, and, in the lobby only, a soft blip when someone else
-  sends a chat message. `useGameSounds` plays them only from
+  sends a chat message, and a bubble pop as each Play global player takes their seat. `useGameSounds` plays them only from
   state the server sent, and the Sound panel
   (`SoundSettings.tsx`) switches each one off or mutes them all.
 

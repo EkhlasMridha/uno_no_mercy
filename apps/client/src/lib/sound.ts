@@ -21,7 +21,8 @@ export type SoundKind =
   | 'hammer'
   | 'knockout'
   | 'win'
-  | 'chatMessage';
+  | 'chatMessage'
+  | 'playerFound';
 
 /** Which sounds the player has switched on, and whether all of them are muted. */
 export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
@@ -421,6 +422,14 @@ const SOUNDS: Record<
     for (let i = 0; i < 6; i++) {
       tone(ac, ac.destination, 'sine', at + 0.6 + i * 0.13, 0.2, 0.05, 2000 + Math.random() * 2000);
     }
+  },
+  // A Play global player found: the bubble they arrive in pops, a quick upward "plop" and a tiny
+  // wet click, with a faint shimmer after it.
+  playerFound(ac, at) {
+    const out = ac.destination;
+    tone(ac, out, 'sine', at, 0.08, 0.3, 380, 1500);
+    noise(ac, at, 0.025, 0.12, 3200, 2600, 0.05);
+    tone(ac, out, 'sine', at + 0.06, 0.25, 0.05, 2093);
   },
   // A new lobby chat message: a soft two-note bubble "blip", G5 up to D6, short and quiet so a busy
   // chat never drowns the room.

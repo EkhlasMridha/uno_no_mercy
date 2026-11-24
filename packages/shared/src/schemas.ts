@@ -53,7 +53,16 @@ export const reconnectSchema = z
   .strict();
 /** Play global: start searching for a match under this name and avatar set (docs/RULES.md §5.19). */
 export const searchMatchSchema = z
-  .object({ name: playerNameSchema, gender: genderSchema })
+  .object({
+    name: playerNameSchema,
+    gender: genderSchema,
+    /** The browser's IANA time zone, a rough region so nearby players are matched first. */
+    timeZone: z
+      .string()
+      .max(64)
+      .regex(/^[A-Za-z0-9_+\-/]+$/, 'Unknown time zone')
+      .optional(),
+  })
   .strict();
 /** Play global: an emote to everyone in your match while you wait (docs/RULES.md §5.19). */
 export const matchEmoteSchema = z.object({ emote: z.enum(MATCH_EMOTES) }).strict();
