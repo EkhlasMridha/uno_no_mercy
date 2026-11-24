@@ -53,6 +53,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
 
 1. The server sends each player `game:state`. Their `validActions` list the playable card ids and say
    whether they may draw, take a penalty, name a roulette color, call UNO or catch someone.
+   At the start of every round the cards are dealt first (RULES.md §5.18): one at a time round the table,
+   each player's hand and seat count filling as their cards land, and the first discard turned over at the
+   end. Until then nothing is open to anyone, and the status line says the cards are being dealt.
 2. The player clicks a highlighted card.
    - Wild (except Roulette): the client asks for a color first.
    - Colored 7 with more cards left: the client asks for a swap target first.

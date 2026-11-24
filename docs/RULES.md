@@ -39,7 +39,8 @@ its face or deck position.
 ## 3. Setup
 
 1. Shuffle all 168 cards (unbiased Fisher–Yates, `crypto.randomInt`).
-2. Deal 7 cards to each player, one at a time, starting left of the dealer.
+2. Deal 7 cards to each player, one at a time, starting left of the dealer. Nobody may act until the
+   deal is over (§5.18).
 3. The remaining cards form the face-down draw pile.
 4. Flip the top card to start the discard pile. **If it is an action card (any non-number card, wilds
    included), ignore it and flip the next one** (official). Ignored cards stay in the discard pile under the
@@ -259,6 +260,22 @@ show them their hand.
    leaves, and when the round ends (every hand is then open to all anyway, §5.14). Every request is cleared when a new round is dealt. A player who
    forfeited has left the table and can't ask. Sharing never changes the game: it only decides whose
    hand one player's view includes.
+
+### 5.18 Waiting for the deal (house rule)
+
+The table deals the opening hands the way a person would: one card at a time, round the table from the
+dealer's left, seven rounds. Every player watches their hand and everyone else's fill up card by card.
+
+1. **Nobody acts during the deal:** until the last card lands, no one may play, draw, take a penalty or
+   catch anyone, and that includes the player who goes first and computer players. Calling UNO can't arise
+   with seven cards. Leaving still works.
+2. **How long:** the pace depends on the table size (`dealTiming` in `packages/shared/src/deal.ts`): about
+   a quarter of a second per card for two players, faster for bigger tables so the deal takes about 5
+   seconds (just over 6 at 20 players). It always ends, because it is a fixed length of time.
+3. **The first discard** is turned over once everyone has their cards, and the color in play shows with it.
+4. **Edge cases:** a player who reloads or reconnects mid-deal sees the deal carry on from where the table
+   is; one who arrives after it sees the hands as they are. A player who leaves during the deal forfeits as
+   at any other time. Every round is dealt this way, the first and each one after it.
 
 ## 6. Ambiguities and chosen policies
 

@@ -47,6 +47,7 @@ beforeAll(async () => {
     reconnectGraceMs: 60_000,
     checkInvariants: true,
     turnHoldMs: 0,
+    dealHold: false,
   });
   closeServer = () => io.close();
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));

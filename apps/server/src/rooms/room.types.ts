@@ -55,6 +55,8 @@ export interface Room {
   computerTimer: ReturnType<typeof setTimeout> | null;
   /** When the UNO breather after the last play or turn change ends (epoch ms; 0 for none). */
   turnHoldUntil: number;
+  /** When the opening deal finishes (epoch ms; 0 for none). Nobody acts before then (§5.18). */
+  dealUntil: number;
   /** Re-sends the table when the breather ends, so clients see their actions open again. */
   holdTimer: ReturnType<typeof setTimeout> | null;
   /** Hand-sharing requests this round. Cleared when a round is dealt. */

@@ -189,6 +189,11 @@ export interface GameStateView {
    * it runs, `validActions` only offers calling UNO; 0 when the table is open.
    */
   turnHoldMs: number;
+  /**
+   * Milliseconds left in the opening deal (docs/RULES.md §5.18). While the cards go round, nobody
+   * may act and `validActions` offers nothing; 0 once the deal is over.
+   */
+  dealMs: number;
   /** The whole table laid open, once the round is finished; null before that. */
   reveal: RoundReveal | null;
 }

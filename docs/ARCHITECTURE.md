@@ -121,6 +121,15 @@ still go through. `toGameView` sends `turnHoldMs` and strips every action except
 `validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
 A play that hands the turn straight back to its player skips the hold unless a player is left
 vulnerable to a catch (`needsTurnHold`). Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+The timer checks the clock again when it fires and waits out any remainder, because Node timers can fire
+a millisecond early; re-sending then would leave the next player looking at a held table.
+
+**Opening deal.** Dealing a round sets `room.dealUntil` to `dealTiming(players).totalMs` ahead
+(`packages/shared/src/deal.ts`, docs/RULES.md §5.18). It holds the same commands as the breather (with
+its own message), `toGameView` sends `dealMs` and strips `validActions` the same way, computers wait for
+it, and the same `holdTimer` re-broadcasts when it ends. The client animates the deal from `dealMs`
+(`useDeal`, `DealAnimation.tsx`), so a page that joins mid-deal picks up where the table is. Tests that
+are not about the deal pass `dealHold: false`.
 
 ## Network protocol
 

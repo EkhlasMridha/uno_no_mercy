@@ -92,16 +92,7 @@ export function startConnection(): void {
   socket.on('connect_error', () => setState({ connection: 'disconnected' }));
 
   socket.on('room:state', (room) => {
-    setState((s) => {
-      // Watching the game start live, rather than joining one already going: deal the cards out.
-      const dealt =
-        s.room?.code === room.code && s.room.status !== 'inGame' && room.status === 'inGame';
-      return {
-        room,
-        game: room.status === 'lobby' ? null : s.game,
-        dealtAt: dealt ? performance.now() : s.dealtAt,
-      };
-    });
+    setState((s) => ({ room, game: room.status === 'lobby' ? null : s.game }));
   });
   socket.on('game:state', (game) => setState({ game }));
   socket.on('chat:history', (chat) => setState({ chat }));

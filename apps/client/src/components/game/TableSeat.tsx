@@ -108,7 +108,7 @@ export function TableSeat({
           <PlayerAvatar traits={avatar} className="h-full w-full" />
           {lastPlayed && (
             <LastPlayedCard
-              key={lastPlayed.seq}
+              key={`play-${lastPlayed.seq}`}
               play={lastPlayed}
               side={Math.cos(rad) < -0.3 ? 'left' : 'right'}
               inwardOnPhone={Math.abs(Math.cos(rad)) > 0.3}
@@ -123,7 +123,7 @@ export function TableSeat({
             </span>
           )}
           <span
-            key={player.handCount}
+            key={`count-${player.handCount}`}
             className={[
               'anim-bump absolute -bottom-1 -right-2 z-10 min-w-[1.4rem] rounded-full px-1 text-center font-sans text-[11px] font-bold leading-[1.15rem] tabular-nums ring-2',
               danger

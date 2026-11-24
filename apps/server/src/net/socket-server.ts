@@ -16,6 +16,8 @@ export interface SocketServerOptions {
   computerMoveDelayMs?: number;
   /** Length of the UNO breather after each play or turn change. Defaults to `TURN_HOLD_MS`. */
   turnHoldMs?: number;
+  /** Whether a new round waits out the opening deal before anyone acts. Default on. */
+  dealHold?: boolean;
   /** Allowed browser origins for cross-origin dev setups. Same-origin needs nothing. */
   corsOrigins?: string[];
   /** Extra hostnames accepted in the Host header, besides IPs, localhost and this machine. */
@@ -74,6 +76,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     checkInvariants: options.checkInvariants,
     computerMoveDelayMs: options.computerMoveDelayMs,
     turnHoldMs: options.turnHoldMs,
+    dealHold: options.dealHold,
     onRoomUpdated: (room) => broadcaster.room(room),
     onRoomClosed: (room, reason) => {
       console.info(`[room ${room.code}] closed: ${reason}`);

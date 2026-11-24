@@ -30,6 +30,7 @@ import { PlayedCardsModal } from '../components/modals/PlayedCardsModal';
 import { RulesPanel } from '../components/modals/RulesPanel';
 import { SwapTargetModal } from '../components/modals/SwapTargetModal';
 import { Modal } from '../components/ui/Modal';
+import { useDeal } from '../hooks/useDeal';
 import { useEventBanners } from '../hooks/useEventBanners';
 import { useGameSounds } from '../hooks/useGameSounds';
 import { useLastPlay } from '../hooks/useLastPlay';
@@ -58,7 +59,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const meId = game.me.playerId;
   const view = game.public;
   const actions = game.me.validActions;
-  const hand = game.me.hand;
+  // While the cards go round, your hand fills one card at a time as each lands (§5.18).
+  const deal = useDeal(game);
+  const dealing = deal !== null;
+  const hand = deal ? game.me.hand.slice(0, deal.dealtTo(meId)) : game.me.hand;
   // Roulette cards stay face up on the table until the reveal ends, then join the fan.
   const onTable =
     view.phase.type === 'rouletteReveal' && view.phase.victimId === meId
@@ -116,8 +120,8 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     if (!finished) setResultsClosed(false);
   }, [finished]);
   // The UNO breather after a play: only calling UNO is open (docs/RULES.md §5.9).
-  const held = game.turnHoldMs > 0;
-  const myMove = isMyTurn && !finished && me?.status === 'active';
+  const held = game.turnHoldMs > 0 || game.dealMs > 0 || dealing;
+  const myMove = isMyTurn && !finished && !dealing && me?.status === 'active';
   const out = me?.status === 'eliminated';
 
   // Knocked out mid-round: say so once, the moment it happens (a reload into it stays quiet).
@@ -147,7 +151,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
   const nudge = useGameSounds(
     view,
     meId,
-    !finished && (isMyTurn || actions.canChooseRouletteColor),
+    !finished && !dealing && (isMyTurn || actions.canChooseRouletteColor),
     game.version,
     avatarOf,
   );
@@ -229,6 +233,10 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
 
   const onCardClick = (card: Card) => {
     if (finished || sendingRef.current) return;
+    if (dealing || game.dealMs > 0) {
+      pushNotice('info', 'Wait for the deal to finish.', 2000);
+      return;
+    }
     if (held) {
       pushNotice('info', 'Hold on: everyone gets 2 seconds to call UNO after a play.', 2000);
       return;
@@ -258,6 +266,9 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
     if (finished) return 'Game over';
     if (watched) return `You are out — watching ${name(watched.targetId)}'s hand.`;
     if (me?.status === 'eliminated') return 'You are out — watching the rest of the game.';
+    if (dealing || game.dealMs > 0) {
+      return isMyTurn ? 'Dealing the cards… you start.' : 'Dealing the cards…';
+    }
     if (held) {
       if (actions.canCallUno) return 'One card left — call UNO before anyone catches you!';
       return isMyTurn
@@ -386,6 +397,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               onShowPlayed={() => setShowPlayed(true)}
               lastPlay={lastPlay}
               landedCardId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}
+              deal={deal}
               targetName={
                 view.pendingDraw && current ? (current.id === meId ? 'You' : current.name) : null
               }
@@ -440,7 +452,7 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
                 <PlayerHand
                   hand={heldHand}
                   playableIds={playable}
-                  isMyTurn={isMyTurn && !finished}
+                  isMyTurn={isMyTurn && !finished && !dealing}
                   onCardClick={onCardClick}
                   sendingId={sending?.cardId ?? null}
                   flyingId={flight?.kind === 'play' ? (flight.card?.id ?? null) : null}

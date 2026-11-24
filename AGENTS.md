@@ -125,13 +125,14 @@ These keep the game fair and the code testable. Do not trade them away for conve
   animation disabled under `prefers-reduced-motion` (the global rule in `index.css` already does this for
   every CSS animation and transition; motion started from script must check the media query itself).
 - Animations are cosmetic. They never delay or gate state. A new state is already applied when its
-  animation starts.
+  animation starts. The opening deal is the one wait, and it is a rule the server enforces
+  (`room.dealUntil`, RULES §5.18), not the animation: the client only shows it.
 - Sounds are cosmetic too. `lib/sound.ts` synthesizes them with Web Audio: the deal (a flick per card), every
   card play (a Discard All has its own: a handful of cards hitting the pile), every card drawn from the pile (a Draw or a Color Roulette reveal, so the table hears
   someone drawing), the sweep and riffle when the discards are reshuffled into a new draw pile, the ding when a roulette reveal finds the named color, a voice shouting "UNO!" when anyone calls it (the browser's own speech voices, a man or a woman to match the caller's avatar), the chime when your turn
   starts, the turn reminder, 0/7 hand exchanges, the
   hammer bonking the head of a player who takes penalty cards (the only recorded sound,
-  `assets/sounds/punch-hammer-hit.mp3`, bundled so it works offline), then the
+  `assets/sounds/flesh-impact.mp3`, bundled so it works offline), then the
   mocking trombone everyone hears, the danger alarm when the Mercy Rule knocks a player out at 25 cards (followed by the
   trombone), and the win, which everyone hears whoever wins. `useGameSounds` plays them only from
   state the server sent, and the Sound panel
@@ -253,12 +254,14 @@ new UI inside that metaphor.
   stays one tier. Seats stay on screen through `--seat-inset` and lift clear of the hand through
   `--seat-low-reach` (`seatPosition`). From `sm` up, nothing scrolls. Only a phone's hand may scroll
   sideways, and only when it is too big to fit. Check 390 × 844, 375 × 667 and 667 × 375.
-- **Motion:** one meaningful movement per event. The opening deal (`DealAnimation.tsx`): seven
-  cards each flicked face down from the draw pile round the table, starting left of the dealer, only
-  when the page saw the game start (`dealtAt` in the store), so a reload never replays it. A card tossed from the thrower's seat, a draw sliding in,
+- **Motion:** one meaningful movement per event. The opening deal (`DealAnimation.tsx`, `useDeal`): seven
+  cards each flicked face down off the draw pile and slid across the felt round the table, starting
+  left of the dealer, timed by the server's `dealMs`. Each card joins its hand as it lands: seat
+  counts and your fan fill one card at a time, the deck counts down, and the first discard flips
+  over (`anim-flip-in`) when the deal ends. A page that arrives mid-deal picks it up where it is. A card tossed from the thrower's seat, a draw sliding in,
   drawn cards flying face down from the draw pile to the drawer's seat, with a red `+N cards` tally
   popping over their avatar (`DrawFlight.tsx`, driven by `cardsDrawn` events; a penalty also brings a
-  mallet down on their head three times, in time with the hammer sound (`HammerHit.tsx`); a Discard All raises the same tag in green (`ink-green`) as `−N cards` with the Discard All
+  cartoon mallet down on their head once, a slow wind-up, one squashing blow on the hammer sound, then dizzy stars (`HammerHit.tsx`); a Discard All raises the same tag in green (`ink-green`) as `−N cards` with the Discard All
   mark, counting the card itself), the new deck riffling once after a reshuffle (`anim-riffle`), hands sliding face down to their new owners on a 0 or 7 (`HandExchange.tsx`, driven by the
   `handsPassed.passes` pairs the server sends), the turn pulse, and your cards hopping in a ripple
   with the knock after 10 s idle on your move (`anim-nudge`, not `anim-shake`, which means "can't play

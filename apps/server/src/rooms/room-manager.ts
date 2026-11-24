@@ -7,6 +7,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   TURN_HOLD_MS,
+  dealTiming,
   WAIT_FOR_REJOIN_MS,
   type ChatMessage,
   type ErrorCode,
@@ -75,6 +76,8 @@ export interface RoomManagerOptions {
   computerMoveDelayMs?: number;
   /** Length of the UNO breather after each play or turn change. Defaults to `TURN_HOLD_MS`. */
   turnHoldMs?: number;
+  /** Whether a new round waits out the opening deal (`dealTiming`) before anyone acts. Default on. */
+  dealHold?: boolean;
   /** How long a seat stays held once the table agrees to wait. Defaults to `WAIT_FOR_REJOIN_MS`. */
   waitForRejoinMs?: number;
   /** Called when a room changes outside a client request (e.g. a reconnect window expired). */
@@ -85,6 +88,11 @@ export interface RoomManagerOptions {
 export interface JoinResult {
   room: Room;
   player: RoomPlayer;
+}
+
+/** When the table opens again: after the opening deal and any UNO breather. */
+function heldUntil(room: Room): number {
+  return Math.max(room.turnHoldUntil, room.dealUntil);
 }
 
 /** In-memory room registry and lobby/game lifecycle. Transport-agnostic. */
@@ -142,6 +150,7 @@ export class RoomManager {
       createdAt: this.now(),
       computerTimer: null,
       turnHoldUntil: 0,
+      dealUntil: 0,
       holdTimer: null,
       handShares: [],
     };
@@ -443,6 +452,12 @@ export class RoomManager {
         'The game moved on before your action arrived. Try again.',
       );
     }
+    if (HELD_COMMANDS.has(command.type) && this.now() < room.dealUntil) {
+      throw new RoomError(
+        'TURN_HOLD',
+        'The cards are still being dealt. Wait for the deal to finish.',
+      );
+    }
     if (HELD_COMMANDS.has(command.type) && this.now() < room.turnHoldUntil) {
       throw new RoomError(
         'TURN_HOLD',
@@ -531,7 +546,16 @@ export class RoomManager {
     room.status = 'inGame';
     room.lastResult = null;
     room.turnHoldUntil = 0;
+    room.dealUntil = 0;
+    if (room.holdTimer) clearTimeout(room.holdTimer);
+    room.holdTimer = null;
     room.handShares = [];
+    // Nobody moves while the cards go round the table (docs/RULES.md §5.18).
+    if (this.options.dealHold ?? true) {
+      const dealMs = dealTiming(members.length).totalMs;
+      room.dealUntil = this.now() + dealMs;
+      this.scheduleHoldEnd(room, dealMs);
+    }
     this.scheduleComputers(room);
   }
 
@@ -563,7 +587,7 @@ export class RoomManager {
         this.runComputerMove(room);
       },
       // Computers wait out the UNO breather like everyone else.
-      Math.max(thinking, room.turnHoldUntil - this.now() + 10),
+      Math.max(thinking, heldUntil(room) - this.now() + 10),
     );
     room.computerTimer.unref?.();
   }
@@ -573,11 +597,23 @@ export class RoomManager {
     const holdMs = this.options.turnHoldMs ?? TURN_HOLD_MS;
     if (holdMs <= 0) return;
     room.turnHoldUntil = this.now() + holdMs;
+    this.scheduleHoldEnd(room, holdMs);
+  }
+
+  /**
+   * Re-sends the table once the breather is over. Node timers can fire a millisecond before
+   * `Date.now()` reaches the deadline; sending then would still show the hold, with every move but
+   * UNO switched off and nothing left to send the table again, so the player to move is stuck.
+   */
+  private scheduleHoldEnd(room: Room, delayMs: number): void {
     if (room.holdTimer) clearTimeout(room.holdTimer);
     room.holdTimer = setTimeout(() => {
       room.holdTimer = null;
-      if (this.rooms.has(room.code) && room.status === 'inGame') this.options.onRoomUpdated(room);
-    }, holdMs);
+      if (!this.rooms.has(room.code) || room.status !== 'inGame') return;
+      const left = heldUntil(room) - this.now();
+      if (left > 0) this.scheduleHoldEnd(room, left);
+      else this.options.onRoomUpdated(room);
+    }, delayMs);
     room.holdTimer.unref?.();
   }
 
@@ -591,7 +627,7 @@ export class RoomManager {
     )) {
       for (const attempt of [command, fallbackComputerMove(game, playerId)]) {
         if (!attempt) continue;
-        if (HELD_COMMANDS.has(attempt.type) && this.now() < room.turnHoldUntil) continue;
+        if (HELD_COMMANDS.has(attempt.type) && this.now() < heldUntil(room)) continue;
         try {
           this.executeGameCommand(room.code, playerId, attempt, null);
           this.options.onRoomUpdated(room);

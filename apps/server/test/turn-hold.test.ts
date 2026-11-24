@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { TURN_HOLD_MS } from '@nomercy/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { STARTING_HAND_SIZE, TURN_HOLD_MS, cardsDealtTo, dealTiming } from '@nomercy/shared';
 import { seededRng, type GameCommand } from '../src/engine/index.js';
 import { toGameView } from '../src/rooms/projections.js';
 import { RoomError, RoomManager } from '../src/rooms/room-manager.js';
@@ -10,18 +10,24 @@ let clock = 1_000_000;
 const managers: RoomManager[] = [];
 
 afterEach(() => {
+  vi.useRealTimers();
   for (const m of managers) m.closeAll('test over');
   managers.length = 0;
 });
 
 /** Two people at a hand-built table: Ana (to move) holds two reds, Ben holds a red and two blues. */
-function table(): { manager: RoomManager; room: Room; ana: string; ben: string } {
+function table(onRoomUpdated: (room: Room) => void = () => {}): {
+  manager: RoomManager;
+  room: Room;
+  ana: string;
+  ben: string;
+} {
   const manager = new RoomManager({
     rng: seededRng(7),
     reconnectGraceMs: 60_000,
     checkInvariants: false,
     now: () => clock,
-    onRoomUpdated: () => {},
+    onRoomUpdated,
     onRoomClosed: () => {},
   });
   managers.push(manager);
@@ -41,6 +47,7 @@ function table(): { manager: RoomManager; room: Room; ana: string; ben: string }
   state.players[1]!.id = guest.id;
   room.game = state;
   room.turnHoldUntil = 0;
+  room.dealUntil = 0;
   return { manager, room, ana: host.id, ben: guest.id };
 }
 
@@ -153,5 +160,103 @@ describe('UNO breather after a play (docs/RULES.md §5.9)', () => {
       ),
     ).toBe('TURN_HOLD');
     expect(toGameView(room, ana, clock)!.me.validActions.canCallUno).toBe(true);
+  });
+
+  it('re-sends the table only once the breather is really over, even if the timer fires early', () => {
+    vi.useFakeTimers();
+    const sent: number[] = [];
+    let benId = '';
+    const { manager, room, ana, ben } = table((r) => {
+      sent.push(toGameView(r, benId, clock)!.turnHoldMs);
+    });
+    benId = ben;
+    manager.executeGameCommand(
+      room.code,
+      ana,
+      { type: 'playCard', cardId: cardId(room.game!, 0) },
+      null,
+    );
+    // The timer fires on time but the wall clock is still a millisecond short of the deadline.
+    clock += TURN_HOLD_MS - 1;
+    vi.advanceTimersByTime(TURN_HOLD_MS);
+    expect(sent).toEqual([]);
+
+    clock += 1;
+    vi.advanceTimersByTime(1);
+    expect(sent).toEqual([0]);
+    expect(toGameView(room, ben, clock)!.me.validActions.playableCardIds).toHaveLength(1);
+  });
+});
+
+describe('the opening deal (docs/RULES.md §5.18)', () => {
+  function dealtTable(computers?: number) {
+    const manager = new RoomManager({
+      rng: seededRng(9),
+      reconnectGraceMs: 60_000,
+      checkInvariants: false,
+      computerMoveDelayMs: 10,
+      now: () => clock,
+      onRoomUpdated: () => {},
+      onRoomClosed: () => {},
+    });
+    managers.push(manager);
+    if (computers) {
+      const { room, player } = manager.createRoom('Ana', 'female', 's1', 2, computers);
+      return { manager, room, ana: player.id };
+    }
+    const { room, player: host } = manager.createRoom('Ana', 'female', 's1', 4);
+    const { player: guest } = manager.joinRoom(room.code, 'Ben', 'male', 's2');
+    manager.setReady(room.code, guest.id, true);
+    manager.startGame(room.code, host.id);
+    return { manager, room, ana: host.id };
+  }
+
+  it('lets nobody act until every card has been dealt', () => {
+    const { manager, room } = dealtTable();
+    const { totalMs } = dealTiming(2);
+    const first = room.game!.players[room.game!.currentIndex]!.id;
+    const draw = () => manager.executeGameCommand(room.code, first, { type: 'draw' }, null);
+
+    const view = toGameView(room, first, clock)!;
+    expect(view.dealMs).toBe(totalMs);
+    expect(view.me.validActions.playableCardIds).toEqual([]);
+    expect(view.me.validActions.canDraw).toBe(false);
+    expect(refusal(draw)).toBe('TURN_HOLD');
+
+    clock += totalMs - 1;
+    expect(refusal(draw)).toBe('TURN_HOLD');
+    clock += 1;
+    expect(toGameView(room, first, clock)!.dealMs).toBe(0);
+    expect(toGameView(room, first, clock)!.me.validActions.canDraw).toBe(true);
+    draw();
+    expect(room.game!.players[room.game!.currentIndex]!.id).toBe(first);
+  });
+
+  it('keeps computers waiting for the deal too', () => {
+    vi.useFakeTimers();
+    const { room, ana } = dealtTable(1);
+    const game = room.game!;
+    game.currentIndex = game.players.findIndex((p) => p.id !== ana);
+    const before = game.version;
+    const { totalMs } = dealTiming(2);
+
+    vi.advanceTimersByTime(totalMs + 100);
+    expect(room.game!.version).toBe(before);
+
+    // The refused computer queued its next try for when the deal would end; let that come round.
+    clock += totalMs;
+    vi.advanceTimersByTime(totalMs + 100);
+    expect(room.game!.version).toBeGreaterThan(before);
+  });
+
+  it('deals one card at a time round the table, starting left of the dealer', () => {
+    const { gapMs, travelMs, totalMs } = dealTiming(3);
+    expect(cardsDealtTo(0, 3, travelMs - 1)).toBe(0);
+    expect(cardsDealtTo(0, 3, travelMs)).toBe(1);
+    expect(cardsDealtTo(1, 3, travelMs)).toBe(0);
+    expect(cardsDealtTo(1, 3, travelMs + gapMs)).toBe(1);
+    expect(cardsDealtTo(0, 3, travelMs + 3 * gapMs)).toBe(2);
+    expect(cardsDealtTo(2, 3, totalMs - 1)).toBe(STARTING_HAND_SIZE - 1);
+    for (const seat of [0, 1, 2]) expect(cardsDealtTo(seat, 3, totalMs)).toBe(STARTING_HAND_SIZE);
   });
 });

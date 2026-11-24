@@ -54,6 +54,7 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
   const computerIds = new Set(room.players.filter((p) => p.isComputer).map((p) => p.id));
   const genders = new Map(room.players.map((p) => [p.id, p.gender]));
   const turnHoldMs = Math.max(0, room.turnHoldUntil - now);
+  const dealMs = Math.max(0, room.dealUntil - now);
   const actions = getValidActions(game, playerId);
   return {
     roomCode: room.code,
@@ -67,10 +68,11 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
     me: {
       playerId,
       hand: seat.hand.map((card) => ({ ...card })),
-      validActions: turnHoldMs > 0 ? onlyCallUno(actions) : actions,
+      validActions: turnHoldMs > 0 || dealMs > 0 ? onlyCallUno(actions) : actions,
     },
     handShare: handShareView(room, playerId),
     turnHoldMs,
+    dealMs,
     reveal: toRoundReveal(game),
   };
 }
