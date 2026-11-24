@@ -43,3 +43,8 @@ export const GLOBAL_BOT_WINDOW_MS = 25_000;
 export const MATCH_FOUND_PAUSE_MS = 1_500;
 /** Faces per avatar set: 4 characters on 6 backdrops (`apps/client/src/lib/avatar.ts`). */
 export const AVATAR_VARIANTS = 24;
+/** Emotes a Play global searcher can send to everyone in their match while they wait. */
+export const MATCH_EMOTES = ['👋', '😂', '🔥', '😎', '😬', '🍀'] as const;
+export type MatchEmote = (typeof MATCH_EMOTES)[number];
+/** Shortest gap between two emotes from one searcher; quicker ones are dropped. */
+export const MATCH_EMOTE_COOLDOWN_MS = 1_200;

@@ -145,6 +145,7 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
 | `match:search`               | `{ name, gender }`                                                   | Play global (RULES.md §5.19); returns `MatchSearchView`; refused while seated or already searching      |
 | `match:cancel`               | `{}`                                                                 | leaves the search; a disconnect does the same                                                           |
+| `match:emote`                | `{ emote }` (one of `MATCH_EMOTES`)                                  | sent to everyone in the match as `match:emote`; one within the cooldown is dropped                      |
 | `room:profile`               | `{ name?, gender? }`                                                 | lobby only; your own seat; at least one field; names stay unique                                        |
 | `room:kick`                  | `{ playerId }`                                                       | host, lobby only; the removed player gets `room:closed` and is unbound                                  |
 | `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
@@ -170,7 +171,8 @@ Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per p
 (one `ChatMessage`, sent to the sockets seated in that room only), `chat:update` (a message whose reactions changed, same audience), `chat:history` (the last 30 lines, sent on
 join, reconnect and `game:request-state`), `room:closed`, and for Play global `match:state` (the
 searcher's `MatchSearchView` whenever someone arrives or leaves), `match:found` (the `SessionInfo` of the
-seat the socket now holds, as after `room:join`) and `match:closed` (the search ended with no table,
+seat the socket now holds, as after `room:join`), `match:emote` (`{ seatId, emote }`, to every
+searcher in the match, the sender included) and `match:closed` (the search ended with no table,
 only on shutdown or a full server). Chat lives in `Room.chat` in memory and is gone
 with the room; it is not part of `room:state`, so it never rides along with game broadcasts.
 `GameStateView.handShare` carries only this player's own hand-sharing: their request (with the
@@ -269,7 +271,9 @@ character and backdrop nobody at the table has) at once, and keeps both at the t
 `RoomManager.globalComputerSeats`), each next arrival a random share of the time left per empty seat;
 a deadline timer seats any still missing, so the countdown always ends with a full table. A full match
 waits `MATCH_FOUND_PAUSE_MS`, then `onMatchReady` calls `createGlobalRoom`, binds each person's socket
-and sends `match:found`. A room's `mode` is `global` from then on:
+and sends `match:found`. `Matchmaker.emote` relays a searcher's emote (`onEmote`) with a per-seat
+cooldown; the computers' greetings and replies run on per-match timers (`emoteTimers`) that are
+cleared when the match is dealt or closed. A room's `mode` is `global` from then on:
 
 - `toRoomView` and `toGameView` report its computers as people: `isComputer: false`, connected, with a
   gender and a fixed `avatar`. `global-match.test.ts` checks no view carries `"isComputer":true`.

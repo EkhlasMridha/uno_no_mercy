@@ -309,6 +309,13 @@ matched with whoever else is searching on this server at the same time.
 7. **Edge cases:** a dropped connection during the round follows §5.16 as usual. A seat whose person left
    during the short pause before the deal goes to a computer; if every person left, no table is dealt.
    The countdown always ends: the last computer takes its seat no later than the deadline.
+8. **While waiting:** a searcher may send one of six emotes (`MATCH_EMOTES`: 👋 😂 🔥 😎 😬 🍀) to
+   everyone in their match; it pops up over their seat. One sent less than `MATCH_EMOTE_COOLDOWN_MS`
+   (1.2 s) after their last is dropped. Computers behave like people here too: some wave a moment
+   after they sit down or someone else does, and some answer an emote a second or three later. Emotes
+   stop when the table is dealt. The search screen also offers **Color snap**, a quick color-matching
+   toy played on the searcher's own device: it never reaches the server and has no effect on the
+   match or the round.
 
 ## 6. Ambiguities and chosen policies
 

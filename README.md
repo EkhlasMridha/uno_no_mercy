@@ -4,6 +4,8 @@ A real-time multiplayer card game for 2–6 players on a local network, built to
 168-card **UNO Show 'em No Mercy** base game. It uses original artwork and is not affiliated with Mattel.
 No one else around? Press **Play**, then **Start** in the lobby: computers fill the empty seats (up to 9).
 
+**Play it live:** [nomercy.shimoolz.com](https://nomercy.shimoolz.com)
+
 - React + TypeScript + Vite + Tailwind client
 - Node.js + Express + Socket.IO server with an authoritative, pure-TypeScript rules engine
 - Shared types, event contracts and Zod schemas in `packages/shared`
