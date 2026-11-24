@@ -69,6 +69,7 @@ const DEFAULT_SOUND: SoundPrefs = {
   knockout: true,
   win: true,
   chatMessage: true,
+  playerFound: true,
   muted: false,
 };
 export function loadSoundPrefs(): SoundPrefs {

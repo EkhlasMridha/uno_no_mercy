@@ -285,13 +285,25 @@ matched with whoever else is searching on this server at the same time.
 
 1. **Before searching:** the player enters a name and picks an avatar set (male or female). The server
    gives them a random face from that set, which they keep for the whole match.
-2. **The search:** a global table seats `GLOBAL_TABLE_SIZE` (4) players. A searcher joins the oldest open
-   match that still has a free seat and nobody with the same name; otherwise a new match opens. Every
+2. **The search:** a global table seats `GLOBAL_TABLE_SIZE` (5) players. The first person in a match is
+   its **base player**. A searcher joins, among the open matches that still have a free seat and
+   nobody with the same name, the one whose base player is **nearest to them**; when several are as
+   near, the oldest. If none is open, a new match opens with them as its base. If the base player
+   leaves, the next person to have arrived becomes the base. Every
    searcher in a match sees the others' faces and names as they arrive, and a countdown of
    `GLOBAL_SEARCH_MS` (1.5 minutes) that starts when the match opened. Someone who joins later sees the
    time that is left.
+
+   _Nearest_ is read from each browser's time zone (`Asia/Dhaka`, `Europe/London`…), so there is no
+   IP lookup: the same zone is nearest, then the smallest gap between the two clocks (measured the
+   short way round the globe, so across the date line too), with a little extra when the zones are
+   in different areas (Asia, Europe, America…). A searcher whose time zone is unknown or missing is
+   equally far from everyone, so they join the oldest open match. Nearness only chooses between
+   open matches: nobody waits longer for a nearer table. The time zone stays on the server and is
+   never shown to other players.
+
 3. **Starting:** as soon as every seat is taken the match is found and the round is dealt, after a short
-   pause (`MATCH_FOUND_PAUSE_MS`) so everyone sees the last arrival.
+   pause (`MATCH_FOUND_PAUSE_MS`, 2.5 seconds) so everyone sees the last arrivals take their seats.
 4. **Not enough people:** computer players take the empty seats. They arrive one at a time at random
    moments in the last `GLOBAL_BOT_WINDOW_MS` (25 seconds) of the countdown, and any still missing take
    their seats when it runs out, so a match never waits longer than the countdown. A person who arrives

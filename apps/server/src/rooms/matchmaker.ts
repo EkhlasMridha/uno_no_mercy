@@ -10,6 +10,7 @@ import {
 } from '@nomercy/shared';
 import type { Rng } from '../engine/index.js';
 import { between, pickAvatar } from './human-like.js';
+import { regionDistance, regionOf } from './region.js';
 import { RoomError, type GlobalSeat } from './room-manager.js';
 import { generatePlayerId } from './session.js';
 
@@ -87,25 +88,50 @@ export class Matchmaker {
     return this.matchOf(socketId) !== undefined;
   }
 
-  /** Seats a searcher in the oldest match with room for them, or opens a new one. */
-  search(socketId: string, name: string, gender: Gender): { match: Match; seat: GlobalSeat } {
+  /**
+   * The match's base player: its first person still searching. Searchers nearest to them join
+   * this match first. If the base leaves, the next person to have arrived takes over.
+   */
+  baseOf(match: Match): GlobalSeat | undefined {
+    return match.seats.find((s) => s.socketId !== null);
+  }
+
+  /**
+   * Seats a searcher in the open match whose base player (its first person) is nearest to them, the
+   * oldest of those when several are as near, or opens a new match with them as its base.
+   */
+  search(
+    socketId: string,
+    name: string,
+    gender: Gender,
+    timeZone?: string,
+  ): { match: Match; seat: GlobalSeat } {
     if (this.isSearching(socketId)) {
       throw new RoomError('ALREADY_IN_ROOM', 'You are already searching for a match');
     }
+    const region = regionOf(timeZone, new Date(this.now()));
     const lower = name.toLocaleLowerCase();
-    const match =
-      this.matches.find(
-        (m) =>
-          !m.found &&
-          m.seats.length < this.tableSize &&
-          !m.seats.some((s) => s.name.toLocaleLowerCase() === lower),
-      ) ?? this.openMatch();
+    let match: Match | undefined;
+    let nearest = Infinity;
+    // `matches` is oldest first, and only a strictly nearer base replaces the pick, so ties go to
+    // the oldest match.
+    for (const m of this.matches) {
+      if (m.found || m.seats.length >= this.tableSize) continue;
+      if (m.seats.some((s) => s.name.toLocaleLowerCase() === lower)) continue;
+      const distance = regionDistance(region, this.baseOf(m)?.region ?? null);
+      if (distance < nearest) {
+        nearest = distance;
+        match = m;
+      }
+    }
+    match ??= this.openMatch();
     const seat: GlobalSeat = {
       id: generatePlayerId(),
       name,
       gender,
       avatar: pickAvatar(gender, match.seats, this.options.rng),
       socketId,
+      region,
     };
     match.seats.push(seat);
     // A computer already waiting sometimes waves at the newcomer.

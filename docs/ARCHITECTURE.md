@@ -143,7 +143,7 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:wait-for-player`       | `{ playerId, wait }`                                                 | the dropped player's decider only: `true` holds the seat, `false` makes them forfeit now                |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
-| `match:search`               | `{ name, gender }`                                                   | Play global (RULES.md §5.19); returns `MatchSearchView`; refused while seated or already searching      |
+| `match:search`               | `{ name, gender, timeZone? }`                                        | Play global (RULES.md §5.19); returns `MatchSearchView`; refused while seated or already searching      |
 | `match:cancel`               | `{}`                                                                 | leaves the search; a disconnect does the same                                                           |
 | `match:emote`                | `{ emote }` (one of `MATCH_EMOTES`)                                  | sent to everyone in the match as `match:emote`; one within the cooldown is dropped                      |
 | `room:profile`               | `{ name?, gender? }`                                                 | lobby only; your own seat; at least one field; names stay unique                                        |
@@ -264,8 +264,11 @@ never waits on a computer. Each move schedules the next, so computers keep playi
 or the round ends. The public views mark them `isComputer`, and they always count as connected and ready.
 
 **Play global** (docs/RULES.md §5.19). `rooms/matchmaker.ts` keeps one pool of forming matches. A
-`match:search` takes a free seat in the oldest match that has one and no clashing name, or opens a match
-with its own countdown (`GLOBAL_SEARCH_MS`). The seat gets its player id and a face (`pickAvatar`: a
+`match:search` takes a free seat in the open match (no clashing name) whose base player, its first
+person still searching (`baseOf`), is nearest by `regionDistance` (`rooms/region.ts`, read from the
+browser's IANA time zone; ties go to the oldest match), or opens a match with its own countdown
+(`GLOBAL_SEARCH_MS`). The region lives only on the server's `GlobalSeat` and never reaches a view.
+The seat gets its player id and a face (`pickAvatar`: a
 character and backdrop nobody at the table has) at once, and keeps both at the table. In the last
 `GLOBAL_BOT_WINDOW_MS` a timer seats one computer at a time (names and faces from
 `RoomManager.globalComputerSeats`), each next arrival a random share of the time left per empty seat;

@@ -61,7 +61,7 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: 'What is Play global?',
-    a: 'Enter a name and pick an avatar set, and you are matched with other players searching at the same time. A table of 4 is dealt as soon as every seat is taken, and the search never lasts more than a minute and a half.',
+    a: 'Enter a name and pick an avatar set, and you are matched with other players searching at the same time. A table of 5 is dealt as soon as every seat is taken, and the search never lasts more than a minute and a half.',
   },
   {
     q: 'How many people can play?',

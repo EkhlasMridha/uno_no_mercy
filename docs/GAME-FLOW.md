@@ -27,7 +27,10 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
   opens the search screen (`GlobalSearchPage.tsx`): an oval table with the countdown on the felt,
   inside a gold ring that empties as time runs out, and a seat for each player found, your own at the
   bottom, the empty ones marked "Open seat". Each arrival fills a seat with that player's face and
-  name. Under the table an emote bar sends 👋 😂 🔥 😎 😬 🍀 to everyone in the match; each pops up
+  name: a bubble with their avatar inside inflates, wobbles and pops, with a soft pop sound. Players
+  found together (you join a match that already has people, or several arrive at once) pop in one
+  after another, about 0.65 s apart, so the table is seen to fill; once the match is full the rest
+  pop quicker, all before the deal. The count and "Match found!" follow what is shown. Under the table an emote bar sends 👋 😂 🔥 😎 😬 🍀 to everyone in the match; each pops up
   over the sender's seat. Beside it (below on phones) is **Color snap** (`ColorSnap.tsx`): tap the
   color of each card before its bar runs out, let wild draw cards pass, and each snap speeds the next
   card up. It keeps your streak and best for this search, and is only a pastime: nothing is sent.

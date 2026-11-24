@@ -50,7 +50,7 @@ export function GlobalProfileModal({ initialName, onClose }: GlobalProfileModalP
     <Modal title="Play global" onClose={onClose}>
       <form className="space-y-4" onSubmit={(e) => void submit(e)} noValidate>
         <p className="text-sm text-chalk/70">
-          Get matched with players searching right now. A table of 4 is dealt as soon as it fills.
+          Get matched with players searching right now. A table of 5 is dealt as soon as it fills.
         </p>
         <label className="block">
           <span className="mb-1.5 block text-sm text-chalk/75">Your name</span>

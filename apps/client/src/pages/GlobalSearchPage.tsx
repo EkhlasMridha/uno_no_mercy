@@ -5,10 +5,12 @@ import {
   MATCH_EMOTE_COOLDOWN_MS,
   MATCH_EMOTES,
   type MatchEmote,
+  type MatchSearchView,
   type MatchSeatView,
 } from '@nomercy/shared';
 import { PlayerAvatar, avatarGlow } from '../components/PlayerAvatar';
 import { ColorSnap } from '../components/search/ColorSnap';
+import { playIfOn } from '../hooks/useGameSounds';
 import { avatarsForTable } from '../lib/avatar';
 import { cancelSearch, sendEmote } from '../net/actions';
 import { useAppState, type SearchEmote, type SearchState } from '../state/store';
@@ -38,6 +40,60 @@ const TIPS = [
   'A +10 can only be answered with another +10.',
 ];
 const TIP_MS = 7000;
+
+/** The gap between two players popping into their seats when several are found at once. */
+const REVEAL_GAP_MS = 650;
+/** Before the first of them pops in, so the search screen has settled. */
+const FIRST_REVEAL_MS = 450;
+/**
+ * Once the match is full, every bubble still waiting pops within this, so each has finished before
+ * the deal (`MATCH_FOUND_PAUSE_MS` after the match fills).
+ */
+const FOUND_REVEAL_BUDGET_MS = 1300;
+/** The quickest two bubbles ever follow each other. */
+const MIN_REVEAL_GAP_MS = 200;
+
+/**
+ * The players to show, in order of arrival. Players found together (joining a match that already
+ * has people, or several arriving at once) pop in one after another rather than all at the same
+ * instant, so the table visibly fills. You are always shown. Only the display waits: the server's
+ * view is already applied.
+ */
+function useStaggeredArrivals(view: MatchSearchView): {
+  shown: MatchSeatView[];
+  settled: boolean;
+} {
+  const [revealed, setRevealed] = useState<string[]>(() => [view.meId]);
+  const lastRevealAt = useRef(Date.now() - REVEAL_GAP_MS + FIRST_REVEAL_MS);
+  const foundAt = useRef<number | null>(null);
+  const waiting = view.players.filter((p) => p.id !== view.meId && !revealed.includes(p.id));
+  const next = waiting[0]?.id;
+  useEffect(() => {
+    if (!next) return;
+    let at = lastRevealAt.current + REVEAL_GAP_MS;
+    if (view.found) {
+      // The table is full: spread the rest evenly up to the deadline, never slower than usual.
+      foundAt.current ??= Date.now();
+      const deadline = foundAt.current + FOUND_REVEAL_BUDGET_MS;
+      const gap = (deadline - lastRevealAt.current) / waiting.length;
+      at = Math.min(at, lastRevealAt.current + Math.max(MIN_REVEAL_GAP_MS, gap));
+    }
+    const timer = window.setTimeout(
+      () => {
+        lastRevealAt.current = Date.now();
+        setRevealed((ids) => [...ids, next]);
+        // Timed to the bubble popping (`.anim-bubble-in`).
+        playIfOn('playerFound', 0.5);
+      },
+      Math.max(0, at - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [next, view.found, waiting.length]);
+  return {
+    shown: view.players.filter((p) => p.id === view.meId || revealed.includes(p.id)),
+    settled: waiting.length === 0,
+  };
+}
 
 /** m:ss for the countdown. */
 function clock(ms: number): string {
@@ -176,14 +232,17 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
   const left = Math.max(0, endsAt - now);
   const live = liveEmotes(emotes, now);
 
+  const { shown, settled } = useStaggeredArrivals(view);
+  const found = view.found && settled;
+
   // You first, then everyone else in the order they arrived.
   const seats = useMemo(() => {
-    const me = view.players.find((p) => p.id === view.meId);
-    const others = view.players.filter((p) => p.id !== view.meId);
+    const me = shown.find((p) => p.id === view.meId);
+    const others = shown.filter((p) => p.id !== view.meId);
     const filled: (MatchSeatView | null)[] = me ? [me, ...others] : others;
     while (filled.length < view.tableSize) filled.push(null);
     return filled;
-  }, [view]);
+  }, [shown, view.meId, view.tableSize]);
   const avatarOf = useMemo(
     () =>
       avatarsForTable(
@@ -194,23 +253,23 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
 
   // Announce each arrival, departure and emote once, for screen readers.
   const [announcement, setAnnouncement] = useState('');
-  const previous = useRef<MatchSeatView[]>(view.players);
+  const previous = useRef<MatchSeatView[]>(shown);
   useEffect(() => {
     const before = previous.current;
-    previous.current = view.players;
-    const count = `${view.players.length} of ${view.tableSize} players.`;
-    if (view.found) {
+    previous.current = shown;
+    const count = `${shown.length} of ${view.tableSize} players.`;
+    if (found) {
       setAnnouncement(`Match found. ${count} Dealing the cards.`);
       return;
     }
-    const arrived = view.players.filter((p) => !before.some((b) => b.id === p.id));
-    const leftSearch = before.filter((b) => !view.players.some((p) => p.id === b.id));
+    const arrived = shown.filter((p) => !before.some((b) => b.id === p.id));
+    const leftSearch = before.filter((b) => !shown.some((p) => p.id === b.id));
     const names = [
       ...arrived.filter((p) => p.id !== view.meId).map((p) => `${p.name} joined.`),
       ...leftSearch.map((p) => `${p.name} left.`),
     ];
     if (names.length > 0) setAnnouncement(`${names.join(' ')} ${count}`);
-  }, [view]);
+  }, [shown, found, view.meId, view.tableSize]);
   const lastEmote = emotes.at(-1);
   useEffect(() => {
     if (!lastEmote || lastEmote.seatId === view.meId) return;
@@ -218,8 +277,8 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
     if (sender) setAnnouncement(`${sender.name}: ${EMOTE_NAME[lastEmote.emote]}`);
   }, [lastEmote, view.meId, view.players]);
 
-  const status = view.found ? 'Match found!' : left > 0 ? 'Finding players' : 'Starting…';
-  const waiting = view.tableSize - view.players.length;
+  const status = found ? 'Match found!' : left > 0 || !settled ? 'Finding players' : 'Starting…';
+  const waiting = view.tableSize - shown.length;
 
   return (
     <div className="lounge-room flex min-h-[100dvh] flex-col">
@@ -244,9 +303,9 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
           <div className="px-10 py-11 sm:px-14 sm:py-14 shortest:px-9 shortest:py-8">
             <div className="table-rail relative aspect-[4/5] w-[min(14.5rem,calc(100vw-7rem))] rounded-[50%] p-3 sm:aspect-[16/10] sm:w-[min(32rem,calc(100vw-9rem),calc((100dvh-19rem)*1.6))] md:w-[min(32rem,calc(100vw-33rem),calc((100dvh-18rem)*1.6))] sm:p-4 shortest:w-[min(26rem,calc(100vw-23rem),calc((100dvh-9.5rem)*1.6))] shortest:p-2.5">
               <div className="table-felt relative flex h-full w-full flex-col items-center justify-center rounded-[50%] text-center">
-                <CountdownRing left={left} found={view.found} status={status} />
+                <CountdownRing left={left} found={found} status={status} />
                 <p className="mt-1 text-sm text-chalk/70 shortest:hidden">
-                  {view.players.length} of {view.tableSize} players
+                  {shown.length} of {view.tableSize} players
                 </p>
               </div>
 
@@ -263,7 +322,7 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
                         <>
                           <span className="relative">
                             <span
-                              className="anim-card-in block rounded-full"
+                              className="anim-bubble-in block rounded-full"
                               style={avatarGlow(avatarOf(player.id))}
                             >
                               <PlayerAvatar
@@ -281,7 +340,7 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
                               </span>
                             )}
                           </span>
-                          <span className="pill max-w-full px-2.5 py-0.5 text-xs sm:text-sm">
+                          <span className="anim-pill-in pill max-w-full px-2.5 py-0.5 text-xs sm:text-sm">
                             <span className="truncate font-semibold">{player.name}</span>
                             {player.id === view.meId && (
                               <span className="shrink-0 text-chalk/60">(you)</span>
@@ -315,7 +374,7 @@ export function GlobalSearchPage({ search }: { search: SearchState }) {
         <div className="flex w-full max-w-[20rem] flex-col items-center gap-4 md:shrink-0 shortest:w-[15.5rem] shortest:shrink-0 shortest:gap-2">
           <ColorSnap frozen={view.found} />
           <p className="text-center text-sm text-chalk/65 shortest:text-xs">
-            {view.found
+            {found
               ? 'Everyone is here. Dealing the cards…'
               : waiting === 1
                 ? 'One seat left. The cards are dealt when it fills.'
