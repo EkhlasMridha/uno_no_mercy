@@ -39,7 +39,8 @@ its face or deck position.
 ## 3. Setup
 
 1. Shuffle all 168 cards (unbiased Fisher–Yates, `crypto.randomInt`).
-2. Deal 7 cards to each player, one at a time, starting left of the dealer.
+2. Deal 7 cards to each player, one at a time, starting left of the dealer. Nobody may act until the
+   deal is over (§5.18).
 3. The remaining cards form the face-down draw pile.
 4. Flip the top card to start the discard pile. **If it is an action card (any non-number card, wilds
    included), ignore it and flip the next one** (official). Ignored cards stay in the discard pile under the
@@ -201,7 +202,8 @@ single card enters a hand: penalties, mandatory draws, roulette reveals and UNO 
 2. **Last standing:** when only one active player remains, they win.
 3. **Tables with computers (house rule):** once every person at the table is knocked out, the round
    ends at once with **no winner** and no points, so nobody watches the computers play on. If a single
-   computer is left, it still wins as last standing. Tables with only people are unaffected.
+   computer is left, it still wins as last standing. Tables with only people are unaffected, and so
+   are global tables (§5.19), which play on to a winner.
 
 4. **The table is turned face up (house rule).** When a round ends, every player may close the
    result and look over the whole table: each seat's hand, the discard pile in the order it was
@@ -259,6 +261,54 @@ show them their hand.
    leaves, and when the round ends (every hand is then open to all anyway, §5.14). Every request is cleared when a new round is dealt. A player who
    forfeited has left the table and can't ask. Sharing never changes the game: it only decides whose
    hand one player's view includes.
+
+### 5.18 Waiting for the deal (house rule)
+
+The table deals the opening hands the way a person would: one card at a time, round the table from the
+dealer's left, seven rounds. Every player watches their hand and everyone else's fill up card by card.
+
+1. **Nobody acts during the deal:** until the last card lands, no one may play, draw, take a penalty or
+   catch anyone, and that includes the player who goes first and computer players. Calling UNO can't arise
+   with seven cards. Leaving still works.
+2. **How long:** the pace depends on the table size (`dealTiming` in `packages/shared/src/deal.ts`): about
+   a quarter of a second per card for two players, faster for bigger tables so the deal takes about 5
+   seconds (just over 6 at 20 players). It always ends, because it is a fixed length of time.
+3. **The first discard** is turned over once everyone has their cards, and the color in play shows with it.
+4. **Edge cases:** a player who reloads or reconnects mid-deal sees the deal carry on from where the table
+   is; one who arrives after it sees the hands as they are. A player who leaves during the deal forfeits as
+   at any other time. Every round is dealt this way, the first and each one after it.
+
+### 5.19 Play global (house rule)
+
+Besides **Play with friends** (a lobby you invite people to), a player can **Play global**: they are
+matched with whoever else is searching on this server at the same time.
+
+1. **Before searching:** the player enters a name and picks an avatar set (male or female). The server
+   gives them a random face from that set, which they keep for the whole match.
+2. **The search:** a global table seats `GLOBAL_TABLE_SIZE` (4) players. A searcher joins the oldest open
+   match that still has a free seat and nobody with the same name; otherwise a new match opens. Every
+   searcher in a match sees the others' faces and names as they arrive, and a countdown of
+   `GLOBAL_SEARCH_MS` (1.5 minutes) that starts when the match opened. Someone who joins later sees the
+   time that is left.
+3. **Starting:** as soon as every seat is taken the match is found and the round is dealt, after a short
+   pause (`MATCH_FOUND_PAUSE_MS`) so everyone sees the last arrival.
+4. **Not enough people:** computer players take the empty seats. They arrive one at a time at random
+   moments in the last `GLOBAL_BOT_WINDOW_MS` (25 seconds) of the countdown, and any still missing take
+   their seats when it runs out, so a match never waits longer than the countdown. A person who arrives
+   while a seat is free still takes it. Computers at a global table look and play like people: they
+   have ordinary names and faces, take human time to move, sometimes forget to call UNO or miss a catch,
+   and take a few seconds to answer a request to see their hand. Their play never breaks a rule: they
+   choose only from the server's valid actions, as at any other table.
+5. **The round:** it is an ordinary round of No Mercy. A global table plays on after every person is
+   knocked out (§5.14.3 does not apply), so the round always ends with a winner, as it would with
+   people. The table plays one round: at the end each player may **Play again** (a new search) or go
+   **Home**. There is no lobby, no next round and no host controls.
+6. **Leaving the search:** **Cancel** leaves the match at once; closing the page or losing the connection
+   does the same. A match whose people have all left is closed, and its computers with it. A person who
+   is already seated or searching can't start another search.
+7. **Edge cases:** a dropped connection during the round follows §5.16 as usual. A seat whose person left
+   during the short pause before the deal goes to a computer; if every person left, no table is dealt.
+   The countdown always ends: the last computer takes its seat no later than the deadline.
 
 ## 6. Ambiguities and chosen policies
 

@@ -5,3 +5,4 @@ export * from './events.js';
 export * from './game-view.js';
 export * from './room-view.js';
 export * from './schemas.js';
+export * from './deal.js';

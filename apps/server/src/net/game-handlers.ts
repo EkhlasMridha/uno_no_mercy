@@ -87,9 +87,10 @@ function registerHandShare<S extends z.ZodTypeAny>(
 }
 
 export function registerGameHandlers(deps: HandlerDeps): void {
-  registerHandShare(deps, 'game:request-hand', requestHandSchema, (room, id, p) =>
-    requestHand(room, id, p.targetId),
-  );
+  registerHandShare(deps, 'game:request-hand', requestHandSchema, (room, id, p) => {
+    requestHand(room, id, p.targetId);
+    deps.manager.answerHandRequestsLater(room);
+  });
   registerHandShare(deps, 'game:answer-hand-request', answerHandRequestSchema, (room, id, p) =>
     answerHandRequest(room, id, p.viewerId, p.allow),
   );

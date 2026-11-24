@@ -30,7 +30,7 @@ const httpServer = createServer(app);
 httpServer.headersTimeout = 10_000;
 httpServer.requestTimeout = 30_000;
 httpServer.maxConnections = 1_000;
-const { io, manager } = createSocketServer(httpServer, {
+const { io, closeAll } = createSocketServer(httpServer, {
   rng: cryptoRng,
   reconnectGraceMs: config.reconnectGraceMs,
   checkInvariants: config.dev,
@@ -69,7 +69,7 @@ httpServer.listen(config.port, config.host, () => {
 
 function shutdown(): void {
   console.info('\nShutting down: all in-memory rooms will be closed.');
-  manager.closeAll('The host stopped the server.');
+  closeAll('The host stopped the server.');
   io.close();
   httpServer.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1500).unref();

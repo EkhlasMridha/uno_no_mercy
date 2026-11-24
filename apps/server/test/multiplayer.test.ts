@@ -47,6 +47,7 @@ beforeAll(async () => {
     checkInvariants: true,
     computerMoveDelayMs: 5,
     turnHoldMs: 0,
+    dealHold: false,
   });
   closeServer = () => io.close();
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
@@ -584,6 +585,7 @@ describe('connection churn', () => {
       checkInvariants: true,
       computerMoveDelayMs: 5,
       turnHoldMs: 0,
+      dealHold: false,
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const churnUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

@@ -9,20 +9,30 @@ import {
 import { getValidActions, toPublicGameView, type GameState } from '../engine/index.js';
 import { handShareView } from './hand-share.js';
 import { waitDeciderId } from './rejoin.js';
-import type { Room } from './room.types.js';
+import type { Room, RoomPlayer } from './room.types.js';
+
+/**
+ * Whether the views mark this seat as a computer. A global table (docs/RULES.md §5.19) shows every
+ * seat as a person, so its computers pass for the people a search would find.
+ */
+function shownAsComputer(room: Room, player: RoomPlayer): boolean {
+  return player.isComputer && room.mode !== 'global';
+}
 
 /** Public lobby projection: identical for every member, contains no secrets. */
 export function toRoomView(room: Room): RoomView {
   return {
     code: room.code,
+    mode: room.mode ?? 'friends',
     hostId: room.hostId,
     status: room.status,
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
       isHost: p.id === room.hostId,
-      isComputer: p.isComputer,
+      isComputer: shownAsComputer(room, p),
       gender: p.gender,
+      avatar: p.avatar ?? null,
       ready: p.ready,
       connected: p.socketId !== null || p.isComputer,
       departed: p.departed,
@@ -51,9 +61,13 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
   const connectedIds = new Set(
     room.players.filter((p) => p.socketId || p.isComputer).map((p) => p.id),
   );
-  const computerIds = new Set(room.players.filter((p) => p.isComputer).map((p) => p.id));
+  const computerIds = new Set(
+    room.players.filter((p) => shownAsComputer(room, p)).map((p) => p.id),
+  );
   const genders = new Map(room.players.map((p) => [p.id, p.gender]));
+  const avatars = new Map(room.players.map((p) => [p.id, p.avatar ?? null]));
   const turnHoldMs = Math.max(0, room.turnHoldUntil - now);
+  const dealMs = Math.max(0, room.dealUntil - now);
   const actions = getValidActions(game, playerId);
   return {
     roomCode: room.code,
@@ -62,15 +76,17 @@ export function toGameView(room: Room, playerId: string, now = Date.now()): Game
       connected: (id) => connectedIds.has(id),
       isComputer: (id) => computerIds.has(id),
       gender: (id) => genders.get(id) ?? null,
+      avatar: (id) => avatars.get(id) ?? null,
       hostId: room.hostId,
     }),
     me: {
       playerId,
       hand: seat.hand.map((card) => ({ ...card })),
-      validActions: turnHoldMs > 0 ? onlyCallUno(actions) : actions,
+      validActions: turnHoldMs > 0 || dealMs > 0 ? onlyCallUno(actions) : actions,
     },
     handShare: handShareView(room, playerId),
     turnHoldMs,
+    dealMs,
     reveal: toRoundReveal(game),
   };
 }

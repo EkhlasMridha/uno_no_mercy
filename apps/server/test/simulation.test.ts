@@ -184,6 +184,7 @@ describe('computer players', { timeout: 60_000 }, () => {
         reconnectGraceMs: 60_000,
         checkInvariants: true,
         computerMoveDelayMs: 10,
+        dealHold: false,
         onRoomUpdated: () => {},
         onRoomClosed: () => {},
       });

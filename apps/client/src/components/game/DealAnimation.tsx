@@ -1,28 +1,18 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import { STARTING_HAND_SIZE, type PublicGameView } from '@nomercy/shared';
+import { useEffect, useRef, type RefObject } from 'react';
 import { playIfOn } from '../../hooks/useGameSounds';
+import type { Deal } from '../../hooks/useDeal';
 import { seatPoint } from '../../lib/table-geometry';
-import { useAppState } from '../../state/store';
 import { CardBack } from '../card/PlayingCard';
 import type { SeatScale } from './TableSeat';
 
-/** How long after the game starts the table may still begin dealing, while the first state arrives. */
-const START_WINDOW_MS = 4000;
-/** The whole deal takes about this long, however many players there are. */
-const DEAL_MS = 2400;
-/** The gap between two cards, kept quick for a big table and unhurried for two players. */
-const MIN_GAP_MS = 30;
-const MAX_GAP_MS = 110;
-/** How long one card takes from the deck to its player. */
-const TRAVEL_MS = 420;
 /** Below this gap a flick per card turns into a buzz, so only every other card is heard. */
-const SOUND_GAP_MS = 55;
-/** Opponents' cards land on their avatar; yours land on the fan over the near edge. */
-const REACH = 1;
-const MY_REACH = 0.92;
+const SOUND_GAP_MS = 70;
+/** Opponents' cards slide into the fan in front of them; yours come right up to the near edge. */
+const REACH = 0.88;
+const MY_REACH = 0.95;
 
 interface DealAnimationProps {
-  view: PublicGameView;
+  deal: Deal | null;
   meId: string;
   angleOf: (playerId: string) => number | null;
   /** The draw pile on the felt, where every card comes from. */
@@ -32,51 +22,34 @@ interface DealAnimationProps {
 
 /**
  * The opening deal: seven cards each, face down, one at a time round the table starting left of
- * the dealer (docs/RULES.md), each with a flick. Only when this page saw the game start; a reload or
- * a late join skips it. Cosmetic only; every hand is already dealt.
+ * the dealer (docs/RULES.md §5.18). Each card is flicked off the deck and slides across the felt to
+ * its player, turning to face them, and joins their hand as it lands: the seats count up and your
+ * fan fills one card at a time. Timed by the server's deal, so a page that arrives mid-deal joins
+ * in where the table is. Cosmetic only: every hand is already dealt on the server.
  */
-export function DealAnimation({ view, meId, angleOf, pileRef, scale }: DealAnimationProps) {
-  const dealtAt = useAppState((s) => s.dealtAt);
+export function DealAnimation({ deal, meId, angleOf, pileRef, scale }: DealAnimationProps) {
   const stage = useRef<HTMLDivElement>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
-  const dealerId = view.log.find((e) => e.event.type === 'gameStarted')?.event;
-  const dealer = dealerId?.type === 'gameStarted' ? dealerId.dealerId : null;
-  const ids = view.players.map((p) => p.id);
-  const dealerIndex = Math.max(dealer ? ids.indexOf(dealer) : 0, 0);
-  // Round by round, starting with the player after the dealer.
-  const order = Array.from(
-    { length: STARTING_HAND_SIZE * ids.length },
-    (_, k) => ids[(dealerIndex + 1 + (k % ids.length)) % ids.length] as string,
-  );
+  const startedAt = deal?.startedAt ?? null;
+  const count = deal?.timing.cards ?? 0;
+  const order = deal?.order ?? [];
   const orderKey = order.join(',');
-  const gap = Math.max(MIN_GAP_MS, Math.min(MAX_GAP_MS, DEAL_MS / order.length));
-  const dealMs = order.length * gap + TRAVEL_MS;
-
-  // Which start is being dealt. Held for the whole deal, so a state that arrives late in the start
-  // window still gets the full deal rather than being cut off when the window closes.
-  const [dealing, setDealing] = useState<number | null>(null);
-  const dealLength = useRef(dealMs);
-  dealLength.current = dealMs;
-  useEffect(() => {
-    if (dealtAt === null || performance.now() - dealtAt > START_WINDOW_MS) return;
-    setDealing(dealtAt);
-    const done = window.setTimeout(() => setDealing(null), dealLength.current + 100);
-    return () => window.clearTimeout(done);
-  }, [dealtAt]);
+  const gap = deal?.timing.gapMs ?? 0;
+  const travel = deal?.timing.travelMs ?? 0;
 
   useEffect(() => {
-    if (dealing === null) return;
+    if (startedAt === null) return;
     const targets = orderKey.split(',');
-    const soundEvery = gap < SOUND_GAP_MS ? 2 : 1;
+    const elapsed = performance.now() - startedAt;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-    // Timed with the cards rather than scheduled ahead, so leaving the table stops the patter too.
-    let dealt = 0;
-    const flicks = window.setInterval(() => {
-      if (dealt % soundEvery === 0) playIfOn('deal');
-      dealt += 1;
-      if (dealt >= targets.length) window.clearInterval(flicks);
-    }, gap);
+    // One flick as each card leaves the deck, for the cards still to come.
+    const soundEvery = gap < SOUND_GAP_MS ? 2 : 1;
+    const flicks: number[] = [];
+    for (let i = 0; i < count; i += soundEvery) {
+      const at = i * gap - elapsed;
+      if (at >= 0) flicks.push(window.setTimeout(() => playIfOn('deal'), at));
+    }
 
     const box = stage.current?.getBoundingClientRect();
     const pile = pileRef.current?.getBoundingClientRect();
@@ -89,62 +62,85 @@ export function DealAnimation({ view, meId, angleOf, pileRef, scale }: DealAnima
         : { x: 50, y: 45 };
     const animations = reduced
       ? []
-      : targets.map((playerId, i) => {
+      : Array.from({ length: count }, (_, i) => {
+          const playerId = targets[i % targets.length] as string;
           const angle = angleOf(playerId);
           const el = cards.current[i];
           if (angle === null || !el) return null;
-          const to = seatPoint(angle, playerId === meId ? MY_REACH : REACH);
-          // Each card spins a little on its way, the way a dealt card does.
-          const spin = (to.x - from.x) * 1.2 + (i % 2 === 0 ? 40 : -40);
+          const mine = playerId === meId;
+          const to = seatPoint(angle, mine ? MY_REACH : REACH);
+          // A dealt card ends turned toward its player, never quite square, the way a hand throws it.
+          const jitter = ((i * 37) % 17) - 8;
+          const turn = angle - 90 + jitter;
+          // Cards to the near seats skid a little past and settle back, as on real felt.
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
           return el.animate(
             [
               {
                 left: `${from.x}%`,
                 top: `${from.y}%`,
-                transform: 'translate(-50%, -50%) scale(1) rotate(0deg)',
+                transform: 'translate(-50%, -50%) translateY(0px) scale(1) rotate(0deg)',
                 opacity: 0,
+                easing: 'cubic-bezier(0.3, 0.9, 0.4, 1)',
               },
-              { opacity: 1, offset: 0.1 },
               {
-                left: `${to.x}%`,
-                top: `${to.y}%`,
-                transform: `translate(-50%, -50%) scale(0.6) rotate(${spin}deg)`,
+                left: `${from.x + dx * 0.12}%`,
+                top: `${from.y + dy * 0.12}%`,
+                // Lifted off the top of the deck before it slides away.
+                transform: `translate(-50%, -50%) translateY(-6px) scale(1.04) rotate(${turn * 0.25}deg)`,
+                offset: 0.12,
                 opacity: 1,
-                offset: 0.85,
+                easing: 'cubic-bezier(0.15, 0.6, 0.2, 1)',
+              },
+              {
+                left: `${from.x + dx * 1.03}%`,
+                top: `${from.y + dy * 1.03}%`,
+                transform: `translate(-50%, -50%) translateY(0px) scale(${mine ? 0.95 : 0.7}) rotate(${turn + 4}deg)`,
+                offset: 0.78,
+                easing: 'ease-out',
               },
               {
                 left: `${to.x}%`,
                 top: `${to.y}%`,
-                transform: `translate(-50%, -50%) scale(0.5) rotate(${spin}deg)`,
+                transform: `translate(-50%, -50%) translateY(0px) scale(${mine ? 0.95 : 0.7}) rotate(${turn}deg)`,
+                opacity: 1,
+                offset: 0.94,
+              },
+              {
+                left: `${to.x}%`,
+                top: `${to.y}%`,
+                transform: `translate(-50%, -50%) translateY(0px) scale(${mine ? 0.95 : 0.7}) rotate(${turn}deg)`,
+                // It has joined the hand: the seat's fan or your own cards take its place.
                 opacity: 0,
               },
             ],
             {
-              duration: TRAVEL_MS,
-              delay: i * gap,
-              easing: 'cubic-bezier(0.25, 0.7, 0.3, 1)',
+              duration: travel,
+              delay: i * gap - elapsed,
               fill: 'both',
             },
           );
         });
     return () => {
-      window.clearInterval(flicks);
+      flicks.forEach((t) => window.clearTimeout(t));
       animations.forEach((a) => a?.cancel());
     };
     // `angleOf` is rebuilt every render; the seats it points at only change with `orderKey`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealing, gap, orderKey, meId, pileRef]);
+  }, [startedAt, count, gap, travel, orderKey, meId, pileRef]);
 
-  if (dealing === null) return null;
+  if (startedAt === null) return null;
   return (
     <div ref={stage} aria-hidden className="pointer-events-none absolute inset-0 z-20">
-      {order.map((playerId, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <div
-          key={`${dealing}-${i}-${playerId}`}
+          key={`${startedAt}-${i}`}
           ref={(el) => {
             cards.current[i] = el;
           }}
           className="absolute"
+          // Waiting cards sit hidden on top of the deck until their turn to leave it.
           style={{ opacity: 0 }}
         >
           <CardBack size={scale === 'sm' ? 'xs' : 'sm'} className="shadow-lifted" />

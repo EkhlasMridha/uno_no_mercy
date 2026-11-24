@@ -12,6 +12,7 @@ import { HammerHit } from './HammerHit';
 import { HandExchange } from './HandExchange';
 import { RouletteReveal } from './RouletteReveal';
 import { TableSeat, type SeatScale } from './TableSeat';
+import type { Deal } from '../../hooks/useDeal';
 import type { LastPlay } from '../../hooks/useLastPlay';
 
 interface GameTableProps {
@@ -29,6 +30,8 @@ interface GameTableProps {
   lastPlay: LastPlay | null;
   /** The card your own throw already landed on the heap while the host confirmed it. */
   landedCardId?: string | null;
+  /** The opening deal while it runs: hands fill one card at a time and the first discard waits. */
+  deal: Deal | null;
 }
 
 const COLOR_STROKE = {
@@ -52,6 +55,7 @@ export function GameTable({
   onShowPlayed,
   lastPlay,
   landedCardId = null,
+  deal,
 }: GameTableProps) {
   const count = view.players.length;
   const myIndex = Math.max(
@@ -61,10 +65,13 @@ export function GameTable({
   const angles = new Map(
     view.players.map((p, i) => [p.id, seatAngle((i - myIndex + count) % count, count)]),
   );
-  const opponents = view.players.filter((p) => p.id !== meId);
+  const opponents = view.players
+    .filter((p) => p.id !== meId)
+    .map((p) => (deal ? { ...p, handCount: deal.dealtTo(p.id) } : p));
   const scale: SeatScale = count <= 6 ? 'lg' : count <= 10 ? 'md' : 'sm';
   const clockwise = view.direction === 1;
   const pileRef = useRef<HTMLButtonElement>(null);
+  const turnedOver = useTurnedOverAfterDeal(deal !== null);
 
   return (
     // `isolate` keeps every z-index on the table below page-level popups.
@@ -89,24 +96,33 @@ export function GameTable({
                 building up never pushes the heap into the seats above. */}
             <div className="relative flex flex-col items-center gap-1 landscape:flex-row landscape:gap-6">
               <div className="flex items-end gap-4 short:gap-3 shortest:gap-2">
-                <ColorInPlay color={view.currentColor} clockwise={clockwise} />
+                {/* Like the first discard, the color in play only exists once the deal is done. */}
+                <div className={deal ? 'invisible' : undefined}>
+                  <ColorInPlay color={view.currentColor} clockwise={clockwise} />
+                </div>
                 <DrawPile
                   pileRef={pileRef}
                   log={view.log}
-                  count={view.drawCount}
+                  count={view.drawCount + (deal?.undealt ?? 0)}
                   refillable={view.discardCount > 1 || view.setAsideCount > 0}
                   setAside={view.setAsideCount}
                   canDraw={canDraw}
                   onDraw={onDraw}
                 />
               </div>
-              <DiscardHeap
-                view={view}
-                name={name}
-                angleOf={(id) => angles.get(id) ?? null}
-                onShowPlayed={onShowPlayed}
-                landedCardId={landedCardId}
-              />
+              {/* The first discard is turned over once everyone has their cards. */}
+              <div
+                key={turnedOver}
+                className={deal ? 'invisible' : turnedOver ? 'anim-flip-in' : undefined}
+              >
+                <DiscardHeap
+                  view={view}
+                  name={name}
+                  angleOf={(id) => angles.get(id) ?? null}
+                  onShowPlayed={onShowPlayed}
+                  landedCardId={landedCardId}
+                />
+              </div>
 
               {view.pendingDraw && (
                 <div
@@ -136,7 +152,7 @@ export function GameTable({
           avatar={avatarOf(p.id)}
           angle={angles.get(p.id) ?? 270}
           scale={scale}
-          isCurrent={p.id === view.currentPlayerId}
+          isCurrent={!deal && p.id === view.currentPlayerId}
           canCatch={catchableIds.includes(p.id)}
           onCatch={() => onCatch(p.id)}
           lastPlayed={lastPlay?.playerId === p.id ? lastPlay : null}
@@ -152,7 +168,7 @@ export function GameTable({
       />
 
       <DealAnimation
-        view={view}
+        deal={deal}
         meId={meId}
         angleOf={(id) => angles.get(id) ?? null}
         pileRef={pileRef}
@@ -174,6 +190,17 @@ export function GameTable({
       />
     </div>
   );
+}
+
+/** Counts deals that ended while this table was open, so the first discard flips over once each. */
+function useTurnedOverAfterDeal(dealing: boolean): number {
+  const [turned, setTurned] = useState(0);
+  const wasDealing = useRef(dealing);
+  useEffect(() => {
+    if (wasDealing.current && !dealing) setTurned((n) => n + 1);
+    wasDealing.current = dealing;
+  }, [dealing]);
+  return turned;
 }
 
 /**

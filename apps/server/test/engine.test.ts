@@ -619,6 +619,7 @@ describe('Mercy Rule', () => {
       connected: () => true,
       isComputer: () => false,
       gender: () => null,
+      avatar: () => null,
       hostId: pid(0),
     });
     expect(view.playHistory.map((e) => [e.playerId, e.card.kind])).toEqual([[pid(0), 'draw4']]);

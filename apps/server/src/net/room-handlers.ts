@@ -14,6 +14,7 @@ import {
   type SessionInfo,
 } from '@nomercy/shared';
 import { z } from 'zod';
+import type { Matchmaker } from '../rooms/matchmaker.js';
 import type { RoomPlayer, Room } from '../rooms/room.types.js';
 import { RoomError, type RoomManager } from '../rooms/room-manager.js';
 import type { Broadcaster } from './broadcaster.js';
@@ -25,6 +26,7 @@ export interface HandlerDeps {
   io: GameServer;
   socket: GameSocket;
   manager: RoomManager;
+  matchmaker: Matchmaker;
   broadcaster: Broadcaster;
   limiter: RateLimiter;
 }
@@ -47,6 +49,9 @@ export function registerRoomHandlers(deps: HandlerDeps): void {
   const requireUnbound = () => {
     if (socket.data.session) {
       throw new RoomError('ALREADY_IN_ROOM', 'Leave your current room first');
+    }
+    if (deps.matchmaker.isSearching(socket.id)) {
+      throw new RoomError('ALREADY_IN_ROOM', 'Cancel your match search first');
     }
   };
 

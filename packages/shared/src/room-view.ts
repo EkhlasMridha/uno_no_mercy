@@ -2,6 +2,12 @@ import type { EndReason } from './game-view.js';
 
 export type RoomStatus = 'lobby' | 'inGame' | 'roundOver';
 
+/**
+ * How the room came about: `friends` is a lobby people are invited to; `global` is a table dealt by
+ * Play global matchmaking (docs/RULES.md §5.19), which plays one round and has no lobby.
+ */
+export type RoomMode = 'friends' | 'global';
+
 /** Which set of cartoon avatars a person is drawn from, chosen when they create or join a room. */
 export const GENDERS = ['male', 'female'] as const;
 export type Gender = (typeof GENDERS)[number];
@@ -21,6 +27,8 @@ export interface LobbyPlayerView {
   isComputer: boolean;
   /** Picks the player's avatar. Null for computer players, who are drawn as robots. */
   gender: Gender | null;
+  /** A face fixed for this player (Play global), below `AVATAR_VARIANTS`; null deals one per table. */
+  avatar: number | null;
   ready: boolean;
   connected: boolean;
   /** Player left or timed out during a running game; kept until the room returns to the lobby. */
@@ -49,6 +57,7 @@ export interface RoundResultView {
 
 export interface RoomView {
   code: string;
+  mode: RoomMode;
   hostId: string;
   status: RoomStatus;
   players: LobbyPlayerView[];
@@ -72,6 +81,27 @@ export interface ChatMessage {
   sentAt: number;
   /** Who reacted with each emoji. An emoji nobody chose is absent. */
   reactions: Partial<Record<string, string[]>>;
+}
+
+/** One player found by a Play global search. */
+export interface MatchSeatView {
+  id: string;
+  name: string;
+  gender: Gender;
+  avatar: number;
+}
+
+/** A Play global search as one searcher sees it (docs/RULES.md §5.19). */
+export interface MatchSearchView {
+  /** This searcher's player id, kept as their seat id once the match is dealt. */
+  meId: string;
+  /** Everyone in the match so far, in order of arrival. */
+  players: MatchSeatView[];
+  tableSize: number;
+  /** Time left on the countdown when this view was sent. */
+  remainingMs: number;
+  /** Every seat is taken: the deal follows in a moment. */
+  found: boolean;
 }
 
 export interface SessionInfo {

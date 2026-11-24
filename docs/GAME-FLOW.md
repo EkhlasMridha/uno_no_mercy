@@ -3,6 +3,13 @@
 ## Room lifecycle
 
 ```
+Home ──Play global──► name + avatar set ──► Search (countdown, seats fill)
+                                              │ full, or the countdown ends (computers fill)
+                                              ▼
+                                            inGame (global) ──(win)──► roundOver
+                                                                         │ Play again ──► Search
+                                                                         │ Home ──► Home
+
 Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    │  guests toggle Ready; host may enable scoring
                    │  anyone may rename or switch avatar set
@@ -15,6 +22,14 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
                    └─────────────────┘
 ```
 
+- **Play global** (docs/RULES.md §5.19): the button opens a popup for a name (the one this browser
+  last used, if any) and an avatar set; both are required. **Find a match** starts the search and
+  opens the search screen (`GlobalSearchPage.tsx`): an oval table with the countdown on the felt and a
+  seat for each player found, your own at the bottom, the empty ones marked "Searching…". Each
+  arrival fills a seat with that player's face and name. Once every seat is taken the screen says
+  "Match found!" and the table is dealt a moment later. **Cancel** goes back home. A global table
+  shows "Global match" instead of a room code, plays one round, and its results offer **Play again**
+  (a new search under the same name and avatar set) and **Home**.
 - **Group chat** is open to everyone seated in the room, in the lobby and during a game, and never
   leaves the room. Text and emoji, one line up to 300 characters. The lobby shows it in a column at the
   right edge; at the table the side panel is split in half, game log and players above, chat below. Either
@@ -29,10 +44,11 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
   own room" beside it; only a code the server couldn't find opens the join popup to check it.
 - **The landing page** (`HomePage.tsx`) is the brand page: a shuffling deck (two deals, then it
   rests), the rules with small hands-on demos (stacking, the Mercy Rule), every action card and an
-  FAQ. The top bar has How to play, Cards, FAQ, Join and Play; on phones only How to play (as an
-  icon) and Play. **Play** opens a lobby at once as host, under the name this browser last used or a
+  FAQ. The top bar has How to play, Cards and FAQ (from `md`), Join and With friends (from `sm`),
+  and Play global; on phones only How to play (as an icon) and Play global. The hero offers Play
+  global, Play with friends and Join a room. **Play with friends** opens a lobby at once as host, under the name this browser last used or a
   random one, with the male avatar set and 4 seats; all of it can be changed in the lobby, and
-  computers fill the open seats from there. While the server is unreachable, Play reads
+  computers fill the open seats from there. While the server is unreachable, the play buttons read
   "Connecting…" and a line under it says why. **Join a room** opens a popup for the room code (a
   pasted invite link or invite text works too) and an optional name. A typed name is sent exactly,
   with no random fallback, so a held seat can be taken back from another device (docs/RULES.md
@@ -53,6 +69,9 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
 
 1. The server sends each player `game:state`. Their `validActions` list the playable card ids and say
    whether they may draw, take a penalty, name a roulette color, call UNO or catch someone.
+   At the start of every round the cards are dealt first (RULES.md §5.18): one at a time round the table,
+   each player's hand and seat count filling as their cards land, and the first discard turned over at the
+   end. Until then nothing is open to anyone, and the status line says the cards are being dealt.
 2. The player clicks a highlighted card.
    - Wild (except Roulette): the client asks for a color first.
    - Colored 7 with more cards left: the client asks for a swap target first.

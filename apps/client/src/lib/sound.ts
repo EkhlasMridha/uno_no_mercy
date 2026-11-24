@@ -1,5 +1,5 @@
 import type { Gender } from '@nomercy/shared';
-import hammerUrl from '../assets/sounds/punch-hammer-hit.mp3';
+import hammerUrl from '../assets/sounds/flesh-impact.mp3';
 
 /**
  * The game sounds. Each is synthesized with Web Audio, or spoken by the browser's own speech voices
@@ -37,14 +37,16 @@ const AudioContextCtor: typeof AudioContext | undefined =
   window.AudioContext ?? window.webkitAudioContext;
 
 let ctx: AudioContext | null = null;
+/** The player's "Mute all": the game's own audio is held suspended, never the device's volume. */
+let gameMuted = false;
 
 /**
  * Browsers keep audio suspended until the player interacts, so call this from a click, tap or key
  * press. It returns at once while audio runs, and resumes a context the OS suspended (a phone sent
- * to the background) on the next tap.
+ * to the background) on the next tap. It stays silent while the game is muted.
  */
 export function unlockAudio(): void {
-  if (!AudioContextCtor || ctx?.state === 'running') return;
+  if (!AudioContextCtor || gameMuted || ctx?.state === 'running') return;
   ctx ??= new AudioContextCtor();
   void ctx.resume();
   loadHammer(ctx);
@@ -52,6 +54,8 @@ export function unlockAudio(): void {
 
 /** The recorded hammer hit, decoded once the first time audio is unlocked. */
 let hammer: AudioBuffer | null = null;
+/** Seconds of near-silence before the hit's transient, skipped so the thud lands on the strike. */
+let hammerOnset = 0;
 let hammerLoading = false;
 
 function loadHammer(ac: AudioContext): void {
@@ -61,6 +65,7 @@ function loadHammer(ac: AudioContext): void {
     .then((res) => res.arrayBuffer())
     .then((bytes) => ac.decodeAudioData(bytes))
     .then((buffer) => {
+      hammerOnset = findOnset(buffer);
       hammer = buffer;
     })
     // A failed load leaves the hammer silent; the next unlock tries again.
@@ -69,25 +74,31 @@ function loadHammer(ac: AudioContext): void {
     });
 }
 
-/** Seconds between the hammer's blows, matching the swing in `HammerHit.tsx`. */
-export const HAMMER_BLOW_S = 0.3;
-/** How many times the hammer comes down, matching `HammerHit.tsx`. */
-export const HAMMER_BLOWS = 3;
+/** Where the recording first gets loud, less a few milliseconds so the attack isn't clipped. */
+function findOnset(buffer: AudioBuffer): number {
+  const samples = buffer.getChannelData(0);
+  let peak = 0;
+  for (const s of samples) peak = Math.max(peak, Math.abs(s));
+  const threshold = peak * 0.2;
+  const first = samples.findIndex((s) => Math.abs(s) >= threshold);
+  return first <= 0 ? 0 : Math.max(0, first / buffer.sampleRate - 0.004);
+}
 
-/** The recorded hit, once per blow, each a little softer, like a hammer bouncing off a head. */
+/** How long the hammer is on screen, wind-up to fade-out, matching `HammerHit.tsx`. */
+export const HAMMER_TOTAL_S = 1.6;
+/** When the mallet meets the head, from the start of the wind-up: 40% of `hammer-swing`. */
+export const HAMMER_IMPACT_S = 0.64;
+
+/** The recorded hit, once, timed to the moment the mallet lands. */
 function playHammer(ac: AudioContext, at: number): void {
   if (!hammer) return;
-  for (let i = 0; i < HAMMER_BLOWS; i++) {
-    const source = ac.createBufferSource();
-    source.buffer = hammer;
-    // Each blow lands a touch lower, so the three don't sound copy-pasted.
-    source.playbackRate.value = 1 - i * 0.06;
-    const amp = ac.createGain();
-    amp.gain.value = 0.9 - i * 0.2;
-    source.connect(amp).connect(ac.destination);
-    releaseWhenDone(source, source, amp);
-    source.start(at + i * HAMMER_BLOW_S);
-  }
+  const source = ac.createBufferSource();
+  source.buffer = hammer;
+  const amp = ac.createGain();
+  amp.gain.value = 0.95;
+  source.connect(amp).connect(ac.destination);
+  releaseWhenDone(source, source, amp);
+  source.start(at + HAMMER_IMPACT_S, hammerOnset);
 }
 
 /**
@@ -237,7 +248,31 @@ function sayUno(gender: Gender, delay: number): void {
   utterance.lang = voice?.lang ?? 'en-US';
   utterance.pitch = voice ? (gender === 'female' ? 1.15 : 0.9) : gender === 'female' ? 1.6 : 0.6;
   utterance.rate = 1.1;
-  window.setTimeout(() => speech.speak(utterance), delay * 1000);
+  const timer = window.setTimeout(() => {
+    pendingSpeech.delete(timer);
+    speech.speak(utterance);
+  }, delay * 1000);
+  pendingSpeech.add(timer);
+}
+
+/** UNO calls waiting on their delay, so muting can drop them before they are spoken. */
+const pendingSpeech = new Set<number>();
+
+/**
+ * Mutes or unmutes the game alone. Muting suspends the game's audio (cutting off anything still
+ * ringing) and drops queued UNO calls; other tabs and apps keep their sound.
+ */
+export function setGameMuted(muted: boolean): void {
+  gameMuted = muted;
+  if (muted) {
+    void ctx?.suspend();
+    pendingSpeech.forEach((timer) => window.clearTimeout(timer));
+    pendingSpeech.clear();
+    // Only cancels this page's own speech.
+    speech?.cancel();
+  } else if (ctx) {
+    void ctx.resume();
+  }
 }
 
 const SOUNDS: Record<

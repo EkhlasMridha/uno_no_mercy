@@ -2,6 +2,7 @@ import type {
   Ack,
   ChatMessage,
   Gender,
+  RoomMode,
   RoomSettings,
   RoomStatus,
   RoundResultView,
@@ -14,6 +15,8 @@ export interface RoomPlayer {
   name: string;
   /** Picks the avatar. Null for computer players. */
   gender: Gender | null;
+  /** A face fixed for this player (Play global); null deals one per table. */
+  avatar: number | null;
   /** Secret, room-scoped. Only ever sent to this player's own socket. */
   reconnectToken: string;
   ready: boolean;
@@ -40,6 +43,8 @@ export interface HandShare {
 
 export interface Room {
   code: string;
+  /** A global room came from matchmaking and disguises its computers as people (RULES §5.19). */
+  mode: RoomMode;
   hostId: string;
   status: RoomStatus;
   players: RoomPlayer[];
@@ -53,8 +58,19 @@ export interface Room {
   createdAt: number;
   /** Pending computer move, if any. */
   computerTimer: ReturnType<typeof setTimeout> | null;
+  /** The computer the pending move was timed for, so it is the one that moves when the timer fires. */
+  computerPlanId: string | null;
+  /**
+   * Global rooms: what each computer decided about a passing chance (calling UNO, a catch), so it
+   * doesn't decide afresh every time the table changes. Cleared when a round is dealt.
+   */
+  computerIntents: Map<string, boolean>;
+  /** Global rooms: computers' delayed chat lines and hand-request answers. Cleared on close. */
+  sideTimers: Set<ReturnType<typeof setTimeout>>;
   /** When the UNO breather after the last play or turn change ends (epoch ms; 0 for none). */
   turnHoldUntil: number;
+  /** When the opening deal finishes (epoch ms; 0 for none). Nobody acts before then (§5.18). */
+  dealUntil: number;
   /** Re-sends the table when the breather ends, so clients see their actions open again. */
   holdTimer: ReturnType<typeof setTimeout> | null;
   /** Hand-sharing requests this round. Cleared when a round is dealt. */

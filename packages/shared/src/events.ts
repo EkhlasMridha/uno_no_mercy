@@ -1,6 +1,6 @@
 import type { AckCallback } from './errors.js';
 import type { GameStateView } from './game-view.js';
-import type { ChatMessage, RoomView, SessionInfo } from './room-view.js';
+import type { ChatMessage, MatchSearchView, RoomView, SessionInfo } from './room-view.js';
 import type {
   AcceptPenaltyPayload,
   AnswerHandRequestPayload,
@@ -20,6 +20,7 @@ import type {
   RequestHandPayload,
   RoomSettingsPayload,
   RouletteColorPayload,
+  SearchMatchPayload,
   StartGamePayload,
   TransferHostPayload,
   WaitForPlayerPayload,
@@ -39,6 +40,10 @@ export interface ClientToServerEvents {
   'room:join': (payload: JoinRoomPayload, ack: AckCallback<SessionInfo>) => void;
   'room:reconnect': (payload: ReconnectPayload, ack: AckCallback<SessionInfo>) => void;
   'room:leave': (payload: Record<string, never>, ack: AckCallback<null>) => void;
+  /** Play global: join a match search (docs/RULES.md §5.19). */
+  'match:search': (payload: SearchMatchPayload, ack: AckCallback<MatchSearchView>) => void;
+  /** Leave the match search. */
+  'match:cancel': (payload: Record<string, never>, ack: AckCallback<null>) => void;
   'room:profile': (payload: ProfilePayload, ack: AckCallback<null>) => void;
   'room:kick': (payload: KickPayload, ack: AckCallback<null>) => void;
   'room:transfer-host': (payload: TransferHostPayload, ack: AckCallback<null>) => void;
@@ -76,6 +81,12 @@ export interface ServerToClientEvents {
   /** A message whose reactions changed, to replace the copy the client holds. */
   'chat:update': (message: ChatMessage) => void;
   'room:closed': (payload: { reason: string }) => void;
+  /** The searcher's match changed: someone arrived or left. */
+  'match:state': (search: MatchSearchView) => void;
+  /** The match was dealt: this socket now holds the seat, as after `room:join`. */
+  'match:found': (session: SessionInfo) => void;
+  /** The search ended without a table (only when the server shuts down). */
+  'match:closed': (payload: { reason: string }) => void;
 }
 
 export type ClientEventName = keyof ClientToServerEvents;

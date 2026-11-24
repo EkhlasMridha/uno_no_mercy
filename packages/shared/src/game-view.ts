@@ -99,6 +99,8 @@ export interface PublicPlayerView {
   isComputer: boolean;
   /** Picks the player's avatar. Null for computer players, who are drawn as robots. */
   gender: Gender | null;
+  /** A face fixed for this player (Play global); null deals one per table. */
+  avatar: number | null;
 }
 
 /** One card that went onto the discard pile this round. `playerId` is null for the starting card. */
@@ -189,6 +191,11 @@ export interface GameStateView {
    * it runs, `validActions` only offers calling UNO; 0 when the table is open.
    */
   turnHoldMs: number;
+  /**
+   * Milliseconds left in the opening deal (docs/RULES.md §5.18). While the cards go round, nobody
+   * may act and `validActions` offers nothing; 0 once the deal is over.
+   */
+  dealMs: number;
   /** The whole table laid open, once the round is finished; null before that. */
   reveal: RoundReveal | null;
 }

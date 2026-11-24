@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import type { GameLogEntry } from '@nomercy/shared';
-import { HAMMER_BLOW_S, HAMMER_BLOWS } from '../../lib/sound';
+import { HAMMER_IMPACT_S, HAMMER_TOTAL_S } from '../../lib/sound';
 import { seatPoint } from '../../lib/table-geometry';
 import type { SeatScale } from './TableSeat';
 
@@ -10,9 +11,11 @@ const MY_REACH = 0.72;
 /** Gap from the seat's centre to the top of the avatar, per scale. */
 const HEAD_OFFSET: Record<SeatScale, number> = { lg: 34, md: 24, sm: 16 };
 /** The mallet's length in pixels, per scale. */
-const SIZE: Record<SeatScale, number> = { lg: 64, md: 50, sm: 38 };
+const SIZE: Record<SeatScale, number> = { lg: 76, md: 58, sm: 44 };
 /** Where the head's centre sits along the mallet, as a share of its length. */
-const HEAD_X = 0.17;
+const HEAD_X = 0.18;
+/** The mallet's height as a share of its length, from its viewBox. */
+const ASPECT = 40 / 72;
 /** A card played in the same update lands first, as the sound waits for it in `useGameSounds`. */
 const AFTER_PLAY_MS = 300;
 
@@ -30,8 +33,9 @@ interface HammerHitProps {
 }
 
 /**
- * A mallet bonking the head of whoever takes penalty cards (a stacked penalty or a missed UNO),
- * once per blow of the hammer sound. Cosmetic only; the cards are already in the hand.
+ * A cartoon mallet bonking the head of whoever takes penalty cards (a stacked penalty or a missed
+ * UNO): one slow wind-up, a single blow in time with the hammer sound, and stars round their head.
+ * Cosmetic only; the cards are already in the hand.
  */
 export function HammerHit({ log, meId, angleOf, scale }: HammerHitProps) {
   const bonks = useNewPenalties(log);
@@ -39,31 +43,84 @@ export function HammerHit({ log, meId, angleOf, scale }: HammerHitProps) {
   if (reduced) return null;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-20">
+    <div aria-hidden className="pointer-events-none absolute inset-0">
       {bonks.map((bonk) => {
         const angle = angleOf(bonk.playerId);
         if (angle === null) return null;
         const mine = bonk.playerId === meId;
         const point = seatPoint(angle, mine ? MY_REACH : REACH);
-        // Seats on the right swing in from the left, so the mallet stays on the stage.
-        const flip = point.x > 60;
-        const size = SIZE[scale];
         return (
-          <div
+          <SeatAnchor
             key={bonk.seq}
-            className="absolute"
-            style={{
-              left: `${point.x}%`,
-              top: `${point.y}%`,
-              // Centres the mallet's head over the seat, its striking face on top of the avatar.
-              transform: `translate(${-size * (flip ? 1 - HEAD_X : HEAD_X)}px, -${(mine ? 0 : HEAD_OFFSET[scale]) + size * 0.55}px) scaleX(${flip ? -1 : 1})`,
-            }}
-          >
-            <Mallet size={size} delayMs={bonk.delayMs} />
-          </div>
+            x={point.x}
+            y={point.y}
+            // Seats on the right swing in from the left, so the mallet stays on the stage.
+            flip={point.x > 60}
+            headOffset={mine ? 0 : HEAD_OFFSET[scale]}
+            size={SIZE[scale]}
+            delayMs={bonk.delayMs}
+          />
         );
       })}
     </div>
+  );
+}
+
+/** The width of the measuring box, to read how much the table is scaled down on small phones. */
+const PROBE_PX = 100;
+
+/**
+ * Marks the seat on the table, then draws the mallet there in a portal on top of the page, so a
+ * swing over a top seat is never cut off by the top bar or anything else stacked over the table.
+ */
+function SeatAnchor({
+  x,
+  y,
+  flip,
+  headOffset,
+  size,
+  delayMs,
+}: {
+  x: number;
+  y: number;
+  flip: boolean;
+  headOffset: number;
+  size: number;
+  delayMs: number;
+}) {
+  const probe = useRef<HTMLDivElement>(null);
+  const [spot, setSpot] = useState<{ left: number; top: number; zoom: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const rect = probe.current?.getBoundingClientRect();
+    if (rect) setSpot({ left: rect.left, top: rect.top, zoom: rect.width / PROBE_PX || 1 });
+  }, [x, y]);
+
+  return (
+    <>
+      <div
+        ref={probe}
+        className="invisible absolute h-0"
+        style={{ left: `${x}%`, top: `${y}%`, width: PROBE_PX }}
+      />
+      {spot &&
+        createPortal(
+          <div
+            aria-hidden
+            className="pointer-events-none fixed z-[55]"
+            style={{
+              left: spot.left,
+              top: spot.top,
+              transformOrigin: '0 0',
+              // Centres the mallet's head over the seat, its striking face on top of the avatar.
+              transform: `scale(${spot.zoom}) translate(${-size * (flip ? 1 - HEAD_X : HEAD_X)}px, -${headOffset + size * ASPECT}px) scaleX(${flip ? -1 : 1})`,
+            }}
+          >
+            <Mallet size={size} delayMs={delayMs} />
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -103,7 +160,7 @@ function useNewPenalties(log: GameLogEntry[]): Bonk[] {
         timers.current.delete(done);
         setBonks((current) => current.filter((b) => b.seq !== bonk.seq));
       },
-      delayMs + HAMMER_BLOWS * HAMMER_BLOW_S * 1000 + 250,
+      delayMs + HAMMER_TOTAL_S * 1000 + 100,
     );
     timers.current.add(done);
   }, [log]);
@@ -112,61 +169,110 @@ function useNewPenalties(log: GameLogEntry[]): Bonk[] {
 }
 
 /**
- * A cartoon mallet pivoting on the end of its handle, to the right of the head it hits, with a
- * gold burst at each blow. The swing repeats once per blow of the sound.
+ * A cartoon mallet pivoting on the end of its handle, to the right of the head it hits. It winds
+ * up slowly, hangs at the top, comes down hard with its head squashing on the blow, bounces off and
+ * settles. A burst marks the blow and dizzy stars circle the victim's head after it.
  */
 function Mallet({ size, delayMs }: { size: number; delayMs: number }) {
-  const blow = `${HAMMER_BLOW_S * 1000}ms`;
-  const timing = { animationDuration: blow, animationDelay: `${delayMs}ms` };
+  const life = { animationDuration: `${HAMMER_TOTAL_S * 1000}ms`, animationDelay: `${delayMs}ms` };
+  const impactDelay = `${delayMs + HAMMER_IMPACT_S * 1000}ms`;
+  const height = size * ASPECT;
+  const burst = size * 0.62;
+  const star = Math.round(size * 0.19);
   return (
-    <div
-      className="anim-hammer-life relative"
-      style={{
-        width: size,
-        height: size * 0.55,
-        animationDelay: `${delayMs}ms`,
-        animationDuration: `${HAMMER_BLOWS * HAMMER_BLOW_S * 1000 + 200}ms`,
-      }}
-    >
+    <div className="anim-hammer-life relative" style={{ ...life, width: size, height }}>
       <svg
-        viewBox="0 0 64 36"
-        className="anim-hammer-swing absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_3px_3px_rgba(0,0,0,0.55)]"
-        style={{ ...timing, transformOrigin: '96% 50%', animationIterationCount: HAMMER_BLOWS }}
+        viewBox="0 0 72 40"
+        className="anim-hammer-swing absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_4px_3px_rgba(0,0,0,0.55)]"
+        style={{ ...life, transformOrigin: '94.5% 51%' }}
       >
-        {/* The handle runs from the pivot on the right to the head on the left. */}
-        <rect x="16" y="15" width="47" height="6" rx="3" className="fill-walnut" />
-        <rect x="16" y="15" width="47" height="2" rx="1" className="fill-chalk/25" />
-        {/* The head: a chunky block, its striking face pointing down. */}
+        {/* The handle runs from the knob at the pivot on the right to the head on the left. */}
         <rect
-          x="1"
-          y="2"
-          width="20"
-          height="32"
-          rx="4"
-          className="fill-felt-700 stroke-chalk/80"
-          strokeWidth="1.5"
+          x="20"
+          y="17"
+          width="48"
+          height="7"
+          rx="3.5"
+          className="fill-walnut-light stroke-room"
+          strokeWidth="2"
         />
-        <rect x="1" y="29" width="20" height="5" rx="2" className="fill-chalk/70" />
-        <rect x="4" y="5" width="4" height="22" rx="2" className="fill-chalk/30" />
+        <rect x="23" y="18.5" width="40" height="1.6" rx="0.8" className="fill-chalk/40" />
+        <circle
+          cx="68"
+          cy="20.5"
+          r="4.5"
+          className="fill-walnut-dark stroke-room"
+          strokeWidth="2"
+        />
+        {/* The head: a barrel in oxblood and brass, its striking face pointing down. */}
+        <g className="anim-hammer-squash" style={life}>
+          <rect
+            x="2"
+            y="2"
+            width="22"
+            height="36"
+            rx="7"
+            className="fill-oxblood stroke-room"
+            strokeWidth="2.5"
+          />
+          <rect x="2.5" y="7" width="21" height="4" className="fill-brass" />
+          <rect x="2.5" y="29" width="21" height="4" className="fill-brass" />
+          <rect x="6" y="13" width="3.5" height="13" rx="1.75" className="fill-chalk/35" />
+        </g>
       </svg>
+      {/* The burst where the face meets the head. */}
       <svg
-        viewBox="0 0 24 24"
-        className="anim-hammer-star absolute"
+        viewBox="0 0 40 40"
+        className="anim-hammer-burst absolute overflow-visible"
         style={{
-          ...timing,
-          animationIterationCount: HAMMER_BLOWS,
-          width: size * 0.5,
-          height: size * 0.5,
-          left: -size * 0.07,
-          top: size * 0.42,
+          animationDelay: impactDelay,
+          width: burst,
+          height: burst,
+          left: size * HEAD_X - burst / 2,
+          top: height - burst / 2,
         }}
       >
+        <g className="stroke-chalk" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M20 1v5M38 12l-5 2.5M38 28l-5-2.5M2 12l5 2.5M2 28l5-2.5" />
+        </g>
         <path
-          d="M12 1l2.4 6.6L21 5l-3.6 5.4L23 12l-5.6 1.6L21 19l-6.6-2.6L12 23l-2.4-6.6L3 19l3.6-5.4L1 12l5.6-1.6L3 5l6.6 2.6z"
+          d="M20 8l3 6.5 7-2.5-2.5 7 6.5 3-6.5 3 2.5 7-7-2.5-3 6.5-3-6.5-7 2.5 2.5-7-6.5-3 6.5-3-2.5-7 7 2.5z"
           className="fill-brass stroke-room"
-          strokeWidth="1"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
         />
+        <circle cx="20" cy="22" r="4" className="fill-chalk" />
       </svg>
+      {/* Dizzy stars orbiting the victim's head once the blow has landed. */}
+      <div
+        className="anim-hammer-dizzy absolute"
+        style={{ animationDelay: impactDelay, left: size * HEAD_X, top: height + size * 0.06 }}
+      >
+        {[0, 1, 2].map((i) => (
+          <svg
+            key={i}
+            viewBox="0 0 24 24"
+            className="anim-hammer-orbit absolute"
+            style={
+              {
+                width: star,
+                height: star,
+                margin: -star / 2,
+                '--rx': `${size * 0.34}px`,
+                '--ry': `${size * 0.09}px`,
+                animationDelay: `${(-i * 700) / 3}ms`,
+              } as CSSProperties
+            }
+          >
+            <path
+              d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.2l-6.1 3.4 1.4-6.8-5.1-4.7 6.9-.8z"
+              className="fill-brass stroke-room"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ))}
+      </div>
     </div>
   );
 }

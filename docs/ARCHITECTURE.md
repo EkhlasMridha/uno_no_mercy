@@ -27,7 +27,8 @@ This is an npm workspaces monorepo with strict TypeScript everywhere. `packages/
 - **Engine** (`apps/server/src/engine`): pure functions over a `GameState`. It does not import Express,
   Socket.IO or React. Randomness is injected (`Rng`), so tests are deterministic.
 - **Rooms** (`apps/server/src/rooms`): room lifecycle, membership, host authority, reconnect tokens,
-  disconnect timers, per-player projections and optional match scoring.
+  disconnect timers, per-player projections and optional match scoring, plus Play global matchmaking
+  (`Matchmaker`, which hands a full match to `RoomManager.createGlobalRoom`).
 - **Net** (`apps/server/src/net`): validates and routes typed events, then broadcasts. The handlers are
   small and call into `RoomManager`.
 - **Client**: renders the projections. Legal moves come from the server's `validActions`, so the client
@@ -121,6 +122,15 @@ still go through. `toGameView` sends `turnHoldMs` and strips every action except
 `validActions`, and a per-room `holdTimer` re-broadcasts when the hold ends, so clients never run a clock.
 A play that hands the turn straight back to its player skips the hold unless a player is left
 vulnerable to a catch (`needsTurnHold`). Computers wait it out too. The timing lives in the rooms layer, so the engine stays clock-free.
+The timer checks the clock again when it fires and waits out any remainder, because Node timers can fire
+a millisecond early; re-sending then would leave the next player looking at a held table.
+
+**Opening deal.** Dealing a round sets `room.dealUntil` to `dealTiming(players).totalMs` ahead
+(`packages/shared/src/deal.ts`, docs/RULES.md §5.18). It holds the same commands as the breather (with
+its own message), `toGameView` sends `dealMs` and strips `validActions` the same way, computers wait for
+it, and the same `holdTimer` re-broadcasts when it ends. The client animates the deal from `dealMs`
+(`useDeal`, `DealAnimation.tsx`), so a page that joins mid-deal picks up where the table is. Tests that
+are not about the deal pass `dealHold: false`.
 
 ## Network protocol
 
@@ -133,6 +143,8 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `room:wait-for-player`       | `{ playerId, wait }`                                                 | the dropped player's decider only: `true` holds the seat, `false` makes them forfeit now                |
 | `room:reconnect`             | `{ code, token }`                                                    | restores the seat; closes an older socket for the same seat                                             |
 | `room:leave`                 | `{}`                                                                 | lobby: frees the seat; in game: forfeit                                                                 |
+| `match:search`               | `{ name, gender }`                                                   | Play global (RULES.md §5.19); returns `MatchSearchView`; refused while seated or already searching      |
+| `match:cancel`               | `{}`                                                                 | leaves the search; a disconnect does the same                                                           |
 | `room:profile`               | `{ name?, gender? }`                                                 | lobby only; your own seat; at least one field; names stay unique                                        |
 | `room:kick`                  | `{ playerId }`                                                       | host, lobby only; the removed player gets `room:closed` and is unbound                                  |
 | `room:transfer-host`         | `{ playerId }`                                                       | host, lobby only; target must be connected; the old host becomes a guest                                |
@@ -141,8 +153,8 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 | `chat:send`                  | `{ text }`                                                           | any seated player, lobby or game; 1–300 chars, one line; delivered only to this room's sockets          |
 | `chat:react`                 | `{ messageId, emoji }`                                               | toggles your reaction (one of six fixed emoji) on a message still in the history                        |
 | `game:start`                 | `{ fillWithComputers? }`                                             | host; everyone else ready; computers may fill open seats                                                |
-| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points)                                                     |
-| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags                                                                     |
+| `game:restart`               | `{}`                                                                 | host; next round (or a new match after 1000 points); refused at a global table                          |
+| `room:return-lobby`          | `{}`                                                                 | host; resets scores and ready flags; refused at a global table                                          |
 | `game:request-state`         | `{}`                                                                 | resends this player's projection                                                                        |
 | `game:play-card`             | `{ commandId, version, cardId, color?, swapTargetId?, declareUno? }` | also used for **stacking**                                                                              |
 | `game:draw`                  | `{ commandId, version }`                                             | one card per press; reveals a card during Color Roulette                                                |
@@ -156,7 +168,10 @@ All client→server events are acknowledged with `Ack<T> = { ok: true, data } | 
 
 Server→client: `room:state` (`RoomView`), `game:state` (`GameStateView`, per player), `chat:message`
 (one `ChatMessage`, sent to the sockets seated in that room only), `chat:update` (a message whose reactions changed, same audience), `chat:history` (the last 30 lines, sent on
-join, reconnect and `game:request-state`), `room:closed`. Chat lives in `Room.chat` in memory and is gone
+join, reconnect and `game:request-state`), `room:closed`, and for Play global `match:state` (the
+searcher's `MatchSearchView` whenever someone arrives or leaves), `match:found` (the `SessionInfo` of the
+seat the socket now holds, as after `room:join`) and `match:closed` (the search ended with no table,
+only on shutdown or a full server). Chat lives in `Room.chat` in memory and is gone
 with the room; it is not part of `room:state`, so it never rides along with game broadcasts.
 `GameStateView.handShare` carries only this player's own hand-sharing: their request (with the
 watched hand once agreed) and the requests on their own hand. The shares live on the room
@@ -245,6 +260,28 @@ and the first one goes through `executeGameCommand`, the same path a human comma
 falls back to a plain draw or penalty, and if nothing goes through the timer is set again, so the table
 never waits on a computer. Each move schedules the next, so computers keep playing until a human must act
 or the round ends. The public views mark them `isComputer`, and they always count as connected and ready.
+
+**Play global** (docs/RULES.md §5.19). `rooms/matchmaker.ts` keeps one pool of forming matches. A
+`match:search` takes a free seat in the oldest match that has one and no clashing name, or opens a match
+with its own countdown (`GLOBAL_SEARCH_MS`). The seat gets its player id and a face (`pickAvatar`: a
+character and backdrop nobody at the table has) at once, and keeps both at the table. In the last
+`GLOBAL_BOT_WINDOW_MS` a timer seats one computer at a time (names and faces from
+`RoomManager.globalComputerSeats`), each next arrival a random share of the time left per empty seat;
+a deadline timer seats any still missing, so the countdown always ends with a full table. A full match
+waits `MATCH_FOUND_PAUSE_MS`, then `onMatchReady` calls `createGlobalRoom`, binds each person's socket
+and sends `match:found`. A room's `mode` is `global` from then on:
+
+- `toRoomView` and `toGameView` report its computers as people: `isComputer: false`, connected, with a
+  gender and a fixed `avatar`. `global-match.test.ts` checks no view carries `"isComputer":true`.
+- `beginRound` passes no `endWhenOut`, so the round plays to a winner; `nextRound` and `returnToLobby`
+  are refused, so the table plays one round and the client offers Play again.
+- Computers move at a person's pace (`rooms/human-like.ts`): `humanDelay` times each computer's move with
+  `thinkingTimeMs` and the quickest moves first (`room.computerPlanId`). `humanizeMoves` sometimes drops
+  an UNO call or a catch, a decision kept in `room.computerIntents` so it isn't re-rolled on every
+  change; a dropped one falls back to the seat's turn move, so the table can't stall. They sometimes
+  post a chat line (`banterFor`) and answer hand requests after a few seconds
+  (`answerHandRequestsLater`). These timers live in `room.sideTimers` and stop when the room closes.
+  `humanPaceScale` shrinks the pace in tests.
 
 ## No-persistence policy
 

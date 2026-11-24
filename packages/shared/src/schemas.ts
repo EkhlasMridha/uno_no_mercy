@@ -50,6 +50,10 @@ export const joinRoomSchema = z
 export const reconnectSchema = z
   .object({ code: roomCodeSchema, token: reconnectTokenSchema })
   .strict();
+/** Play global: start searching for a match under this name and avatar set (docs/RULES.md §5.19). */
+export const searchMatchSchema = z
+  .object({ name: playerNameSchema, gender: genderSchema })
+  .strict();
 /** A lobby player changing their own name or avatar set. */
 export const profileSchema = z
   .object({ name: playerNameSchema.optional(), gender: genderSchema.optional() })
@@ -128,6 +132,7 @@ export const endHandShareSchema = z.object({ viewerId: playerIdSchema.optional()
 
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
+export type SearchMatchPayload = z.input<typeof searchMatchSchema>;
 export type ReconnectPayload = z.input<typeof reconnectSchema>;
 export type ProfilePayload = z.input<typeof profileSchema>;
 export type KickPayload = z.input<typeof kickSchema>;
