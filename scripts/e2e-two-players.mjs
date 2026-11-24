@@ -1,7 +1,7 @@
 /**
  * End-to-end smoke test: two headless Chrome tabs (the seat lives in per-tab sessionStorage, so
- * two tabs are two players) pick an avatar, create a room, join, ready up and start a game, then
- * check that both hold a full starting hand and can see each other at the table.
+ * two tabs are two players). One opens a room with Play with friends, the other joins it by code,
+ * they ready up and start a game, then both must hold a full starting hand and see each other.
  *
  * Needs a running app: `npm run dev`, then `node scripts/e2e-two-players.mjs`.
  */
@@ -105,27 +105,34 @@ try {
   const alpha = await openPlayerTab(debugPort);
   const bravo = await openPlayerTab(debugPort);
 
+  // Play with friends opens a lobby straight away under the name this browser last used.
   await waitFor(
-    () => alpha(`fill('input[autocomplete=nickname]', 'Alpha') && click('Create a room')`),
-    'Alpha to open "Create a room"',
+    () => alpha(`(localStorage.setItem('nomercy.name', 'Alpha'), click('Play with friends'))`),
+    'Alpha to open a room with Play with friends',
   );
-  // Creating and joining both ask for an avatar set first.
-  await waitFor(() => alpha(`click('Male')`), 'Alpha to pick an avatar');
-  await waitFor(() => alpha(`click('Create room')`), 'Alpha to create the room');
   const code = await waitFor(
     () => alpha(`document.querySelector('button[aria-label^="Room code"]')?.textContent.trim()`),
     'Alpha to reach the lobby',
   );
 
+  await waitFor(() => bravo(`click('Join a room')`), 'Bravo to open "Join a room"');
   await waitFor(
     () =>
       bravo(
         `fill('input[autocomplete=nickname]', 'Bravo') && ` +
-          `fill('input[aria-label="Room code"]', ${JSON.stringify(code)}) && click('Join')`,
+          `fill('input[placeholder^="•"]', ${JSON.stringify(code)})`,
+      ),
+    'Bravo to enter the room code and a name',
+  );
+  // A separate step, so React has applied the typed values before the form is sent.
+  await waitFor(
+    () =>
+      bravo(
+        `[...document.querySelectorAll('button[type=submit]')].some(` +
+          `(b) => !b.disabled && b.textContent.trim() === 'Join' && (b.click(), true))`,
       ),
     `Bravo to join room ${code}`,
   );
-  await waitFor(() => bravo(`click('Female')`), 'Bravo to pick an avatar');
   await waitFor(() => bravo(`click("I'm ready")`), 'Bravo to mark ready');
   await waitFor(() => alpha(`click('Start game')`), 'Alpha to start the game');
   // The room has open seats, so Start asks about computers first; play with just the two of them.
