@@ -89,14 +89,41 @@ function stream(seed: string) {
 
 const at = <T>(list: readonly T[], i: number): T => list[i % list.length] as T;
 
+/** A seat to draw a face for. `avatar`, when set, fixes the face (Play global). */
+export interface AvatarSeat {
+  id: string;
+  seat: number;
+  isComputer: boolean;
+  gender: Gender | null;
+  avatar?: number | null;
+}
+
+/**
+ * The face a server-chosen avatar number stands for: `backdrop * 4 + character` from the gender's
+ * cast, the rest seeded from the number. It doesn't depend on who else is at the table, so a
+ * Play global player keeps the face they had while searching.
+ */
+export function fixedAvatar(gender: Gender, avatar: number): PersonAvatar {
+  const { pick } = stream(`avatar:${gender}:${avatar}`);
+  const backdrop = at(BACKDROPS, Math.floor(avatar / CAST[gender].length));
+  return {
+    kind: 'person',
+    gender,
+    character: at(CAST[gender], avatar % CAST[gender].length),
+    backdrop,
+    hoodie: pick(HOODIES.filter((h) => h !== backdrop.base)),
+    skin: pick(SKIN),
+    hair: pick(HAIR),
+  };
+}
+
 /**
  * Deals a character to every seat. The deal is seeded from the players at the table, so every
  * browser draws the same faces. Backdrops go round without repeats, so six neighbours never share
- * one, and each gender's cast goes round the same way among the people who chose it.
+ * one, and each gender's cast goes round the same way among the people who chose it. A seat with a
+ * fixed `avatar` keeps that face instead.
  */
-export function avatarsForTable(
-  players: readonly { id: string; seat: number; isComputer: boolean; gender: Gender | null }[],
-): TableAvatars {
+export function avatarsForTable(players: readonly AvatarSeat[]): TableAvatars {
   const seated = [...players].sort((a, b) => a.seat - b.seat);
   const deck = stream(seated.map((p) => p.id).join('|'));
   const backdrops = deck.shuffle(BACKDROPS);
@@ -109,6 +136,10 @@ export function avatarsForTable(
   const dealt = { robot: 0, male: 0, female: 0 };
   seated.forEach((player, i) => {
     const { pick } = stream(player.id);
+    if (player.gender && player.avatar !== undefined && player.avatar !== null) {
+      faces.set(player.id, fixedAvatar(player.gender, player.avatar));
+      return;
+    }
     const backdrop = at(backdrops, i);
     if (player.isComputer) {
       faces.set(player.id, { kind: 'robot', backdrop, ...at(robotFaces, dealt.robot++) });

@@ -1,10 +1,12 @@
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import { Server } from 'socket.io';
 import { createRequestGuard } from '../http/request-guard.js';
-import { RoomManager } from '../rooms/room-manager.js';
+import { Matchmaker } from '../rooms/matchmaker.js';
+import { RoomError, RoomManager } from '../rooms/room-manager.js';
 import type { Rng } from '../engine/index.js';
 import { Broadcaster } from './broadcaster.js';
 import { registerGameHandlers } from './game-handlers.js';
+import { registerMatchHandlers } from './match-handlers.js';
 import { RateLimiter } from './rate-limiter.js';
 import { registerRoomHandlers } from './room-handlers.js';
 import type { GameServer } from './socket-types.js';
@@ -18,6 +20,12 @@ export interface SocketServerOptions {
   turnHoldMs?: number;
   /** Whether a new round waits out the opening deal before anyone acts. Default on. */
   dealHold?: boolean;
+  /** Play global countdown. Defaults to `GLOBAL_SEARCH_MS`. */
+  globalSearchMs?: number;
+  /** Pause between a match filling and its deal. Defaults to `MATCH_FOUND_PAUSE_MS`. */
+  matchFoundPauseMs?: number;
+  /** Scales how long computers at global tables think. Defaults to 1. */
+  humanPaceScale?: number;
   /** Allowed browser origins for cross-origin dev setups. Same-origin needs nothing. */
   corsOrigins?: string[];
   /** Extra hostnames accepted in the Host header, besides IPs, localhost and this machine. */
@@ -77,21 +85,62 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     computerMoveDelayMs: options.computerMoveDelayMs,
     turnHoldMs: options.turnHoldMs,
     dealHold: options.dealHold,
+    humanPaceScale: options.humanPaceScale,
     onRoomUpdated: (room) => broadcaster.room(room),
+    onChatMessage: (room, message) => broadcaster.chatMessage(room, message),
     onRoomClosed: (room, reason) => {
       console.info(`[room ${room.code}] closed: ${reason}`);
       broadcaster.closed(room, reason);
     },
   });
 
+  const matchmaker = new Matchmaker({
+    rng: options.rng,
+    searchMs: options.globalSearchMs,
+    foundPauseMs: options.matchFoundPauseMs,
+    computerSeats: (count, seated) => manager.globalComputerSeats(count, seated),
+    onMatchUpdated: (match) => {
+      for (const seat of match.seats) {
+        if (seat.socketId)
+          io.to(seat.socketId).emit('match:state', matchmaker.viewFor(match, seat.id));
+      }
+    },
+    onMatchReady: (seats) => {
+      const people = seats.filter((s) => s.socketId !== null);
+      try {
+        const { room, people: seated } = manager.createGlobalRoom(seats);
+        for (const player of seated) {
+          const socket = player.socketId ? io.sockets.sockets.get(player.socketId) : undefined;
+          if (!socket) continue;
+          socket.data.session = { roomCode: room.code, playerId: player.id };
+          socket.emit('match:found', {
+            roomCode: room.code,
+            playerId: player.id,
+            reconnectToken: player.reconnectToken,
+          });
+        }
+        console.info(`[room ${room.code}] global match dealt (${people.length} searching)`);
+        broadcaster.room(room);
+      } catch (error) {
+        if (!(error instanceof RoomError)) console.error('global match failed to start', error);
+        const reason = error instanceof RoomError ? error.message : 'The match could not start';
+        for (const seat of people) {
+          if (seat.socketId) io.to(seat.socketId).emit('match:closed', { reason });
+        }
+      }
+    },
+  });
+
   io.on('connection', (socket) => {
     socket.data.session = null;
     const limiter = new RateLimiter(30, 15);
-    const deps = { io, socket, manager, broadcaster, limiter };
+    const deps = { io, socket, manager, matchmaker, broadcaster, limiter };
     registerRoomHandlers(deps);
     registerGameHandlers(deps);
+    registerMatchHandlers(deps);
 
     socket.on('disconnect', () => {
+      matchmaker.cancel(socket.id);
       const session = socket.data.session;
       if (!session) return;
       const room = manager.handleDisconnect(session.roomCode, session.playerId, socket.id);
@@ -99,5 +148,15 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     });
   });
 
-  return { io, manager };
+  /** Host shutdown: ends every search, then closes every room. */
+  const closeAll = (reason: string) => {
+    for (const match of matchmaker.closeAll()) {
+      for (const seat of match.seats) {
+        if (seat.socketId) io.to(seat.socketId).emit('match:closed', { reason });
+      }
+    }
+    manager.closeAll(reason);
+  };
+
+  return { io, manager, matchmaker, closeAll };
 }

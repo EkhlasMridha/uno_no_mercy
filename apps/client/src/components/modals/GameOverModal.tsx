@@ -1,6 +1,6 @@
-import { Crown, DoorOpen, Eye, Home, RotateCcw, Skull } from 'lucide-react';
+import { Crown, DoorOpen, Eye, Globe, Home, RotateCcw, Skull } from 'lucide-react';
 import type { GameStateView, RoomView } from '@nomercy/shared';
-import { leaveRoom, nextRound, returnToLobby } from '../../net/actions';
+import { leaveRoom, nextRound, playAgain, returnToLobby } from '../../net/actions';
 import { Modal } from '../ui/Modal';
 
 interface GameOverModalProps {
@@ -121,32 +121,51 @@ export function GameOverModal({ room, game, meId, onClose }: GameOverModalProps)
         })}
       </ol>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        {isHost ? (
+      {room.mode === 'global' ? (
+        // A global table plays one round (docs/RULES.md §5.19): search again, or go home.
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <button
             type="button"
             className="btn-primary col-span-2 sm:min-w-[11rem] sm:flex-1"
-            onClick={() => void nextRound()}
+            onClick={() => void playAgain()}
           >
-            <RotateCcw size={18} /> {matchWinner ? 'New match' : 'Next round'}
+            <Globe size={18} /> Play again
           </button>
-        ) : (
-          <p className="col-span-2 self-center text-center text-sm text-chalk/60 sm:flex-1 sm:text-left">
-            Waiting for the host…
-          </p>
-        )}
-        <button type="button" className="btn-secondary" onClick={onClose}>
-          <Eye size={18} /> Review the table
-        </button>
-        {isHost && (
-          <button type="button" className="btn-secondary" onClick={() => void returnToLobby()}>
-            <Home size={18} /> Lobby
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            <Eye size={18} /> Review the table
           </button>
-        )}
-        <button type="button" className="btn-ghost" onClick={() => void leaveRoom()}>
-          <DoorOpen size={18} /> Leave
-        </button>
-      </div>
+          <button type="button" className="btn-ghost" onClick={() => void leaveRoom()}>
+            <Home size={18} /> Home
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {isHost ? (
+            <button
+              type="button"
+              className="btn-primary col-span-2 sm:min-w-[11rem] sm:flex-1"
+              onClick={() => void nextRound()}
+            >
+              <RotateCcw size={18} /> {matchWinner ? 'New match' : 'Next round'}
+            </button>
+          ) : (
+            <p className="col-span-2 self-center text-center text-sm text-chalk/60 sm:flex-1 sm:text-left">
+              Waiting for the host…
+            </p>
+          )}
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            <Eye size={18} /> Review the table
+          </button>
+          {isHost && (
+            <button type="button" className="btn-secondary" onClick={() => void returnToLobby()}>
+              <Home size={18} /> Lobby
+            </button>
+          )}
+          <button type="button" className="btn-ghost" onClick={() => void leaveRoom()}>
+            <DoorOpen size={18} /> Leave
+          </button>
+        </div>
+      )}
     </Modal>
   );
 }

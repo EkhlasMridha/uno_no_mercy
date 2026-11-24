@@ -328,7 +328,14 @@ export function GamePage({ room, game }: { room: RoomView; game: GameStateView }
               Round {room.roundNumber}
             </p>
             <p className="truncate text-xs text-chalk/60 sm:text-sm">
-              Room <span className="font-display tracking-widest text-chalk/85">{room.code}</span>
+              {room.mode === 'global' ? (
+                'Global match'
+              ) : (
+                <>
+                  Room{' '}
+                  <span className="font-display tracking-widest text-chalk/85">{room.code}</span>
+                </>
+              )}
               {room.settings.scoringEnabled && `, first to ${room.matchTarget} points`}
             </p>
           </div>

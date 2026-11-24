@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ConnectionOverlay } from './components/ConnectionOverlay';
 import { Toasts } from './components/Toasts';
-import { unlockAudio } from './lib/sound';
+import { setGameMuted, unlockAudio } from './lib/sound';
 import { startConnection } from './net/socket';
 import { HomePage } from './pages/HomePage';
 import { useAppState } from './state/store';
@@ -11,7 +11,9 @@ import { useAppState } from './state/store';
 // download the whole game before it can show anything.
 const loadLobby = () => import('./pages/LobbyPage');
 const loadGame = () => import('./pages/GamePage');
+const loadSearch = () => import('./pages/GlobalSearchPage');
 const LobbyPage = lazy(() => loadLobby().then((m) => ({ default: m.LobbyPage })));
+const GlobalSearchPage = lazy(() => loadSearch().then((m) => ({ default: m.GlobalSearchPage })));
 const GamePage = lazy(() => loadGame().then((m) => ({ default: m.GamePage })));
 
 function Waiting({ label }: { label: string }) {
@@ -26,7 +28,15 @@ function Screen() {
   const session = useAppState((s) => s.session);
   const room = useAppState((s) => s.room);
   const game = useAppState((s) => s.game);
+  const search = useAppState((s) => s.search);
 
+  if (!session && search) {
+    return (
+      <Suspense fallback={<Waiting label="Starting the search…" />}>
+        <GlobalSearchPage search={search} />
+      </Suspense>
+    );
+  }
   if (!session) return <HomePage />;
   if (!room || room.code !== session.roomCode) return <Waiting label="Joining room…" />;
   if (room.status === 'lobby') {
@@ -53,6 +63,7 @@ function usePrefetchGame() {
     const prefetch = () => {
       void loadLobby();
       void loadGame();
+      void loadSearch();
     };
     if ('requestIdleCallback' in window) {
       const handle = window.requestIdleCallback(prefetch, { timeout: 4000 });
@@ -73,6 +84,8 @@ export function App() {
     events.forEach((e) => window.addEventListener(e, unlockAudio));
     return () => events.forEach((e) => window.removeEventListener(e, unlockAudio));
   }, []);
+  const muted = useAppState((s) => s.sound.muted);
+  useEffect(() => setGameMuted(muted), [muted]);
   usePrefetchGame();
   return (
     <>

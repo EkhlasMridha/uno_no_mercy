@@ -1,7 +1,7 @@
 import type { Ack, CardColor, CommandResult, Gender, ReactionEmoji } from '@nomercy/shared';
 import { randomPlayerName } from '../lib/random-name';
-import { getState, pushNotice } from '../state/store';
-import { adoptSession, forgetSession, request } from './socket';
+import { getState, pushNotice, setState } from '../state/store';
+import { adoptSession, forgetSession, request, searchState } from './socket';
 
 function newCommandId(): string {
   // crypto.getRandomValues works on plain-http LAN origins (randomUUID needs a secure context).
@@ -78,6 +78,28 @@ export const kickPlayer = async (playerId: string) =>
 /** Host only: hands the room to another player, who becomes the host instead. */
 export const transferHost = async (playerId: string) =>
   report(await request('room:transfer-host', { playerId }));
+
+// ---- Play global (docs/RULES.md §5.19) ----
+
+/** Starts searching for a global match. The search screen opens once the server has seated you. */
+export async function searchMatch(name: string, gender: Gender) {
+  const result = await request('match:search', { name, gender });
+  if (result.ok) setState({ search: searchState(result.data), globalProfile: { name, gender } });
+  return result;
+}
+
+/** Leaves the search and goes back to the home page. */
+export async function cancelSearch() {
+  setState({ search: null });
+  return report(await request('match:cancel', {}));
+}
+
+/** After a global round: leave the table and search again under the same name and avatar set. */
+export async function playAgain() {
+  const profile = getState().globalProfile;
+  await leaveRoom();
+  if (profile) report(await searchMatch(profile.name, profile.gender));
+}
 
 export async function leaveRoom() {
   const result = await request('room:leave', {});

@@ -51,17 +51,19 @@ function favoriteColor(hand: readonly Card[], rng: Rng): CardColor {
 
 /**
  * A legal move for a computer seat, picked only from the server's valid actions.
- * Returns null when this seat has nothing to do right now.
+ * Returns null when this seat has nothing to do right now. Without `reflexes`, calling UNO and
+ * catching are passed over, leaving only the seat's turn move.
  */
 export function chooseComputerMove(
   state: GameState,
   playerId: string,
   rng: Rng,
+  reflexes = true,
 ): GameCommand | null {
   const actions = getValidActions(state, playerId);
-  if (actions.canCallUno) return { type: 'callUno' };
+  if (reflexes && actions.canCallUno) return { type: 'callUno' };
   const catchable = actions.catchablePlayerIds[0];
-  if (catchable) return { type: 'catchUno', targetId: catchable };
+  if (reflexes && catchable) return { type: 'catchUno', targetId: catchable };
   if (actions.canChooseRouletteColor) {
     // Every color is equally likely to turn up, so any guess is as good as another.
     return {

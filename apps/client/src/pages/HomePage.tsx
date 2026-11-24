@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { BookOpen, ChevronDown, LogIn, Play, WifiOff } from 'lucide-react';
+import { BookOpen, ChevronDown, Globe, LogIn, Play, Users, WifiOff } from 'lucide-react';
 import {
   DECK_SIZE,
   MAX_COMPUTERS,
@@ -23,6 +23,7 @@ import { CardGallery } from '../components/landing/CardGallery';
 import { MercyMeter } from '../components/landing/MercyMeter';
 import { ShuffleDeck } from '../components/landing/ShuffleDeck';
 import { StackDemo } from '../components/landing/StackDemo';
+import { GlobalProfileModal } from '../components/modals/GlobalProfileModal';
 import { Modal } from '../components/ui/Modal';
 
 // Read once when the app loads, so a page opened from an invite link joins that room.
@@ -31,7 +32,7 @@ const invitedCode = takeInviteCode();
 // back to this page, and must not send you straight back in.
 let inviteUsed = false;
 
-/** Seats in a room opened from Play; the host changes it in the lobby. */
+/** Seats in a room opened from Play with friends; the host changes it in the lobby. */
 const DEFAULT_SEATS = 4;
 
 const sample = (card: CardFace, id: string): Card => ({ ...card, id }) as Card;
@@ -56,7 +57,11 @@ const CODE_HINT = `Room codes are ${ROOM_CODE_LENGTH} characters and never use O
 const FAQ: Array<{ q: string; a: string }> = [
   {
     q: 'Is UNO No Mercy free to play here?',
-    a: 'Yes. There is no account, no download and no ads. Open the page, press Play and you are the host of a new room.',
+    a: 'Yes. There is no account, no download and no ads. Open the page, press Play global to be matched with other players, or Play with friends to host a room of your own.',
+  },
+  {
+    q: 'What is Play global?',
+    a: 'Enter a name and pick an avatar set, and you are matched with other players searching at the same time. A table of 4 is dealt as soon as every seat is taken, and the search never lasts more than a minute and a half.',
   },
   {
     q: 'How many people can play?',
@@ -64,7 +69,7 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Can I play against the computer?',
-    a: `Yes. Press Start in the lobby with seats still open and computer players fill them, up to ${MAX_COMPUTERS}. You can play alone against bots or mix them in with friends.`,
+    a: `Yes. Press Play with friends, then Start in the lobby with seats still open and computer players fill them, up to ${MAX_COMPUTERS}. You can play alone against bots or mix them in with friends.`,
   },
   {
     q: 'How do my friends join?',
@@ -116,6 +121,7 @@ export function HomePage() {
     invitedCode && !inviteUsed ? { status: 'joining' } : null,
   );
   const [showJoin, setShowJoin] = useState(false);
+  const [showGlobal, setShowGlobal] = useState(false);
   const [code, setCode] = useState(invitedCode ?? '');
   const [joinName, setJoinName] = useState(() => savedName() ?? '');
   const [joinError, setJoinError] = useState<{ field: 'code' | 'name'; message: string } | null>(
@@ -151,7 +157,7 @@ export function HomePage() {
     });
   }, [invite, online]);
 
-  // Play goes straight to a new lobby under the last name used here, or a random one; the name and
+  // Play with friends goes straight to a new lobby under the last name used here, or a random one; the name and
   // avatar set can be changed in the lobby, and computers can fill the empty seats from there.
   const play = async () => {
     if (busy || !online) return;
@@ -202,27 +208,45 @@ export function HomePage() {
     setJoinError({ field, message: result.error.message });
   };
 
-  const playLabel = pending === 'create' ? 'Opening a table…' : online ? 'Play' : 'Connecting…';
+  const playLabel =
+    pending === 'create' ? 'Opening a table…' : online ? 'Play with friends' : 'Connecting…';
+  const globalLabel = online ? 'Play global' : 'Connecting…';
   const joinLabel = inviteFailed && invitedCode ? `Join ${invitedCode}` : 'Join a room';
 
-  /** The page's two actions. An invite that didn't get through puts joining first. */
+  /**
+   * The page's actions: Play global, Play with friends, and joining a room. An invite that didn't
+   * get through puts joining first.
+   */
   const actions = (where: 'hero' | 'cta') => {
-    const playButton = (
+    const globalButton = (
       <button
         type="button"
         className={`${inviteFailed ? 'btn-secondary btn-lg' : 'btn-primary btn-hero'} w-full sm:w-auto`}
         disabled={busy || !online}
         aria-describedby={online ? undefined : 'connection-status'}
+        aria-haspopup="dialog"
+        onClick={() => setShowGlobal(true)}
+      >
+        <Globe size={inviteFailed ? 20 : 26} aria-hidden />
+        {globalLabel}
+      </button>
+    );
+    const playButton = (
+      <button
+        type="button"
+        className="btn-secondary btn-lg w-full sm:w-auto"
+        disabled={busy || !online}
+        aria-describedby={online ? undefined : 'connection-status'}
         onClick={() => void play()}
       >
-        <Play size={inviteFailed ? 20 : 26} aria-hidden className="fill-current" />
+        <Users size={20} aria-hidden />
         {inviteFailed && pending !== 'create' ? 'Start my own room' : playLabel}
       </button>
     );
     const joinButton = (
       <button
         type="button"
-        className={`${inviteFailed ? 'btn-primary btn-hero' : 'btn-secondary btn-lg'} w-full sm:w-auto`}
+        className={`${inviteFailed ? 'btn-primary btn-hero' : 'btn-ghost btn-lg'} w-full sm:w-auto`}
         aria-haspopup="dialog"
         onClick={openJoin}
       >
@@ -231,12 +255,13 @@ export function HomePage() {
     );
     return (
       <div
-        className={`flex w-full max-w-sm flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row ${
-          where === 'hero' ? 'lg:justify-start' : ''
+        className={`flex w-full max-w-sm flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center ${
+          where === 'hero' ? 'sm:justify-center lg:justify-start' : 'sm:justify-center'
         }`}
       >
-        {inviteFailed ? joinButton : playButton}
-        {inviteFailed ? playButton : joinButton}
+        {inviteFailed ? joinButton : globalButton}
+        {playButton}
+        {inviteFailed ? globalButton : joinButton}
       </div>
     );
   };
@@ -265,10 +290,10 @@ export function HomePage() {
             <BookOpen size={16} aria-hidden />
             <span className="hidden sm:inline">How to play</span>
           </a>
-          <a href="#cards" className="btn-ghost btn-nav hidden sm:inline-flex">
+          <a href="#cards" className="btn-ghost btn-nav hidden md:inline-flex">
             Cards
           </a>
-          <a href="#faq" className="btn-ghost btn-nav hidden sm:inline-flex">
+          <a href="#faq" className="btn-ghost btn-nav hidden md:inline-flex">
             FAQ
           </a>
           <button
@@ -281,12 +306,21 @@ export function HomePage() {
           </button>
           <button
             type="button"
+            className="btn-ghost btn-nav hidden sm:inline-flex"
+            disabled={busy || !online}
+            onClick={() => void play()}
+          >
+            <Users size={16} aria-hidden /> With friends
+          </button>
+          <button
+            type="button"
             className="btn-primary btn-nav px-4 sm:px-5"
             disabled={busy || !online}
             aria-describedby={online ? undefined : 'connection-status'}
-            onClick={() => void play()}
+            aria-haspopup="dialog"
+            onClick={() => setShowGlobal(true)}
           >
-            <Play size={16} aria-hidden className="fill-current" /> {playLabel}
+            <Globe size={16} aria-hidden /> {globalLabel}
           </button>
         </nav>
       </header>
@@ -324,14 +358,14 @@ export function HomePage() {
             <p className="landing-lede mx-auto mt-6 lg:mx-0">
               The {DECK_SIZE}-card shedding game that hits back, played right in your browser. Stack
               draws up to +10, swap hands on a 7, and drop out the moment you hold{' '}
-              {MERCY_HAND_LIMIT} cards. Bring 2 to {MAX_PLAYERS} friends, or fill the table with
-              bots.
+              {MERCY_HAND_LIMIT} cards. Play global to get matched with other players, or bring 2 to{' '}
+              {MAX_PLAYERS} friends and fill the empty seats with bots.
             </p>
 
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
               {actions('hero')}
               <p className="text-sm text-chalk/70">
-                Free, no sign-up. You get a lobby to invite friends or add bots.
+                Free, no sign-up. Play with friends gives you a lobby to invite them or add bots.
               </p>
               {!online && (
                 <p
@@ -350,6 +384,13 @@ export function HomePage() {
 
           <ShuffleDeck />
         </section>
+
+        {showGlobal && (
+          <GlobalProfileModal
+            initialName={savedName() ?? ''}
+            onClose={() => setShowGlobal(false)}
+          />
+        )}
 
         {showJoin && (
           <Modal title="Join a room" onClose={() => setShowJoin(false)}>
@@ -564,7 +605,7 @@ export function HomePage() {
             <ol className="mt-10 grid gap-8 md:grid-cols-3">
               {[
                 {
-                  title: 'Press Play',
+                  title: 'Press Play with friends',
                   text: 'You get a lobby of your own and host the room. Change your name and avatar there.',
                 },
                 {

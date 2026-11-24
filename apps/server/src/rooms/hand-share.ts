@@ -26,7 +26,8 @@ function isLive(room: Room, share: HandShare): boolean {
 
 /**
  * A knocked-out player asks to see an active player's hand. It replaces any earlier request of
- * theirs, so they watch one hand at a time. A computer agrees at once.
+ * theirs, so they watch one hand at a time. A computer agrees at once, except at a global table,
+ * where it answers later as a person would (`RoomManager.answerHandRequestsLater`).
  */
 export function requestHand(room: Room, viewerId: string, targetId: string): void {
   if (room.status !== 'inGame' || !room.game) {
@@ -50,7 +51,7 @@ export function requestHand(room: Room, viewerId: string, targetId: string): voi
   room.handShares.push({
     viewerId,
     targetId,
-    status: target.isComputer ? 'allowed' : 'pending',
+    status: target.isComputer && room.mode !== 'global' ? 'allowed' : 'pending',
   });
 }
 

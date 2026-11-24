@@ -33,3 +33,13 @@ export const MAX_COMPUTERS = 9;
 export const TURN_HOLD_MS = 2000;
 /** How long the table holds a dropped player's seat once the next player agrees to wait (§5.16). */
 export const WAIT_FOR_REJOIN_MS = 5 * 60_000;
+/** Seats at a Play global table (docs/RULES.md §5.19). */
+export const GLOBAL_TABLE_SIZE = 4;
+/** How long a Play global match searches before computers fill the empty seats. */
+export const GLOBAL_SEARCH_MS = 90_000;
+/** The last part of the search in which computers take empty seats one at a time. */
+export const GLOBAL_BOT_WINDOW_MS = 25_000;
+/** The pause after a match fills, so everyone sees the last arrival before the deal. */
+export const MATCH_FOUND_PAUSE_MS = 1_500;
+/** Faces per avatar set: 4 characters on 6 backdrops (`apps/client/src/lib/avatar.ts`). */
+export const AVATAR_VARIANTS = 24;

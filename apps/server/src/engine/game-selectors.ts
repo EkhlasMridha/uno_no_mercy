@@ -16,6 +16,7 @@ export interface SeatPresence {
   connected: (playerId: string) => boolean;
   isComputer: (playerId: string) => boolean;
   gender: (playerId: string) => Gender | null;
+  avatar: (playerId: string) => number | null;
   hostId: string;
 }
 
@@ -108,6 +109,7 @@ export function toPublicGameView(state: GameState, presence: SeatPresence): Publ
     isHost: p.id === presence.hostId,
     isComputer: presence.isComputer(p.id),
     gender: presence.gender(p.id),
+    avatar: presence.avatar(p.id),
   }));
   return {
     players,

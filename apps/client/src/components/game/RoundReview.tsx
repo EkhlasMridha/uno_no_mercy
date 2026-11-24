@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Crown, DoorOpen, Eye, Home, RotateCcw, Skull, Trophy, X } from 'lucide-react';
+import { Crown, DoorOpen, Eye, Globe, Home, RotateCcw, Skull, Trophy, X } from 'lucide-react';
 import type { Card, GameStateView, PlayedCardEntry, RoomView } from '@nomercy/shared';
 import { sortHand } from '../../lib/cards';
 import type { NameLookup } from '../../lib/event-text';
-import { nextRound, returnToLobby } from '../../net/actions';
+import { nextRound, playAgain, returnToLobby } from '../../net/actions';
 import { PlayingCard } from '../card/PlayingCard';
 
 type Tab = 'hands' | 'played' | 'draw';
@@ -35,7 +35,9 @@ export function RoundReview({ room, game, meId, name, onShowResults }: RoundRevi
   const reveal = game.reveal;
   const phase = game.public.phase;
   const winnerId = phase.type === 'finished' ? phase.winnerId : null;
-  const isHost = room.hostId === meId;
+  // A global table has no next round or lobby (docs/RULES.md §5.19), so nobody gets host controls.
+  const global = room.mode === 'global';
+  const isHost = room.hostId === meId && !global;
   const matchOver = Boolean(room.lastResult?.matchWinnerId);
 
   if (!open) {
@@ -67,6 +69,14 @@ export function RoundReview({ room, game, meId, name, onShowResults }: RoundRevi
                 <Home size={18} /> Lobby
               </button>
             </>
+          ) : global ? (
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2"
+              onClick={() => void playAgain()}
+            >
+              <Globe size={18} /> Play again
+            </button>
           ) : (
             <span className="px-2 text-sm text-chalk/70">Waiting for the host…</span>
           )}

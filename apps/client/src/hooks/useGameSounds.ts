@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Gender, PublicGameView } from '@nomercy/shared';
 import type { TableAvatars } from '../lib/avatar';
-import { HAMMER_BLOW_S, HAMMER_BLOWS, playSound, type SoundKind } from '../lib/sound';
+import { HAMMER_IMPACT_S, playSound, type SoundKind } from '../lib/sound';
 import { getState } from '../state/store';
 
 const REMINDER_MS = 10_000;
@@ -115,11 +115,12 @@ export function useGameSounds(
     const knockedOut = fresh.some(
       (e) => e.event.type === 'playerEliminated' && e.event.reason === 'mercy',
     );
-    // The hammer comes down on the penalized player's head first, in time with `HammerHit`.
+    // The hammer comes down on the penalized player's head first, in time with `HammerHit`; the
+    // table's reaction follows the thud while the stars are still circling.
     let at = played ? 0.3 : 0;
     if (penalized && isOn('hammer')) {
       playSound('hammer', at);
-      at += HAMMER_BLOWS * HAMMER_BLOW_S + 0.15;
+      at += HAMMER_IMPACT_S + 0.55;
     }
     if (knockedOut) {
       if (isOn('knockout')) {

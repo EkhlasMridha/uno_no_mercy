@@ -35,7 +35,7 @@ apps/server
   src/rooms       Room lifecycle, sessions, reconnects, per-player projections, scoring
   src/net         Socket.IO handlers: validate, route, broadcast
   test/           Vitest: engine.test.ts, simulation.test.ts, multiplayer.test.ts,
-                  turn-hold.test.ts, three-player-uno.test.ts
+                  turn-hold.test.ts, three-player-uno.test.ts, global-match.test.ts
 apps/client       React + Vite + Tailwind. Presentation only
 docs              RULES.md, ARCHITECTURE.md, GAME-FLOW.md, LAN-SETUP.md
 ```
@@ -61,6 +61,9 @@ These keep the game fair and the code testable. Do not trade them away for conve
    hand and both piles (`round-reveal.test.ts`); it is `null` in every other phase.
    The other exception is consented: a knocked-out player may watch a hand the player accepted
    (`handShare.watching`, RULES §5.17), checked on every projection (`hand-share.test.ts`).
+   At a Play global table (RULES §5.19) the views show computers as people (`isComputer: false`,
+   `shownAsComputer` in `projections.ts`); keep any new view field from giving them away
+   (`global-match.test.ts`).
 6. **168 cards, always.** A card is always in exactly one place: draw pile, discard pile, a hand, or set
    aside. `conservation.ts` asserts it in `--dev` and in the simulation test. Never park a card in phase
    state. Put it in a real pile and keep ids in the phase (see `rouletteReveal.revealedIds`).

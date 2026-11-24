@@ -29,6 +29,15 @@ import {
   computerNames,
   fallbackComputerMove,
 } from './computer-player.js';
+import {
+  banterFor,
+  between,
+  handRequestAnswer,
+  humanizeMoves,
+  pickAvatar,
+  screenNames,
+  thinkingTimeMs,
+} from './human-like.js';
 import { scoreRound } from './match-scoring.js';
 import { waitDeciderId } from './rejoin.js';
 import type { Room, RoomPlayer } from './room.types.js';
@@ -80,9 +89,25 @@ export interface RoomManagerOptions {
   dealHold?: boolean;
   /** How long a seat stays held once the table agrees to wait. Defaults to `WAIT_FOR_REJOIN_MS`. */
   waitForRejoinMs?: number;
+  /**
+   * Scales the human pace of computers at global tables (`thinkingTimeMs`). Defaults to 1; tests
+   * shrink it so a round finishes quickly.
+   */
+  humanPaceScale?: number;
   /** Called when a room changes outside a client request (e.g. a reconnect window expired). */
   onRoomUpdated: (room: Room) => void;
   onRoomClosed: (room: Room, reason: string) => void;
+  /** Called when a computer posts a chat line at a global table. */
+  onChatMessage?: (room: Room, message: ChatMessage) => void;
+}
+
+/** One seat of a found Play global match. A null socket is a computer. */
+export interface GlobalSeat {
+  id: string;
+  name: string;
+  gender: Gender;
+  avatar: number;
+  socketId: string | null;
 }
 
 export interface JoinResult {
@@ -136,29 +161,56 @@ export class RoomManager {
       throw new RoomError('ROOM_FULL', 'The server has reached its room limit');
     }
     const player = this.newPlayer(name, gender, socketId);
-    const room: Room = {
-      code: this.generateRoomCode(),
-      hostId: player.id,
-      status: 'lobby',
-      players: [player],
-      settings: { scoringEnabled: false, maxPlayers: computers > 0 ? computers + 1 : maxPlayers },
-      game: null,
-      chat: [],
-      roundNumber: 0,
-      dealerIndex: this.options.rng(MAX_PLAYERS),
-      lastResult: null,
-      createdAt: this.now(),
-      computerTimer: null,
-      turnHoldUntil: 0,
-      dealUntil: 0,
-      holdTimer: null,
-      handShares: [],
-    };
+    const room = this.newRoom('friends', player, computers > 0 ? computers + 1 : maxPlayers);
     player.ready = true;
     this.addComputers(room, computers);
     this.rooms.set(room.code, room);
     if (computers > 0) this.beginRound(room);
     return { room, player };
+  }
+
+  /**
+   * Deals a Play global table from a found match (docs/RULES.md §5.19). People keep the ids and
+   * faces they searched with; the first person hosts, though a global table has nothing to host.
+   */
+  createGlobalRoom(seats: readonly GlobalSeat[]): { room: Room; people: RoomPlayer[] } {
+    if (!seats.some((s) => s.socketId !== null)) {
+      throw new Error('A global room needs at least one person');
+    }
+    if (this.rooms.size >= (this.options.maxRooms ?? 50)) {
+      throw new RoomError('ROOM_FULL', 'The server is busy. Try again in a minute.');
+    }
+    const players: RoomPlayer[] = seats.map((seat) => ({
+      ...this.newPlayer(seat.name, seat.gender, seat.socketId),
+      id: seat.id,
+      avatar: seat.avatar,
+      ready: true,
+      isComputer: seat.socketId === null,
+    }));
+    const host = players.find((p) => !p.isComputer) as RoomPlayer;
+    const room = this.newRoom('global', host, players.length);
+    room.players = players;
+    this.rooms.set(room.code, room);
+    this.beginRound(room);
+    return { room, people: players.filter((p) => !p.isComputer) };
+  }
+
+  /** People-like names and faces for the computers that fill a global match. */
+  globalComputerSeats(
+    count: number,
+    seated: readonly { name: string; gender: Gender; avatar: number }[],
+  ): Omit<GlobalSeat, 'id'>[] {
+    const taken = [...seated];
+    const names = screenNames(
+      count,
+      seated.map((s) => s.name),
+      this.options.rng,
+    );
+    return names.map((profile) => {
+      const seat = { ...profile, avatar: pickAvatar(profile.gender, taken, this.options.rng) };
+      taken.push(seat);
+      return { ...seat, socketId: null };
+    });
   }
 
   joinRoom(code: string, name: string, gender: Gender, socketId: string): JoinResult {
@@ -366,6 +418,7 @@ export class RoomManager {
   /** Host starts another round (or a fresh match once someone reached the target). */
   nextRound(code: string, playerId: string): Room {
     const room = this.requireHost(code, playerId);
+    this.refuseGlobal(room);
     if (room.status !== 'roundOver') throw new RoomError('INVALID_PHASE', 'The round is not over');
     room.players = room.players.filter((p) => !p.departed);
     const connected = room.players.filter((p) => p.socketId || p.isComputer);
@@ -382,6 +435,7 @@ export class RoomManager {
 
   returnToLobby(code: string, playerId: string): Room {
     const room = this.requireHost(code, playerId);
+    this.refuseGlobal(room);
     if (room.status !== 'roundOver') throw new RoomError('INVALID_PHASE', 'The round is not over');
     room.status = 'lobby';
     room.game = null;
@@ -472,6 +526,7 @@ export class RoomManager {
     room.game = outcome.state;
     if (room.game.phase.type === 'finished') this.finishRound(room);
     else if (needsTurnHold(room.game, turnBefore, outcome.events)) this.startTurnHold(room);
+    if (room.mode === 'global') this.banter(room, outcome.events);
     this.scheduleComputers(room);
     return { room, version: room.game.version };
   }
@@ -491,6 +546,30 @@ export class RoomManager {
     player.expiryTimer.unref?.();
     this.ensureConnectedHost(room);
     return room;
+  }
+
+  /**
+   * Global rooms: a computer asked to show its hand answers after a few seconds, yes or no, as a
+   * person would (docs/RULES.md §5.17, §5.19). Elsewhere computers agree at once in `requestHand`.
+   */
+  answerHandRequestsLater(room: Room): void {
+    if (room.mode !== 'global') return;
+    for (const share of room.handShares) {
+      const key = `hand:${share.viewerId}:${share.targetId}`;
+      const target = room.players.find((p) => p.id === share.targetId);
+      if (share.status !== 'pending' || !target?.isComputer || room.computerIntents.has(key)) {
+        continue;
+      }
+      const { allow, delayMs } = handRequestAnswer(this.options.rng);
+      room.computerIntents.set(key, allow);
+      this.later(room, delayMs * this.paceScale, () => {
+        // Withdrawn, replaced or outlived by the round: there is nothing left to answer.
+        if (room.status !== 'inGame' || !room.handShares.includes(share)) return;
+        if (share.status !== 'pending') return;
+        share.status = allow ? 'allowed' : 'denied';
+        this.options.onRoomUpdated(room);
+      });
+    }
   }
 
   /** Closes all rooms (host shutdown). */
@@ -537,10 +616,12 @@ export class RoomManager {
       players: members.map((p) => ({ id: p.id, name: p.name })),
       dealerIndex: room.dealerIndex,
       rng: this.options.rng,
-      // With computers at the table, the round ends once its people are all out.
-      endWhenOut: members.some((p) => p.isComputer)
-        ? members.filter((p) => !p.isComputer).map((p) => p.id)
-        : [],
+      // With computers at the table, the round ends once its people are all out. A global table
+      // plays on to a winner, as a table of people would (docs/RULES.md §5.19).
+      endWhenOut:
+        room.mode === 'friends' && members.some((p) => p.isComputer)
+          ? members.filter((p) => !p.isComputer).map((p) => p.id)
+          : [],
     });
     room.game = state;
     room.status = 'inGame';
@@ -550,6 +631,7 @@ export class RoomManager {
     if (room.holdTimer) clearTimeout(room.holdTimer);
     room.holdTimer = null;
     room.handShares = [];
+    room.computerIntents.clear();
     // Nobody moves while the cards go round the table (docs/RULES.md §5.18).
     if (this.options.dealHold ?? true) {
       const dealMs = dealTiming(members.length).totalMs;
@@ -574,22 +656,82 @@ export class RoomManager {
   private scheduleComputers(room: Room): void {
     const game = room.game;
     if (room.computerTimer || room.status !== 'inGame' || !game) return;
+    const delayMs =
+      room.mode === 'global' ? this.humanDelay(room, game) : this.computerDelay(room, game);
+    if (delayMs === null) return;
+    room.computerTimer = setTimeout(() => {
+      room.computerTimer = null;
+      this.runComputerMove(room);
+    }, delayMs);
+    room.computerTimer.unref?.();
+  }
+
+  /** How long until a computer at a friends table moves, or null when none has a move. */
+  private computerDelay(room: Room, game: GameState): number | null {
     const computers = this.computerIds(room);
     // A fixed rng is enough here: only whether any move exists matters.
-    if (!computers.some((id) => chooseComputerMove(game, id, () => 0))) return;
+    if (!computers.some((id) => chooseComputerMove(game, id, () => 0))) return null;
     // Fuller tables move faster so a lap doesn't keep the human waiting; draw streaks faster still.
     const crowd = Math.max(0.35, Math.min(1, 6 / computers.length));
     const streak = game.phase.type === 'drawing' || game.phase.type === 'rouletteReveal' ? 0.5 : 1;
     const thinking = (this.options.computerMoveDelayMs ?? 900) * crowd * streak;
-    room.computerTimer = setTimeout(
-      () => {
-        room.computerTimer = null;
-        this.runComputerMove(room);
-      },
-      // Computers wait out the UNO breather like everyone else.
-      Math.max(thinking, heldUntil(room) - this.now() + 10),
-    );
-    room.computerTimer.unref?.();
+    // Computers wait out the UNO breather like everyone else.
+    return Math.max(thinking, heldUntil(room) - this.now() + 10);
+  }
+
+  /**
+   * Global tables: each computer with a move takes a person's time over it, and the quickest one
+   * moves first. A held move also waits out the breather, then a beat more, as a person would.
+   */
+  private humanDelay(room: Room, game: GameState): number | null {
+    const rng = this.options.rng;
+    let plan: { playerId: string; ms: number } | null = null;
+    for (const { playerId, command } of this.globalMoves(room, game)) {
+      const thinking = thinkingTimeMs(game, playerId, command, rng) * this.paceScale;
+      const held = HELD_COMMANDS.has(command.type)
+        ? heldUntil(room) - this.now() + between(rng, 150, 650) * this.paceScale
+        : 0;
+      const ms = Math.max(thinking, held, 10);
+      if (!plan || ms < plan.ms) plan = { playerId, ms };
+    }
+    room.computerPlanId = plan?.playerId ?? null;
+    return plan?.ms ?? null;
+  }
+
+  /** The computers' moves at a global table, with a person's lapses (`humanizeMoves`). */
+  private globalMoves(room: Room, game: GameState) {
+    const moves = computerMoves(game, this.computerIds(room), this.options.rng);
+    return humanizeMoves(game, moves, room.computerIntents, this.options.rng);
+  }
+
+  private get paceScale(): number {
+    return this.options.humanPaceScale ?? 1;
+  }
+
+  /** Global rooms: a computer at the table may say something about what just happened. */
+  private banter(room: Room, events: readonly GameEvent[]): void {
+    for (const computer of room.players.filter((p) => p.isComputer && !p.departed)) {
+      for (const event of events) {
+        const line = banterFor(event, computer.id, this.options.rng);
+        if (!line) continue;
+        this.later(room, line.delayMs * this.paceScale, () => {
+          if (computer.departed) return;
+          const { message } = this.postChat(room.code, computer.id, line.text);
+          this.options.onChatMessage?.(room, message);
+        });
+        break;
+      }
+    }
+  }
+
+  /** Runs `act` after a delay, unless the room has closed by then. */
+  private later(room: Room, delayMs: number, act: () => void): void {
+    const timer = setTimeout(() => {
+      room.sideTimers.delete(timer);
+      if (this.rooms.has(room.code)) act();
+    }, delayMs);
+    timer.unref?.();
+    room.sideTimers.add(timer);
   }
 
   /** Starts the UNO breather (docs/RULES.md §5.9) and re-sends the table when it ends. */
@@ -620,11 +762,15 @@ export class RoomManager {
   private runComputerMove(room: Room): void {
     const game = room.game;
     if (!this.rooms.has(room.code) || room.status !== 'inGame' || !game) return;
-    for (const { playerId, command } of computerMoves(
-      game,
-      this.computerIds(room),
-      this.options.rng,
-    )) {
+    let moves = computerMoves(game, this.computerIds(room), this.options.rng);
+    if (room.mode === 'global') {
+      // The computer the timer was set for moves first, if it still can; the table may have moved on.
+      const planned = room.computerPlanId;
+      moves = this.globalMoves(room, game).sort(
+        (a, b) => Number(b.playerId === planned) - Number(a.playerId === planned),
+      );
+    }
+    for (const { playerId, command } of moves) {
       for (const attempt of [command, fallbackComputerMove(game, playerId)]) {
         if (!attempt) continue;
         if (HELD_COMMANDS.has(attempt.type) && this.now() < heldUntil(room)) continue;
@@ -734,8 +880,45 @@ export class RoomManager {
     room.computerTimer = null;
     if (room.holdTimer) clearTimeout(room.holdTimer);
     room.holdTimer = null;
+    for (const timer of room.sideTimers) clearTimeout(timer);
+    room.sideTimers.clear();
     this.rooms.delete(room.code);
     this.options.onRoomClosed(room, reason);
+  }
+
+  /** A global table plays one round: there is no next round and no lobby (docs/RULES.md §5.19). */
+  private refuseGlobal(room: Room): void {
+    if (room.mode === 'global') {
+      throw new RoomError(
+        'INVALID_PHASE',
+        'This table plays one round. Press Play again for a new match.',
+      );
+    }
+  }
+
+  private newRoom(mode: Room['mode'], host: RoomPlayer, maxPlayers: number): Room {
+    return {
+      code: this.generateRoomCode(),
+      mode,
+      hostId: host.id,
+      status: 'lobby',
+      players: [host],
+      settings: { scoringEnabled: false, maxPlayers },
+      game: null,
+      chat: [],
+      roundNumber: 0,
+      dealerIndex: this.options.rng(MAX_PLAYERS),
+      lastResult: null,
+      createdAt: this.now(),
+      computerTimer: null,
+      computerPlanId: null,
+      computerIntents: new Map(),
+      sideTimers: new Set(),
+      turnHoldUntil: 0,
+      dealUntil: 0,
+      holdTimer: null,
+      handShares: [],
+    };
   }
 
   private requireHost(code: string, playerId: string): Room {
@@ -755,6 +938,7 @@ export class RoomManager {
       id: generatePlayerId(),
       name,
       gender,
+      avatar: null,
       reconnectToken: generateReconnectToken(),
       ready: false,
       socketId,

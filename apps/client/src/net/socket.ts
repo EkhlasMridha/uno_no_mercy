@@ -3,6 +3,7 @@ import {
   CHAT_HISTORY_LIMIT,
   type Ack,
   type ClientToServerEvents,
+  type MatchSearchView,
   type ServerToClientEvents,
   type SessionInfo,
 } from '@nomercy/shared';
@@ -78,6 +79,11 @@ async function restoreSeat(): Promise<void> {
   }
 }
 
+/** A search view with its countdown pinned to this device's clock. */
+export function searchState(view: MatchSearchView) {
+  return { view, endsAt: Date.now() + view.remainingMs };
+}
+
 let started = false;
 export function startConnection(): void {
   if (started) return;
@@ -87,7 +93,11 @@ export function startConnection(): void {
     setState({ connection: 'connected' });
     void restoreSeat();
   });
-  socket.on('disconnect', () => setState({ connection: 'disconnected' }));
+  socket.on('disconnect', () => {
+    // The server drops a search with its socket, so there is nothing to resume.
+    if (getState().search) pushNotice('info', 'Lost the connection, so the search stopped.', 6000);
+    setState({ connection: 'disconnected', search: null });
+  });
   socket.io.on('reconnect_attempt', () => setState({ connection: 'connecting' }));
   socket.on('connect_error', () => setState({ connection: 'disconnected' }));
 
@@ -107,6 +117,17 @@ export function startConnection(): void {
     setState((s) => ({ chat: s.chat.map((m) => (m.id === message.id ? message : m)) })),
   );
   socket.on('room:closed', ({ reason }) => forgetSession(reason));
+  socket.on('match:state', (view) => {
+    if (getState().search) setState({ search: searchState(view) });
+  });
+  socket.on('match:found', (session) => {
+    adoptSession(session);
+    setState({ search: null });
+  });
+  socket.on('match:closed', ({ reason }) => {
+    setState({ search: null });
+    pushNotice('info', reason, 6000);
+  });
 
   socket.connect();
 }

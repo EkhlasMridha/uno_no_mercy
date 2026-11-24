@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from 'react';
-import type { ChatMessage, GameStateView, RoomView, SessionInfo } from '@nomercy/shared';
+import type {
+  ChatMessage,
+  GameStateView,
+  Gender,
+  MatchSearchView,
+  RoomView,
+  SessionInfo,
+} from '@nomercy/shared';
 import type { SoundPrefs } from '../lib/sound';
 import { loadSoundPrefs, saveSoundPrefs } from '../net/session-storage';
 
@@ -11,9 +18,19 @@ export interface Notice {
   text: string;
 }
 
+/** A Play global search under way, and when its countdown runs out on this device's clock. */
+export interface SearchState {
+  view: MatchSearchView;
+  endsAt: number;
+}
+
 export interface AppState {
   connection: ConnectionStatus;
   session: SessionInfo | null;
+  /** Searching for a Play global match (docs/RULES.md §5.19). Null when not searching. */
+  search: SearchState | null;
+  /** The name and avatar set of the last Play global search, kept for this page only for Play again. */
+  globalProfile: { name: string; gender: Gender } | null;
   room: RoomView | null;
   game: GameStateView | null;
   /** This room's group chat, oldest first. Replaced by the server's history on every (re)join. */
@@ -31,6 +48,8 @@ export interface AppState {
 let state: AppState = {
   connection: 'connecting',
   session: null,
+  search: null,
+  globalProfile: null,
   room: null,
   game: null,
   chat: [],

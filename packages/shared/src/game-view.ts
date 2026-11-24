@@ -99,6 +99,8 @@ export interface PublicPlayerView {
   isComputer: boolean;
   /** Picks the player's avatar. Null for computer players, who are drawn as robots. */
   gender: Gender | null;
+  /** A face fixed for this player (Play global); null deals one per table. */
+  avatar: number | null;
 }
 
 /** One card that went onto the discard pile this round. `playerId` is null for the starting card. */
