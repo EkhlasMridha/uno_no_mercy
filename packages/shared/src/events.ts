@@ -1,3 +1,4 @@
+import type { MatchEmote } from './constants.js';
 import type { AckCallback } from './errors.js';
 import type { GameStateView } from './game-view.js';
 import type { ChatMessage, MatchSearchView, RoomView, SessionInfo } from './room-view.js';
@@ -13,6 +14,7 @@ import type {
   EndHandSharePayload,
   JoinRoomPayload,
   KickPayload,
+  MatchEmotePayload,
   PlayCardPayload,
   ProfilePayload,
   ReadyPayload,
@@ -44,6 +46,8 @@ export interface ClientToServerEvents {
   'match:search': (payload: SearchMatchPayload, ack: AckCallback<MatchSearchView>) => void;
   /** Leave the match search. */
   'match:cancel': (payload: Record<string, never>, ack: AckCallback<null>) => void;
+  /** Send an emote to everyone in your match while you wait. */
+  'match:emote': (payload: MatchEmotePayload, ack: AckCallback<null>) => void;
   'room:profile': (payload: ProfilePayload, ack: AckCallback<null>) => void;
   'room:kick': (payload: KickPayload, ack: AckCallback<null>) => void;
   'room:transfer-host': (payload: TransferHostPayload, ack: AckCallback<null>) => void;
@@ -83,6 +87,8 @@ export interface ServerToClientEvents {
   'room:closed': (payload: { reason: string }) => void;
   /** The searcher's match changed: someone arrived or left. */
   'match:state': (search: MatchSearchView) => void;
+  /** Someone in the searcher's match sent an emote (the sender gets it too). */
+  'match:emote': (payload: { seatId: string; emote: MatchEmote }) => void;
   /** The match was dealt: this socket now holds the seat, as after `room:join`. */
   'match:found': (session: SessionInfo) => void;
   /** The search ended without a table (only when the server shuts down). */

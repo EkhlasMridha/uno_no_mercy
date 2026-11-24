@@ -68,6 +68,7 @@ const DEFAULT_SOUND: SoundPrefs = {
   hammer: true,
   knockout: true,
   win: true,
+  chatMessage: true,
   muted: false,
 };
 export function loadSoundPrefs(): SoundPrefs {

@@ -9,6 +9,7 @@ import {
   Layers2,
   Layers3,
   Megaphone,
+  MessageCircle,
   Play,
   Repeat,
   Shuffle,
@@ -110,6 +111,12 @@ const SOUNDS: { kind: SoundKind; label: string; description: string; Icon: Lucid
     label: 'Win',
     description: 'A fanfare for everyone when a player wins the round.',
     Icon: Trophy,
+  },
+  {
+    kind: 'chatMessage',
+    label: 'Chat message',
+    description: 'A soft blip when someone else sends a message while you wait in the lobby.',
+    Icon: MessageCircle,
   },
 ];
 

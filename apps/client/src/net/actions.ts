@@ -1,4 +1,11 @@
-import type { Ack, CardColor, CommandResult, Gender, ReactionEmoji } from '@nomercy/shared';
+import type {
+  Ack,
+  CardColor,
+  CommandResult,
+  Gender,
+  MatchEmote,
+  ReactionEmoji,
+} from '@nomercy/shared';
 import { randomPlayerName } from '../lib/random-name';
 import { getState, pushNotice, setState } from '../state/store';
 import { adoptSession, forgetSession, request, searchState } from './socket';
@@ -84,7 +91,13 @@ export const transferHost = async (playerId: string) =>
 /** Starts searching for a global match. The search screen opens once the server has seated you. */
 export async function searchMatch(name: string, gender: Gender) {
   const result = await request('match:search', { name, gender });
-  if (result.ok) setState({ search: searchState(result.data), globalProfile: { name, gender } });
+  if (result.ok) {
+    setState({
+      search: searchState(result.data),
+      searchEmotes: [],
+      globalProfile: { name, gender },
+    });
+  }
   return result;
 }
 
@@ -92,6 +105,11 @@ export async function searchMatch(name: string, gender: Gender) {
 export async function cancelSearch() {
   setState({ search: null });
   return report(await request('match:cancel', {}));
+}
+
+/** Sends an emote to everyone in your match. One sent too soon after the last is simply dropped. */
+export async function sendEmote(emote: MatchEmote) {
+  return request('match:emote', { emote });
 }
 
 /** After a global round: leave the table and search again under the same name and avatar set. */

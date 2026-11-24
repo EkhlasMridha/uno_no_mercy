@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { io as connect, type Socket } from 'socket.io-client';
 import {
   AVATAR_VARIANTS,
+  MATCH_EMOTE_COOLDOWN_MS,
   playerNameSchema,
   type Ack,
   type ClientToServerEvents,
@@ -45,6 +46,7 @@ function newManager(seed = 7, onRoomUpdated: (room: Room) => void = () => {}) {
 function newMatchmaker(manager = newManager()) {
   const ready: GlobalSeat[][] = [];
   const updates: number[] = [];
+  const emotes: { seatId: string; emote: string }[] = [];
   const matchmaker = new Matchmaker({
     rng: seededRng(11),
     searchMs: SEARCH_MS,
@@ -52,12 +54,19 @@ function newMatchmaker(manager = newManager()) {
     foundPauseMs: PAUSE_MS,
     computerSeats: (count, seated) => manager.globalComputerSeats(count, seated),
     onMatchUpdated: (match) => updates.push(match.seats.length),
+    onEmote: (_match, seatId, emote) => emotes.push({ seatId, emote }),
     onMatchReady: (seats) => ready.push(seats),
   });
-  return { matchmaker, ready, updates };
+  return { matchmaker, ready, updates, emotes };
 }
 
 const people = (seats: readonly GlobalSeat[]) => seats.filter((s) => s.socketId !== null);
+
+/** Runs the clock until the first computer has taken a seat, before the match is full. */
+function untilAComputerSits(match: { seats: GlobalSeat[]; found: boolean }) {
+  while (match.seats.every((s) => s.socketId !== null)) vi.advanceTimersByTime(100);
+  expect(match.found).toBe(false);
+}
 
 describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
   beforeEach(() => {
@@ -138,8 +147,8 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
 
   it('closes a match whose people have all left, computers and all', () => {
     const { matchmaker, ready } = newMatchmaker();
-    matchmaker.search('s1', 'Solo', 'male');
-    vi.advanceTimersByTime(SEARCH_MS - 5_000);
+    const { match } = matchmaker.search('s1', 'Solo', 'male');
+    untilAComputerSits(match);
     expect(matchmaker.cancel('s1')).toBe(true);
     vi.advanceTimersByTime(SEARCH_MS);
     expect(ready).toHaveLength(0);
@@ -158,6 +167,41 @@ describe('Play global matchmaking (docs/RULES.md §5.19)', () => {
     ['t0', 't1', 't2', 't3'].forEach((id) => matchmaker.cancel(id));
     vi.advanceTimersByTime(PAUSE_MS);
     expect(ready).toHaveLength(1);
+  });
+
+  it('passes emotes to the match, drops ones quicker than the cooldown, and refuses non-searchers', () => {
+    const { matchmaker, emotes } = newMatchmaker();
+    const { seat } = matchmaker.search('s1', 'Ana', 'female');
+    expect(matchmaker.emote('s1', '👋')).toBe(true);
+    expect(matchmaker.emote('s1', '🔥')).toBe(false);
+    vi.advanceTimersByTime(MATCH_EMOTE_COOLDOWN_MS);
+    expect(matchmaker.emote('s1', '🔥')).toBe(true);
+    expect(emotes).toEqual([
+      { seatId: seat.id, emote: '👋' },
+      { seatId: seat.id, emote: '🔥' },
+    ]);
+    expect(() => matchmaker.emote('nobody', '👋')).toThrow(RoomError);
+  });
+
+  it('has computers greet and answer emotes like people, and stop once the match is dealt', () => {
+    const { matchmaker, emotes, ready } = newMatchmaker();
+    const { match, seat } = matchmaker.search('s1', 'Solo', 'male');
+    // Wait until computers have arrived, then keep emoting: some of them answer, a moment later.
+    untilAComputerSits(match);
+    for (let i = 0; i < 6 && !match.found; i++) {
+      matchmaker.emote('s1', '😂');
+      vi.advanceTimersByTime(MATCH_EMOTE_COOLDOWN_MS);
+    }
+    const computers = new Set(match.seats.filter((s) => s.socketId === null).map((s) => s.id));
+    const fromComputers = emotes.filter((e) => e.seatId !== seat.id);
+    expect(fromComputers.length).toBeGreaterThan(0);
+    expect(fromComputers.every((e) => computers.has(e.seatId))).toBe(true);
+    vi.advanceTimersByTime(SEARCH_MS + PAUSE_MS);
+    expect(ready).toHaveLength(1);
+    // Nothing more arrives from a match that has been dealt.
+    const count = emotes.length;
+    vi.advanceTimersByTime(10_000);
+    expect(emotes).toHaveLength(count);
   });
 
   it('keeps two people with the same name apart, and refuses a second search', () => {
@@ -350,6 +394,8 @@ describe('Play global over Socket.IO', () => {
     };
     const search: MatchSearchView[] = [];
     let found: SessionInfo | null = null;
+    const emotes: { seatId: string; emote: string }[] = [];
+    socket.on('match:emote', (e) => emotes.push(e));
     socket.on('match:state', (v) => {
       search.push(v);
       seen.raw.push(JSON.stringify(v));
@@ -370,7 +416,7 @@ describe('Play global over Socket.IO', () => {
         event,
         payload,
       );
-    return { socket, seen, search, emit, found: () => found };
+    return { socket, seen, search, emotes, emit, found: () => found };
   }
 
   const until = async (check: () => boolean) => {
@@ -411,6 +457,25 @@ describe('Play global over Socket.IO', () => {
     // The seat is bound to the socket like a joined room.
     const state = await a.emit('game:request-state', {});
     expect(state.ok).toBe(true);
+  });
+
+  it('relays a validated emote to everyone in the match', async () => {
+    const d = await client();
+    const e = await client();
+    const searched = await d.emit<MatchSearchView>('match:search', {
+      name: 'Di',
+      gender: 'female',
+    });
+    await e.emit('match:search', { name: 'Ed', gender: 'male' });
+    expect(await d.emit('match:emote', { emote: '💣' })).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_PAYLOAD' },
+    });
+    expect(await d.emit('match:emote', { emote: '🍀' })).toMatchObject({ ok: true });
+    const meId = searched.ok ? searched.data.meId : '';
+    await until(() => e.emotes.some((x) => x.seatId === meId && x.emote === '🍀'));
+    expect(d.emotes.some((x) => x.seatId === meId)).toBe(true);
+    await until(() => d.found() !== null);
   });
 
   it('stops a search when the searcher cancels or disconnects', async () => {

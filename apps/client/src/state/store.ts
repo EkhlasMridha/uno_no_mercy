@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   GameStateView,
   Gender,
+  MatchEmote,
   MatchSearchView,
   RoomView,
   SessionInfo,
@@ -24,11 +25,22 @@ export interface SearchState {
   endsAt: number;
 }
 
+/** One emote sent in the searcher's match. `id` only grows, so a repeat restarts its bubble. */
+export interface SearchEmote {
+  id: number;
+  seatId: string;
+  emote: MatchEmote;
+  /** When it arrived, on this device's clock. */
+  at: number;
+}
+
 export interface AppState {
   connection: ConnectionStatus;
   session: SessionInfo | null;
   /** Searching for a Play global match (docs/RULES.md §5.19). Null when not searching. */
   search: SearchState | null;
+  /** Recent emotes in the match being searched, newest last. Cleared when a search starts. */
+  searchEmotes: SearchEmote[];
   /** The name and avatar set of the last Play global search, kept for this page only for Play again. */
   globalProfile: { name: string; gender: Gender } | null;
   room: RoomView | null;
@@ -49,6 +61,7 @@ let state: AppState = {
   connection: 'connecting',
   session: null,
   search: null,
+  searchEmotes: [],
   globalProfile: null,
   room: null,
   game: null,

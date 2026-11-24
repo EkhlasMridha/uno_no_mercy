@@ -20,7 +20,8 @@ export type SoundKind =
   | 'penalty'
   | 'hammer'
   | 'knockout'
-  | 'win';
+  | 'win'
+  | 'chatMessage';
 
 /** Which sounds the player has switched on, and whether all of them are muted. */
 export type SoundPrefs = Record<SoundKind, boolean> & { muted: boolean };
@@ -420,6 +421,13 @@ const SOUNDS: Record<
     for (let i = 0; i < 6; i++) {
       tone(ac, ac.destination, 'sine', at + 0.6 + i * 0.13, 0.2, 0.05, 2000 + Math.random() * 2000);
     }
+  },
+  // A new lobby chat message: a soft two-note bubble "blip", G5 up to D6, short and quiet so a busy
+  // chat never drowns the room.
+  chatMessage(ac, at) {
+    const out = ac.destination;
+    tone(ac, out, 'sine', at, 0.09, 0.16, 784, 880);
+    tone(ac, out, 'sine', at + 0.08, 0.18, 0.15, 1174.7, 1250);
   },
 };
 

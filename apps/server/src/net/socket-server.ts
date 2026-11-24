@@ -105,6 +105,11 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
           io.to(seat.socketId).emit('match:state', matchmaker.viewFor(match, seat.id));
       }
     },
+    onEmote: (match, seatId, emote) => {
+      for (const seat of match.seats) {
+        if (seat.socketId) io.to(seat.socketId).emit('match:emote', { seatId, emote });
+      }
+    },
     onMatchReady: (seats) => {
       const people = seats.filter((s) => s.socketId !== null);
       try {

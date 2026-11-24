@@ -24,10 +24,15 @@ Home ──create──► Lobby (host) ◄──join (code)── Home (others)
 
 - **Play global** (docs/RULES.md §5.19): the button opens a popup for a name (the one this browser
   last used, if any) and an avatar set; both are required. **Find a match** starts the search and
-  opens the search screen (`GlobalSearchPage.tsx`): an oval table with the countdown on the felt and a
-  seat for each player found, your own at the bottom, the empty ones marked "Searching…". Each
-  arrival fills a seat with that player's face and name. Once every seat is taken the screen says
-  "Match found!" and the table is dealt a moment later. **Cancel** goes back home. A global table
+  opens the search screen (`GlobalSearchPage.tsx`): an oval table with the countdown on the felt,
+  inside a gold ring that empties as time runs out, and a seat for each player found, your own at the
+  bottom, the empty ones marked "Open seat". Each arrival fills a seat with that player's face and
+  name. Under the table an emote bar sends 👋 😂 🔥 😎 😬 🍀 to everyone in the match; each pops up
+  over the sender's seat. Beside it (below on phones) is **Color snap** (`ColorSnap.tsx`): tap the
+  color of each card before its bar runs out, let wild draw cards pass, and each snap speeds the next
+  card up. It keeps your streak and best for this search, and is only a pastime: nothing is sent.
+  A rules tip changes every few seconds under it. Once every seat is taken the screen says
+  "Match found!", the game and emotes stop, and the table is dealt a moment later. **Cancel** goes back home. A global table
   shows "Global match" instead of a room code, plays one round, and its results offer **Play again**
   (a new search under the same name and avatar set) and **Home**.
 - **Group chat** is open to everyone seated in the room, in the lobby and during a game, and never

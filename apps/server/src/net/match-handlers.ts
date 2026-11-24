@@ -1,4 +1,4 @@
-import { searchMatchSchema } from '@nomercy/shared';
+import { matchEmoteSchema, searchMatchSchema } from '@nomercy/shared';
 import { z } from 'zod';
 import { RoomError } from '../rooms/room-manager.js';
 import { registerHandler } from './handler-utils.js';
@@ -20,6 +20,11 @@ export function registerMatchHandlers(deps: HandlerDeps): void {
 
   registerHandler(socket, limiter, 'match:cancel', emptySchema, () => {
     matchmaker.cancel(socket.id);
+    return { ok: true, data: null };
+  });
+
+  registerHandler(socket, limiter, 'match:emote', matchEmoteSchema, ({ emote }) => {
+    matchmaker.emote(socket.id, emote);
     return { ok: true, data: null };
   });
 }

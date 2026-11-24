@@ -7,6 +7,7 @@ import {
   type ServerToClientEvents,
   type SessionInfo,
 } from '@nomercy/shared';
+import { playSound } from '../lib/sound';
 import { getState, pushNotice, setState } from '../state/store';
 import { clearSession, loadSession, saveSession } from './session-storage';
 
@@ -106,19 +107,31 @@ export function startConnection(): void {
   });
   socket.on('game:state', (game) => setState({ game }));
   socket.on('chat:history', (chat) => setState({ chat }));
-  socket.on('chat:message', (message) =>
-    setState((s) =>
-      s.chat.some((m) => m.id >= message.id)
-        ? {}
-        : { chat: [...s.chat, message].slice(-CHAT_HISTORY_LIMIT) },
-    ),
-  );
+  socket.on('chat:message', (message) => {
+    const s = getState();
+    if (s.chat.some((m) => m.id >= message.id)) return;
+    setState({ chat: [...s.chat, message].slice(-CHAT_HISTORY_LIMIT) });
+    // Waiting in the lobby, a blip says someone wrote; your own lines stay quiet.
+    const fromOther = message.senderId !== s.session?.playerId;
+    if (fromOther && s.room?.status === 'lobby' && !s.sound.muted && s.sound.chatMessage) {
+      playSound('chatMessage');
+    }
+  });
   socket.on('chat:update', (message) =>
     setState((s) => ({ chat: s.chat.map((m) => (m.id === message.id ? message : m)) })),
   );
   socket.on('room:closed', ({ reason }) => forgetSession(reason));
   socket.on('match:state', (view) => {
     if (getState().search) setState({ search: searchState(view) });
+  });
+  socket.on('match:emote', ({ seatId, emote }) => {
+    setState((s) => {
+      if (!s.search) return {};
+      const id = (s.searchEmotes.at(-1)?.id ?? 0) + 1;
+      return {
+        searchEmotes: [...s.searchEmotes, { id, seatId, emote, at: Date.now() }].slice(-24),
+      };
+    });
   });
   socket.on('match:found', (session) => {
     adoptSession(session);

@@ -4,6 +4,7 @@ import {
   CHAT_MESSAGE_MAX_LENGTH,
   MAX_COMPUTERS,
   MAX_PLAYERS,
+  MATCH_EMOTES,
   REACTION_EMOJIS,
   MIN_PLAYERS,
   PLAYER_NAME_MAX_LENGTH,
@@ -54,6 +55,8 @@ export const reconnectSchema = z
 export const searchMatchSchema = z
   .object({ name: playerNameSchema, gender: genderSchema })
   .strict();
+/** Play global: an emote to everyone in your match while you wait (docs/RULES.md §5.19). */
+export const matchEmoteSchema = z.object({ emote: z.enum(MATCH_EMOTES) }).strict();
 /** A lobby player changing their own name or avatar set. */
 export const profileSchema = z
   .object({ name: playerNameSchema.optional(), gender: genderSchema.optional() })
@@ -133,6 +136,7 @@ export const endHandShareSchema = z.object({ viewerId: playerIdSchema.optional()
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
 export type SearchMatchPayload = z.input<typeof searchMatchSchema>;
+export type MatchEmotePayload = z.input<typeof matchEmoteSchema>;
 export type ReconnectPayload = z.input<typeof reconnectSchema>;
 export type ProfilePayload = z.input<typeof profileSchema>;
 export type KickPayload = z.input<typeof kickSchema>;
