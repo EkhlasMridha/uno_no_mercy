@@ -215,6 +215,9 @@ Differences from the suggested list: the wild color and the 7 swap target travel
   root-relative URLs. The server makes `og:url`, `og:image` and `twitter:image` absolute for the origin of
   each request (the host is already checked; HTTPS only via a trusted `X-Forwarded-Proto`), because most
   crawlers ignore relative image URLs. The share image and icons are drawn from `apps/client/branding/`.
+- **Search engines** (`http/app.ts`): `/robots.txt` and `/sitemap.xml` are generated for the request's
+  origin and list only `/`, the one page. Any other path still opens the game but answers `404` with
+  `X-Robots-Tag: noindex`, so crawlers don't index copies of the home page.
 - **Who may connect** (`http/request-guard.ts`): the `Host` header must be an IP address, `localhost`, this
   machine's name or a name in `ALLOWED_HOSTS`; anything else gets `421`, which defeats DNS-rebinding pages.
   The Socket.IO handshake also requires a same-origin `Origin` (WebSockets skip CORS, so without it any

@@ -6,6 +6,9 @@ import { createRequestGuard, type RequestGuardOptions } from './request-guard.js
 /** The link-preview image named by og:image and twitter:image in the client's index.html. */
 const SHARE_IMAGE_PATH = '/social-card.jpg';
 
+const escapeXml = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 function httpStatusOf(error: unknown): number {
   const status =
     typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
@@ -49,6 +52,23 @@ export function createHttpApp(
     res.json({ ok: true });
   });
 
+  // Search engines read these two; without them the catch-all below answered with the game page.
+  app.get('/robots.txt', (req, res) => {
+    res
+      .type('text/plain')
+      .send(`User-agent: *\nAllow: /\n\nSitemap: ${guard.publicOrigin(req)}/sitemap.xml\n`);
+  });
+  app.get('/sitemap.xml', (req, res) => {
+    res
+      .type('application/xml')
+      .send(
+        '<?xml version="1.0" encoding="UTF-8"?>\n' +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+          `  <url><loc>${escapeXml(guard.publicOrigin(req))}/</loc></url>\n` +
+          '</urlset>\n',
+      );
+  });
+
   if (clientDist) {
     const indexPage = createIndexPage(clientDist);
     const sendIndex: RequestHandler = (req, res) => {
@@ -67,7 +87,13 @@ export function createHttpApp(
       next();
     });
     app.use(express.static(clientDist, { index: false, maxAge: 0 }));
-    app.get('*', sendIndex);
+    app.get('/', sendIndex);
+    // The game lives at "/" (invites add ?join=CODE). Any other path still opens the game for a
+    // person, but answers 404 so search engines don't index endless copies of the home page.
+    app.get('*', (req, res, next) => {
+      res.status(404).setHeader('X-Robots-Tag', 'noindex');
+      sendIndex(req, res, next);
+    });
   } else {
     app.get('/', (_req, res) => {
       res

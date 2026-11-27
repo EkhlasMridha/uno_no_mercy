@@ -689,10 +689,30 @@ describe('network guard', () => {
     const host = new URL(guardedUrl).host;
     for (const pathname of ['/', '/index.html', '/room/ABCD']) {
       const page = await get(pathname, host);
-      expect(page.status).toBe(200);
+      expect(page.status).toBe(pathname === '/room/ABCD' ? 404 : 200);
       expect(page.body).toContain(`content="http://${host}/social-card.jpg"`);
       expect(page.body).toContain(`content="http://${host}/"`);
     }
+  });
+
+  it('gives search engines a robots file, a sitemap and a 404 for unknown paths', async () => {
+    const host = new URL(guardedUrl).host;
+    const robots = await get('/robots.txt', host);
+    expect(robots.status).toBe(200);
+    expect(robots.headers['content-type']).toContain('text/plain');
+    expect(robots.body).toContain(`Sitemap: http://${host}/sitemap.xml`);
+
+    const sitemap = await get('/sitemap.xml', host);
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.headers['content-type']).toContain('application/xml');
+    expect(sitemap.body).toContain(`<loc>http://${host}/</loc>`);
+
+    const home = await get('/', host);
+    expect(home.headers['x-robots-tag']).toBeUndefined();
+    const unknown = await get('/no-such-page', host);
+    expect(unknown.status).toBe(404);
+    expect(unknown.headers['x-robots-tag']).toBe('noindex');
+    expect(unknown.body).toContain('<title>');
   });
 
   it('lets other sites embed the share image but nothing else', async () => {
