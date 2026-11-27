@@ -640,9 +640,12 @@ describe('network guard', () => {
     siteDir = mkdtempSync(path.join(tmpdir(), 'nomercy-site-'));
     writeFileSync(
       path.join(siteDir, 'index.html'),
-      '<!doctype html><title>t</title>' +
+      '<!doctype html><html lang="en"><head><title>t</title>' +
+        '<meta name="robots" content="index, follow" />' +
+        '<link rel="canonical" href="https://game.example/" />' +
         '<meta property="og:image" content="/social-card.jpg" />' +
-        '<meta property="og:url" content="/" />',
+        '<meta property="og:url" content="/" /></head>' +
+        '<body><div id="root"><main><h1>Game</h1></main></div></body></html>',
     );
     writeFileSync(path.join(siteDir, 'social-card.jpg'), 'jpeg');
     guarded = createServer(createHttpApp(siteDir));
@@ -695,7 +698,7 @@ describe('network guard', () => {
     }
   });
 
-  it('gives search engines a robots file, a sitemap and a 404 for unknown paths', async () => {
+  it('gives search engines a robots file, a sitemap and a 404 page for unknown paths', async () => {
     const host = new URL(guardedUrl).host;
     const robots = await get('/robots.txt', host);
     expect(robots.status).toBe(200);
@@ -709,10 +712,18 @@ describe('network guard', () => {
 
     const home = await get('/', host);
     expect(home.headers['x-robots-tag']).toBeUndefined();
+    expect(home.body).not.toContain('not-found');
+    expect(home.body).toContain('rel="canonical"');
+
     const unknown = await get('/no-such-page', host);
     expect(unknown.status).toBe(404);
     expect(unknown.headers['x-robots-tag']).toBe('noindex');
-    expect(unknown.body).toContain('<title>');
+    expect(unknown.body).toContain('<html lang="en" data-page="not-found">');
+    expect(unknown.body).toContain('<title>Page not found - UNO No Mercy</title>');
+    expect(unknown.body).toContain('<meta name="robots" content="noindex" />');
+    expect(unknown.body).not.toContain('rel="canonical"');
+    expect(unknown.body).toContain('<h1>Page not found</h1>');
+    expect(unknown.body).not.toContain('<h1>Game</h1>');
   });
 
   it('lets other sites embed the share image but nothing else', async () => {

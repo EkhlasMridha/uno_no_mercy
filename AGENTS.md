@@ -277,6 +277,36 @@ Text in the game should help the player act. Use plain verbs and sentence case, 
 happens: "Draw", "Take +6", "Play it or keep drawing". When something is refused, say why and what to do
 instead. Keep names consistent from button to log line: a "Draw" button produces "drew" in the log.
 
+## Search engines (SEO)
+
+The public site (`https://nomercy.shimoolz.com/`) is one page, `/`. Google once refused to index it
+because `/robots.txt`, `/sitemap.xml` and every unknown path returned the game page with a 200. Keep
+these in place:
+
+- **Robots and sitemap are served by the server** (`apps/server/src/http/app.ts`), built for the
+  request's origin through `guard.publicOrigin`, so LAN hosts and the public domain each get their own
+  URLs. Don't add static `robots.txt` or `sitemap.xml` files to `apps/client/public` (they would hardcode
+  one domain). Both routes must stay above the static handler and the catch-all.
+- **Only real pages answer 200.** `/` is the game, and invites are `/?join=CODE`. Every other path
+  answers `404` with `X-Robots-Tag: noindex` and the 404 page: `index-page.ts` marks the HTML with
+  `data-page="not-found"`, a `noindex` robots meta, its own title and no canonical, and `main.tsx` then
+  renders `NotFoundPage.tsx` instead of the app (no socket connection). If you add a real page
+  (a rules or card guide, say), give it its own route returning 200, add its URL to the sitemap and
+  extend the test, or Google will treat it as a 404.
+- **The head of `apps/client/index.html`** carries the title, description, `robots` meta, canonical,
+  Open Graph and Twitter tags and the JSON-LD (`VideoGame`, `FAQPage`). Keep the canonical on `/`, keep
+  the `FAQPage` answers in step with `FAQ` in `HomePage.tsx`, and never add `noindex` to the page itself.
+- **Crawlers that don't run scripts read the summary inside `#root`** in `index.html` (an `h1`, a short
+  description, how to play). Keep it as real, accurate text. React replaces it on the first render.
+- **Tests:** `multiplayer.test.ts` (the "network guard" block) checks that robots and the sitemap
+  return the right content types and URLs, and that unknown paths return a 404 with `noindex`. Keep it
+  passing.
+- **Production runs the built server.** A change here reaches Google only after the server is
+  rebuilt and restarted (`docker compose up -d --build`). Afterwards, `curl` `/robots.txt`,
+  `/sitemap.xml` and a made-up path to confirm you get plain text, XML and a 404.
+- Behind nginx, forward `X-Forwarded-Host` and `X-Forwarded-Proto` and set `TRUST_PROXY`, or the
+  sitemap and share links will name `http://localhost`.
+
 ## Definition of done
 
 - [ ] `docs/RULES.md` describes the behaviour, including edge cases.
