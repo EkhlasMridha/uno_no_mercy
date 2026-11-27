@@ -88,11 +88,12 @@ export function createHttpApp(
     });
     app.use(express.static(clientDist, { index: false, maxAge: 0 }));
     app.get('/', sendIndex);
-    // The game lives at "/" (invites add ?join=CODE). Any other path still opens the game for a
-    // person, but answers 404 so search engines don't index endless copies of the home page.
-    app.get('*', (req, res, next) => {
+    // The game lives at "/" (invites add ?join=CODE). Any other path gets the 404 page, so search
+    // engines don't index copies of the home page.
+    app.get('*', (req, res) => {
       res.status(404).setHeader('X-Robots-Tag', 'noindex');
-      sendIndex(req, res, next);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('html').send(indexPage(guard.publicOrigin(req), 'notFound'));
     });
   } else {
     app.get('/', (_req, res) => {
